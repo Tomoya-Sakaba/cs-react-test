@@ -1,18 +1,25 @@
-﻿using System;
+﻿using backend.Services;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Web;
-using System.Web.Mvc;
+using System.Web.Http;
+using System.Web.Http.Results;
 
 namespace backend.Controllers
 {
-    public class HomeController : Controller
+    [RoutePrefix("api/test")]
+    public class HomeController : ApiController
     {
-        public ActionResult Index()
-        {
-            ViewBag.Title = "Home Page";
+        private readonly TestService _testService = new TestService();
 
-            return View();
+        [HttpGet]
+        [Route("")]
+        public IHttpActionResult GetTestData()
+        {
+            var data = _testService.GetTestData();
+
+            return Ok(data);
         }
     }
 }

@@ -2,7 +2,7 @@
 
 namespace test.Controllers
 {
-    [RoutePrefix("api/test")]
+    [RoutePrefix("api/hello")]
 
     public class HelloController : ApiController
     {
