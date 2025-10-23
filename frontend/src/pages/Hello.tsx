@@ -18,8 +18,8 @@ const Hello = () => {
   }
 
   const handleTest = async() => {
-    await axios.get("/api/test").then((res) => {
-      console.log(res.data.message);
+    await axios.get("/api/users").then((res) => {
+      console.log(res.data);
     })
   }
 
