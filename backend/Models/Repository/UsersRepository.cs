@@ -53,5 +53,34 @@ namespace backend.Models.Repository
             }
             return list;
         }
+
+        public List<UsersEntity> GetUser(int userId)
+        {
+            var list = new List<UsersEntity>();
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = "SELECT Id, Name, Password, Created_At, Updated_At FROM dbo.Users WHERE ID = @userId";
+                using (SqlCommand cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new UsersEntity
+                            {
+                                Id = (int)reader["Id"],
+                                Name = (string)reader["Name"],
+                                Password = (string)reader["Password"],
+                                CreatedAt = (DateTime)reader["Created_At"],
+                                UpdatedAt = (DateTime)reader["Updated_At"]
+                            });
+                        }
+                    }
+                }
+            }
+            return list;
+        }
     }
 }

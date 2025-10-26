@@ -4,6 +4,8 @@ using backend.Models.DTOs;
 using System;
 using System.Linq;
 using System.Web.Http;
+using System.Text;
+using System.Diagnostics;
 
 namespace backend.Controllers
 {
@@ -15,6 +17,7 @@ namespace backend.Controllers
         [Route("api/users")]
         public IHttpActionResult CreateUser([FromBody] CreateUserRequest request)
         {
+            // パスワードをハッシュ化
             string hash = HashPassword(request.password);
 
             var user = new UsersEntity
@@ -27,6 +30,7 @@ namespace backend.Controllers
             return Ok();
         }
 
+        // ユーザー一覧取得API
         [HttpGet]
         [Route("api/users")]
         public IHttpActionResult GetUsers()
@@ -36,17 +40,36 @@ namespace backend.Controllers
             {
                 Id = e.Id,
                 Name = e.Name,
-                CreatedAt = e.CreatedAt
+                CreatedAt = e.CreatedAt,
+                UpdatedAt = e.UpdatedAt
             }).ToList();
 
             return Ok(users);
         }
 
+        // ユーザーを一件取得API
+        [HttpGet]
+        [Route("api/users/{userId}")]
+        public IHttpActionResult GetUser(int userId)
+        {
+            var entities = _UserRepository.GetUser(userId);
+            var users = entities.Select(e => new UserResponse
+            {
+                Id = e.Id,
+                Name = e.Name,
+                CreatedAt = e.CreatedAt,
+                UpdatedAt = e.UpdatedAt
+            }).ToList();
+
+            return Ok(users);
+        }
+
+        // パスワードをハッシュ化する関数
         private string HashPassword(string password)
         {
             using (var sha = System.Security.Cryptography.SHA256.Create())
             {
-                var bytes = System.Text.Encoding.UTF8.GetBytes(password);
+                var bytes = Encoding.UTF8.GetBytes(password);
                 var hashBytes = sha.ComputeHash(bytes);
                 return BitConverter.ToString(hashBytes).Replace("-", "");
             }
