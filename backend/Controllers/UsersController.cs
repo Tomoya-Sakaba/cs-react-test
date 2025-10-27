@@ -17,17 +17,25 @@ namespace backend.Controllers
         [Route("api/users")]
         public IHttpActionResult CreateUser([FromBody] CreateUserRequest request)
         {
-            // パスワードをハッシュ化
-            string hash = HashPassword(request.password);
-
-            var user = new UsersEntity
+            try
             {
-                Name = request.name,
-                Password = hash
-            };
 
-            _UserRepository.AddUser(user);
-            return Ok();
+                // パスワードをハッシュ化
+                string hash = HashPassword(request.password);
+
+                var user = new UsersEntity
+                {
+                    Name = request.name,
+                    Password = hash
+                };
+
+                int newUserId = _UserRepository.AddUser(user);
+                return Ok(new { id = newUserId });
+            }
+            catch (Exception ex)
+            {
+                return InternalServerError(ex);
+            }
         }
 
         // ユーザー一覧取得API
@@ -62,6 +70,29 @@ namespace backend.Controllers
             }).ToList();
 
             return Ok(users);
+        }
+
+        // ユーザーを更新
+        [HttpPut]
+        [Route("api/users/{userId}")]
+        public IHttpActionResult UpdateUser(int userId, [FromBody] UpdateUserRepuest request)
+        {
+            try
+            {
+
+                var user = new UsersEntity
+                {
+                    Id = userId,
+                    Name = request.name,
+                };
+
+                _UserRepository.UpdateUser(user);
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                return InternalServerError(ex);
+            }
         }
 
         // パスワードをハッシュ化する関数

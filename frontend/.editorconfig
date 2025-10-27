@@ -1,0 +1,44 @@
+# top-most EditorConfig file
+root = true
+
+# --- 共通設定 ---
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# --- Markdown / JSON / YAML は特別扱い ---
+[*.{md,json,yml,yaml}]
+indent_size = 2
+trim_trailing_whitespace = false
+
+# --- C#（VSで使う場合） ---
+[*.cs]
+indent_size = 4
+charset = utf-8-bom
+dotnet_sort_system_directives_first = true
+insert_final_newline = true
+
+# --- JavaScript / TypeScript / React (TSX, JSX) ---
+[*.{js,jsx,ts,tsx}]
+indent_size = 2
+quote_type = single
+insert_final_newline = true
+trim_trailing_whitespace = true
+curly_bracket_next_line = false
+space_before_function_parentheses = false
+semi = true
+tab_width = 2
+
+# --- JSONファイル ---
+[*.json]
+indent_style = space
+indent_size = 2
+
+# --- CSS / SCSS ---
+[*.{css,scss}]
+indent_size = 2
+insert_final_newline = true

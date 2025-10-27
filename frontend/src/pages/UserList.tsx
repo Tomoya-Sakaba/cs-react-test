@@ -1,4 +1,4 @@
-﻿import axios from "axios";
+import axios from "axios";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -31,7 +31,13 @@ const UserList = () => {
   return (
     <>
       <div className="mx-8 h-full">
-        <h1 className="mb-10 text-2xl font-bold">ユーザー一覧</h1>
+        <h1 className="mb-5 text-2xl font-bold">ユーザー一覧</h1>
+
+        <Link to={"new"} >
+          <div className="mb-5 w-32 cursor-pointer rounded-xl bg-blue-500 p-2 text-center text-white">
+          ユーザー新規作成
+          </div>
+        </Link>
 
         <div className="w-1/2">
           {Array.isArray(users) && users.map((item, index) => (

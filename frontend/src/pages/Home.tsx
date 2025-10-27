@@ -1,4 +1,4 @@
-﻿import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 
 const Home = () => {
@@ -13,6 +13,7 @@ const Home = () => {
           <Button onClick={() => navigate("/hello")}>hello</Button>
           <Button onClick={() => navigate("/user/create")}>ユーザー作成</Button>
           <Button onClick={() => navigate("/user/list")}>ユーザーリスト</Button>
+          <Button onClick={() => navigate("/attendance")}>勤怠管理</Button>
         </div>
       </div>
     </>

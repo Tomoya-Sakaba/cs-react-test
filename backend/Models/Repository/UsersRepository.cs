@@ -13,17 +13,23 @@ namespace backend.Models.Repository
     {
         private readonly string connectionString = ConfigurationManager.ConnectionStrings["MyDbConnection"].ConnectionString;
         // GET: UsersRepository
-        public void AddUser(UsersEntity user)
+        public int AddUser(UsersEntity user)
         {
             using (SqlConnection conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "INSERT INTO dbo.Users (Name, Password) VALUES (@Name, @Password)";
+                string sql = @"
+                    INSERT INTO dbo.Users (Name, Password)
+                    VALUES (@Name, @Password)
+                    SELECT CAST(SCOPE_IDENTITY() AS int);
+                ";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@Name", user.Name);
                     cmd.Parameters.AddWithValue("@Password", user.Password);
-                    cmd.ExecuteNonQuery();
+                    int newId = (int)cmd.ExecuteScalar();
+
+                    return newId;
                 }
             }
         }
@@ -81,6 +87,25 @@ namespace backend.Models.Repository
                 }
             }
             return list;
+        }
+
+        public void UpdateUser(UsersEntity user)
+        {
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = @"
+                    UPDATE dbo.Users
+                    SET Name = @Name, Updated_At = GETDATE()
+                    WHERE id = @Id
+                ";
+                using (SqlCommand cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@Name", user.Name);
+                    cmd.Parameters.AddWithValue("@Id", user.Id);
+                    cmd.ExecuteNonQuery();
+                }
+            }
         }
     }
 }

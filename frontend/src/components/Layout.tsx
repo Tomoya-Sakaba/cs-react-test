@@ -1,21 +1,22 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
 
 const Layout = () => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
     <div className="h-screen overflow-hidden">
-      {/* ƒwƒbƒ_[ - Š®‘SŒÅ’è */}
-      {/*<div className="fixed top-0 left-0 right-0 z-50">*/}
+      {/* ãƒ˜ãƒƒãƒ€ãƒ¼ - å®Œå…¨å›ºå®š */}
+      {/*<div className="fixed left-0 right-0 top-0 z-50">*/}
       {/*  <Header />*/}
       {/*</div>*/}
 
-      {/* ƒTƒCƒhƒo[‚ÆƒRƒ“ƒeƒ“ƒc - ƒwƒbƒ_[‰º‚É”z’u */}
-      <div className="flex pt-14 h-full">
-        {/*<div className="fixed left-0 top-14 bottom-0 z-40">*/}
-        {/*  <Sidebar isHovered={isHovered} setIsHovered={setIsHovered} />*/}
-        {/*</div>*/}
+      {/* ã‚µã‚¤ãƒ‰ãƒãƒ¼ã¨ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ - ãƒ˜ãƒƒãƒ€ãƒ¼ä¸‹ã«é…ç½® */}
+      <div className="flex h-full pt-14">
+        <div className="fixed bottom-0 left-0 top-14 z-40">
+          <Sidebar isHovered={isHovered} setIsHovered={setIsHovered} />
+        </div>
         <main
           className={`flex-1 overflow-auto transition-all duration-300  ${isHovered ? "ml-48" : "ml-16"
             }`}
