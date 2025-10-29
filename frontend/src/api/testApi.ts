@@ -1,4 +1,5 @@
-import type { fetchTestType } from "../pages/AgTest";
+import axios from "axios";
+import type { fetchTestType, PlanType } from "../pages/AgTest";
 
 
 export const testApi = {
@@ -65,5 +66,14 @@ export const testApi = {
         note: "",
       },
     ];
+  },
+
+  async fetchPlanData(): Promise<PlanType[]> {
+    const res = await axios.get<PlanType[]>("/api/plan", {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    return res.data;
   },
 };

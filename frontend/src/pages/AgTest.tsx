@@ -7,7 +7,7 @@ import TestPdf from '../components/TestPdf';
 import PdfPreview from '../components/PdfPreview';
 import { useEffect, useState } from 'react';
 import { testApi } from '../api/testApi';
-import { convertBackToFetchTestType, convertTestData } from '../utils/convertData';
+import {  convertTestData } from '../utils/convertData';
 import YearMonthFilter from '../components/YearMonthFilter';
 import { useYearMonthParams } from '../hooks/useYearMonthParams';
 import { mapMonthlyTestData } from '../utils/mappingData';
@@ -38,6 +38,12 @@ export type testType = {
   contentB: testItem,
   contentC: testItem,
   contentD: testItem,
+  note: string
+}
+
+export type PlanType = {
+  date: string,
+  contentType: Record<string, testItem>[],
   note: string
 }
 
@@ -308,9 +314,9 @@ const AgTest = () => {
 
         const mapData = mapMonthlyTestData(convertData, currentYear, currentIndexMonth)
 
-        console.log("fetchデータ", res);
-        console.log("convartデータ", convertData);
-        console.log("mappingデータ", mapData);
+        //console.log("fetchデータ", res);
+        //console.log("convartデータ", convertData);
+        //console.log("mappingデータ", mapData);
         setRowData(mapData);
         setAgRowData(JSON.parse(JSON.stringify(mapData)));
 
@@ -320,6 +326,14 @@ const AgTest = () => {
     }
     fetchData();
   }, [currentYear, currentIndexMonth])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const res = await testApi.fetchPlanData();
+      console.log(res);
+    }
+    fetchData()
+  }, [])
 
 
   return (
