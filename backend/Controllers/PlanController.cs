@@ -19,5 +19,13 @@ namespace backend.Controllers
             var data = _service.GetPlanData();
             return Ok(data);
         }
+
+        [HttpGet]
+        [Route("api/content")]
+        public IHttpActionResult GetContentTypeList()
+        {
+            var data = _service.GetContentTypeList();
+            return Ok(data);
+        }
     }
 }

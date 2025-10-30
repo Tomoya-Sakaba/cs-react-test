@@ -21,39 +21,56 @@ namespace backend.Services
 
             // 日付ごとにグループ化
             var grouped = rawData
-        .GroupBy(r => r.date)
-        .Select(g =>
-        {
-            // すべての contentType をまず 0 初期化で作る
-            var contentTypeDict = allContentTypes
-                .GroupBy(ct => ct.content_type_id)
-                .Select(grp => grp.First())
-                .ToDictionary(
-                    ct => ct.content_type_id,
-                    ct => new TestItem { Company = 0, Vol = 0, Time = "" }
-                );
-
-            // 実際のデータで上書き
-            foreach (var record in g)
-            {
-                contentTypeDict[record.content_type_id] = new TestItem
+                .GroupBy(r => r.date)
+                .Select(g =>
                 {
-                    Company = record.company,
-                    Vol = record.vol,
-                    Time = record.time
-                };
-            }
+                    // すべての contentType をまず 0 初期化で作る
+                    var contentTypeDict = allContentTypes
+                        .GroupBy(ct => ct.content_type_id)
+                        .Select(grp => grp.First())
+                        .ToDictionary(
+                            ct => ct.content_type_id,
+                            ct => new TestItem { Company = 0, Vol = 0, Time = "" }
+                        );
 
-            return new TestPlanDto
-            {
-                Date = g.Key.ToString("yyyy-MM-dd"),
-                ContentType = contentTypeDict,
-                Note = g.FirstOrDefault()?.note_text ?? ""
-            };
-        })
-        .ToList();
+                    // 実際のデータで上書き
+                    foreach (var record in g)
+                    {
+                        contentTypeDict[record.content_type_id] = new TestItem
+                        {
+                            Company = record.company,
+                            Vol = record.vol,
+                            Time = record.time
+                        };
+                    }
+
+                    return new TestPlanDto
+                    {
+                        Date = g.Key.ToString("yyyy-MM-dd"),
+                        ContentType = contentTypeDict,
+                        Note = g.FirstOrDefault()?.note_text ?? "",
+                    };
+                })
+                .ToList();
 
             return grouped;
+        }
+
+        public List<ContentTypeListDto> GetContentTypeList()
+        {
+            var allContentTypes = _repository.GetAllContentTypes();
+
+            var contentType = allContentTypes
+                .Select(a =>
+                {
+                    return new ContentTypeListDto
+                    {
+                        ContentTypeId = a.content_type_id,
+                        ContentName = a.content_name
+                    };
+                }).
+                ToList();
+            return contentType;
         }
     }
 }

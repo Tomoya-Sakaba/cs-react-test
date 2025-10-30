@@ -1,13 +1,12 @@
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
-import type { ColDef, ColGroupDef } from 'ag-grid-community';
+import type { ColDef, ColGroupDef, ValueGetterParams } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { fetchTestData, usePdfPreview, type PdfPreviewData, type TestPdfData } from '../hooks/usePdfPreview';
 import TestPdf from '../components/TestPdf';
 import PdfPreview from '../components/PdfPreview';
 import { useEffect, useState } from 'react';
 import { testApi } from '../api/testApi';
-import {  convertTestData } from '../utils/convertData';
 import YearMonthFilter from '../components/YearMonthFilter';
 import { useYearMonthParams } from '../hooks/useYearMonthParams';
 import { mapMonthlyTestData } from '../utils/mappingData';
@@ -41,10 +40,24 @@ export type testType = {
   note: string
 }
 
-export type PlanType = {
+export type FetchPlanType = {
   date: string,
-  contentType: Record<string, testItem>[],
+  contentType: Record<number, testItem>,
   note: string
+}
+
+export type MapdePlan = {
+  date: string,
+  dayLabel: string, // 例: "1日(月)"
+  isHoliday: boolean,
+  isSturday: boolean,
+  contentType: Record<number, testItem>,
+  note: string
+}
+
+export type ContentTypeList = {
+  contentTypeId: number;
+  contentName: string;
 }
 
 export type MapedTestType = {
@@ -59,8 +72,7 @@ export type MapedTestType = {
   note: string
 }
 
-
-const getColumnDefs = (isEditing: boolean): (ColDef<MapedTestType> | ColGroupDef<MapedTestType>)[] => [
+const getColumnDefs = (isEditing: boolean, contentTypeList: ContentTypeList[]): (ColDef<MapdePlan> | ColGroupDef<MapdePlan>)[] => [
   {
     headerName: "日付",
     field: "dayLabel",
@@ -72,138 +84,44 @@ const getColumnDefs = (isEditing: boolean): (ColDef<MapedTestType> | ColGroupDef
       return "text-gray-800";
     },
   },
-  {
-    headerName: "Content A",
+  ...contentTypeList.map(type => ({
+    headerName: type.contentName,
     children: [
       {
         headerName: "会社",
-        field: "contentA.company",
-        width: 90,
-        valueFormatter: (params) => (params.value === 0 ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
+        minWidth: 90,
+        flex: 1,
+        valueGetter: (params: ValueGetterParams<MapdePlan>) =>
+          params.data?.contentType[type.contentTypeId]?.company ?? 0,
+        editable: isEditing,
         cellEditor: CustomInputEditor,
         cellEditorParams: { type: "number" },
       },
       {
         headerName: "数量",
-        field: "contentA.vol",
-        width: 90,
-        valueFormatter: (params) => (params.value === 0 ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
+        minWidth: 90,
+        flex: 1,
+        valueGetter: (params: ValueGetterParams<MapdePlan>) =>
+          params.data?.contentType[type.contentTypeId]?.vol ?? 0,
+        editable: isEditing,
         cellEditor: CustomInputEditor,
         cellEditorParams: { type: "number" },
       },
       {
         headerName: "時間",
-        field: "contentA.time",
-        width: 90,
-        valueFormatter: (params) => (params.value === "" ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
+        flex: 1,
+        minWidth: 90,
+        valueGetter: (params: ValueGetterParams<MapdePlan>) =>
+          params.data?.contentType[type.contentTypeId]?.time ?? "",
+        editable: isEditing,
         cellEditor: CustomInputEditor,
         cellEditorParams: { type: "time" },
       },
     ],
-  },
-  {
-    headerName: "Content B",
-    children: [
-      {
-        headerName: "会社",
-        field: "contentB.company",
-        width: 90,
-        valueFormatter: (params) => (params.value === 0 ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "number" },
-      },
-      {
-        headerName: "数量",
-        field: "contentB.vol",
-        width: 90,
-        valueFormatter: (params) => (params.value === 0 ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "number" },
-      },
-      {
-        headerName: "時間",
-        field: "contentB.time",
-        width: 90,
-        valueFormatter: (params) => (params.value === "" ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "time" },
-      },
-    ],
-  },
-  {
-    headerName: "Content C",
-    children: [
-      {
-        headerName: "会社",
-        field: "contentC.company",
-        width: 90,
-        valueFormatter: (params) => (params.value === 0 ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "number" },
-      },
-      {
-        headerName: "数量",
-        field: "contentC.vol",
-        width: 90,
-        valueFormatter: (params) => (params.value === 0 ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "number" },
-      },
-      {
-        headerName: "時間",
-        field: "contentC.time",
-        width: 90,
-        valueFormatter: (params) => (params.value === "" ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "time" },
-      },
-    ],
-  },
-  {
-    headerName: "Content D",
-    children: [
-      {
-        headerName: "会社",
-        field: "contentD.company",
-        width: 90,
-        valueFormatter: (params) => (params.value === 0 ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "number" },
-      },
-      {
-        headerName: "数量",
-        field: "contentD.vol",
-        width: 90,
-        valueFormatter: (params) => (params.value === 0 ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "number" },
-      },
-      {
-        headerName: "時間",
-        field: "contentD.time",
-        width: 90,
-        valueFormatter: (params) => (params.value === "" ? "-" : params.value),
-        editable: isEditing, // ここで toggle 状態で編集可否切替
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "time" },
-      },
-    ],
-  },
+  })),
   {
     headerName: "備考",
     field: "note",
-    flex: 1,
     minWidth: 200,
     editable: isEditing, // ここで toggle 状態で編集可否切替
     cellEditor: CustomInputEditor,
@@ -215,8 +133,8 @@ const AgTest = () => {
   const { currentYear, currentIndexMonth } = useYearMonthParams();
   const pdfHook = usePdfPreview<PdfPreviewData<TestPdfData[]>>(2025, 9)
   const [isEditing, setIsEditing] = useState(false);
-  const [rowData, setRowData] = useState<MapedTestType[]>([]);
-  const [agRowData, setAgRowData] = useState<MapedTestType[]>([]);
+  const [rowData, setRowData] = useState<MapdePlan[]>([]);
+  const [agRowData, setAgRowData] = useState<MapdePlan[]>([]);
 
   const toggleEditMode = () => {
     if (isEditing) {
@@ -254,8 +172,8 @@ const AgTest = () => {
 
       // contentA〜D の各コンテンツをループ
       ["A", "B", "C", "D"].forEach((c, idx) => {
-        const edited = editedRow[`content${c}` as keyof MapedTestType] as testItem;
-        const original = originalRow[`content${c}` as keyof MapedTestType] as testItem;
+        const edited = editedRow[`content${c}` as keyof MapdePlan] as testItem;
+        const original = originalRow[`content${c}` as keyof MapdePlan] as testItem;
 
         // 編集後・元データが空かどうか判定
         const isEmptyEdited = edited.company === 0 && edited.vol === 0 && edited.time === "";
@@ -304,36 +222,41 @@ const AgTest = () => {
     await pdfHook.handlePreviewPdf(pdfData, TestPdf);
   };
 
+  const getContentTypeIdList = (list: ContentTypeList[]): number[] => {
+    return list.map(item => item.contentTypeId);
+  }
+  const getDefaultRecord = (IdList: number[]): Record<number, testItem> => {
+    return IdList.reduce((acc, id) => {
+      acc[id] = { company: 0, vol: 0, time: "" };
+      return acc;
+    }, {} as Record<number, testItem>);
+  };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await testApi.fetchTestData();
-
-        const convertData = convertTestData(res);
-
-        const mapData = mapMonthlyTestData(convertData, currentYear, currentIndexMonth)
-
-        //console.log("fetchデータ", res);
-        //console.log("convartデータ", convertData);
-        //console.log("mappingデータ", mapData);
-        setRowData(mapData);
-        setAgRowData(JSON.parse(JSON.stringify(mapData)));
-
-      } catch (err) {
-        console.error(err)
-      }
-    }
-    fetchData();
-  }, [currentYear, currentIndexMonth])
+  const [constentType, setContentType] = useState<ContentTypeList[]>([])
 
   useEffect(() => {
     const fetchData = async () => {
       const res = await testApi.fetchPlanData();
-      console.log(res);
+      console.log("res", res);
+
+      const resContent = await testApi.fetchContentTypeList();
+      console.log("resContent", resContent);
+
+      setContentType(resContent);
+      const contentTypeIdList = getContentTypeIdList(resContent);
+      console.log("contentTypeIdList", contentTypeIdList);
+
+      const defaultData = getDefaultRecord(contentTypeIdList);
+      console.log("defaultData", defaultData);
+
+      const mapData = mapMonthlyTestData(res, currentYear, currentIndexMonth, getDefaultRecord, contentTypeIdList)
+      console.log("mapData", mapData)
+
+      setRowData(mapData);
+      setAgRowData(JSON.parse(JSON.stringify(mapData)));
     }
     fetchData()
-  }, [])
+  }, [currentYear, currentIndexMonth])
 
 
   return (
@@ -366,7 +289,7 @@ const AgTest = () => {
           <div className="ag-theme-alpine h-full min-h-0 w-full">
             <AgGridReact
               rowData={agRowData}
-              columnDefs={getColumnDefs(isEditing)}
+              columnDefs={getColumnDefs(isEditing, constentType)}
               defaultColDef={{
                 resizable: true,
                 valueFormatter: (params) => {
