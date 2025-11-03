@@ -169,11 +169,15 @@
     </Compile>
     <Compile Include="Models\DTOs\ContentTypeDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeListDto.cs" />
+    <Compile Include="Models\DTOs\PlanHistoryDto.cs" />
     <Compile Include="Models\DTOs\PlanRecordDto.cs" />
     <Compile Include="Models\DTOs\TestItem.cs" />
+    <Compile Include="Models\DTOs\TestItemHistory.cs" />
     <Compile Include="Models\DTOs\TestPlanDto.cs" />
+    <Compile Include="Models\DTOs\TestPlanHistoryDto.cs" />
     <Compile Include="Models\DTOs\UpdateUserRepuest.cs" />
     <Compile Include="Models\DTOs\UserResponse.cs" />
+    <Compile Include="Models\Entities\PlanEntity.cs" />
     <Compile Include="Models\Entities\UsersEntity.cs" />
     <Compile Include="Models\Repository\PlanRepository.cs" />
     <Compile Include="Models\Repository\UsersRepository.cs" />

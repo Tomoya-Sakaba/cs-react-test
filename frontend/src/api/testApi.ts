@@ -68,8 +68,12 @@ export const testApi = {
     ];
   },
 
-  async fetchPlanData(): Promise<FetchPlanType[]> {
+  async fetchPlanData(year: number, month: number): Promise<FetchPlanType[]> {
     const res = await axios.get<FetchPlanType[]>("/api/plan", {
+      params: {
+        year,
+        month,
+      },
       headers: {
         Accept: "application/json",
       },
@@ -85,4 +89,24 @@ export const testApi = {
     });
     return res.data;
   },
+
+  async postPlanData(form: FetchPlanType[]) {
+    const res = await axios.post("/api/plan", form, {
+      headers: {
+        Accept: "application/json",
+      }
+    })
+
+    return res.data;
+  },
+
+  async createNewPlan(form: FetchPlanType[]) {
+    const res = await axios.post("/api/plan/new", form, {
+      headers: {
+        Accept: "application/json",
+      }
+    })
+
+    return res.data;
+  }
 };
