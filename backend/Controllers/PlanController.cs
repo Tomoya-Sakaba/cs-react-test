@@ -13,6 +13,9 @@ namespace backend.Controllers
     {
         private readonly PlanService _service = new PlanService();
 
+        //------------------------------------------------------------------------------
+        // 最新のPlanデータ取得API
+        //------------------------------------------------------------------------------
         [HttpGet]
         [Route("api/plan")]
         public IHttpActionResult GetPlan(int year, int month)
@@ -49,7 +52,7 @@ namespace backend.Controllers
             if (plans == null || plans.Count == 0)
                 return BadRequest("データが空です。");
 
-            _service.SavePlans(plans);
+            _service.SavePlans2(plans);
             return Ok();
         }
     }

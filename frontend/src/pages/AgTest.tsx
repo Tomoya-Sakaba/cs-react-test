@@ -130,8 +130,10 @@ const AgTest = () => {
   //---------------------------------------------------------------------------
   // 初回レンダリング処理
   //---------------------------------------------------------------------------
+  const [isNew, setIsNew ] = useState(false);
   useEffect(() => {
     const fetchData = async () => {
+
       // fetch
       const res = await testApi.fetchPlanData(currentYear, currentIndexMonth + 1);
       console.log("res", res);
@@ -144,18 +146,30 @@ const AgTest = () => {
       const contentTypeIdList = getContentTypeIdList(resContent);
       console.log("contentTypeIdList", contentTypeIdList);
 
-      const defaultData = getDefaultRecord(contentTypeIdList);
-      console.log("defaultData", defaultData);
+      //const defaultData = getDefaultRecord(contentTypeIdList);
+      //console.log("defaultData", defaultData);
 
-      // 全日マッピング処理
-      const mapData = mapMonthlyTestData(res, currentYear, currentIndexMonth, getDefaultRecord, contentTypeIdList)
-      console.log("mapData", mapData)
+      if (res.length === 0 || !res) {
+        setIsNew(true);
+        console.log("isNew:", isNew);
 
-      setRowData(mapData);
-      setAgRowData(JSON.parse(JSON.stringify(mapData)));
+        // 全日マッピング処理
+        const mapData = mapMonthlyTestData([], currentYear, currentIndexMonth, getDefaultRecord, contentTypeIdList)
+        console.log("mapData(新規)", mapData)
+        setRowData(mapData);
+        setAgRowData(JSON.parse(JSON.stringify(mapData)));
+
+      } else {
+        // 全日マッピング処理
+        const mapData = mapMonthlyTestData(res, currentYear, currentIndexMonth, getDefaultRecord, contentTypeIdList)
+        console.log("mapData(既存)", mapData)
+        setRowData(mapData);
+        setAgRowData(JSON.parse(JSON.stringify(mapData)));
+      }
+      
     }
     fetchData()
-  }, [currentYear, currentIndexMonth])
+  }, [currentYear, currentIndexMonth, isNew])
 
 
   const getContentTypeIdList = (list: ContentTypeList[]): number[] => {
@@ -213,22 +227,33 @@ const AgTest = () => {
 
     console.log("保存処理：", updatedRows);
 
-    // Grid内の現在の状態をagRowDataとrowDataにセット
-    setAgRowData(updatedRows);
-    setRowData(updatedRows);
 
     const reqData = convertPlanData(updatedRows);
     console.log("コンバート後：", reqData);
 
     try {
-      // --- API呼び出し（あなたのtestApi経由）---
-      const res = await testApi.createNewPlan(reqData);
 
-      console.log("登録成功:", res);
-      alert("新規登録が完了しました。");
+      if (isNew) {
+        // --- API呼び出し（あなたのtestApi経由）---
+        const res = await testApi.createNewPlan(reqData);
+        console.log("登録成功:", res);
+        alert("新規登録が完了しました。");
+
+      } else {
+        // --- API呼び出し（あなたのtestApi経由）---
+        const res = await testApi.savePlan(reqData);
+        console.log("登録成功:", res);
+        alert("新規登録が完了しました。");
+
+      }
 
       // 編集モード解除
       setIsEditing(false);
+
+      // Grid内の現在の状態をagRowDataとrowDataにセット
+      setAgRowData(updatedRows);
+      setRowData(updatedRows);
+
     } catch (error) {
       console.error("登録エラー:", error);
       alert("登録に失敗しました。サーバーを確認してください。");

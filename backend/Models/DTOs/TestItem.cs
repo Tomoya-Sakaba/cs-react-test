@@ -14,5 +14,9 @@ namespace backend.Models.DTOs
         public decimal Vol { get; set; }
         [JsonProperty("time")]
         public string Time { get; set; }
+
+        [JsonProperty("version")]
+        public int Version { get; set; }
+
     }
 }

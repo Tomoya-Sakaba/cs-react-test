@@ -12,6 +12,7 @@ namespace backend.Models.DTOs
         public int company { get; set; }
         public decimal vol { get; set; }
         public string time { get; set; }
+        public int version { get; set; }
         public string note_text { get; set; }
     }
 }

@@ -90,7 +90,17 @@ export const testApi = {
     return res.data;
   },
 
-  async postPlanData(form: FetchPlanType[]) {
+  async createNewPlan(form: FetchPlanType[]) {
+    const res = await axios.post("/api/plan/new", form, {
+      headers: {
+        Accept: "application/json",
+      }
+    })
+
+    return res.data;
+  },
+
+  async savePlan(form: FetchPlanType[]) {
     const res = await axios.post("/api/plan", form, {
       headers: {
         Accept: "application/json",
@@ -100,13 +110,4 @@ export const testApi = {
     return res.data;
   },
 
-  async createNewPlan(form: FetchPlanType[]) {
-    const res = await axios.post("/api/plan/new", form, {
-      headers: {
-        Accept: "application/json",
-      }
-    })
-
-    return res.data;
-  }
 };

@@ -17,26 +17,38 @@ namespace backend.Models.Repository
     {
         private readonly string connectionString = ConfigurationManager.ConnectionStrings["MyDbConnection"].ConnectionString;
 
+        // Planデータ取得（最新バージョン）
         public List<PlanRecordDto> GetAllPlanRecords(int year, int month)
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
                 SELECT
-                    ISNULL(p.date, n.note_date) AS date,
+                    COALESCE(p.date, n.note_date) AS date,
                     p.content_type_id,
                     p.company,
                     p.vol,
                     p.time,
+                    p.version,
                     n.note_text
                 FROM t_plan p
-                FULL OUTER JOIN note n
-                    ON p.date = n.note_date
-                    AND p.is_active = 1
-                WHERE
-                    YEAR(ISNULL(p.date, n.note_date)) = @Year
-                    AND MONTH(ISNULL(p.date, n.note_date)) = @Month
-                ORDER BY ISNULL(p.date, n.note_date), p.content_type_id
+                FULL OUTER JOIN note n 
+                    ON n.note_date = p.date
+                WHERE 
+                    (
+                        p.version IS NULL
+                        OR p.version = (
+                            SELECT MAX(tp.version)
+                            FROM t_plan tp
+                            WHERE tp.date = p.date
+                              AND tp.content_type_id = p.content_type_id
+                        )
+                    )
+                    AND YEAR(COALESCE(p.date, n.note_date)) = @Year
+                    AND MONTH(COALESCE(p.date, n.note_date)) = @Month
+                ORDER BY 
+                    COALESCE(p.date, n.note_date),
+                    p.content_type_id;
             ";
 
                 return db.Query<PlanRecordDto>(sql, new { Year = year, Month = month }).ToList();
@@ -121,24 +133,9 @@ namespace backend.Models.Repository
             }
 
         }
+        
+        
 
-        public void Insert(DateTime date, int contentTypeId, TestItem item)
-        {
-            using (IDbConnection db = new SqlConnection(connectionString))
-            {
-                var sql = @"
-                    INSERT INTO t_plan (date, content_type_id, company, vol, time)
-                    VALUES (@date, @contentTypeId, @company, @vol, @time)";
-                db.Execute(sql, new
-                {
-                    date,
-                    contentTypeId,
-                    company = item.Company,
-                    vol = item.Vol,
-                    time = item.Time
-                });
-            }
-        }
 
         // 新規Plan登録
         public void InsertPlan(IDbConnection db, IDbTransaction tran, PlanEntity plan)
@@ -202,6 +199,113 @@ namespace backend.Models.Repository
                 NoteText = noteText,
                 UserName = userName
             }, tran);
+        }
+
+        //---------------------------------------------------------------------
+        // planとnoteの最新バージョン＋１を取得
+        //---------------------------------------------------------------------
+        public int GetNextVersion(int year, int month)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT 
+                        ISNULL(MAX(v), 0) + 1 AS next_version
+                    FROM (
+                        SELECT MAX(version) AS v FROM t_plan
+                        WHERE YEAR(date) = @Year AND MONTH(date) = @Month
+                        UNION ALL
+                        SELECT MAX(version) AS v FROM note
+                        WHERE YEAR(note_date) = @Year AND MONTH(note_date) = @Month
+                    ) AS all_versions;
+                ";
+
+                return db.Query<int>(sql, new { Year = year, Month = month }).FirstOrDefault();
+            }
+        }
+
+        //---------------------------------------------------------------------
+        // 該当日付の最新バージョンPlanデータを取得
+        //---------------------------------------------------------------------
+        public List<PlanRecordDto> GetLatestByDate(DateTime targetDate)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT
+                        COALESCE(p.date, n.note_date) AS date,
+                        p.content_type_id,
+                        p.company,
+                        p.vol,
+                        p.time,
+                        p.version,
+                        n.note_text
+                    FROM t_plan p
+                    FULL OUTER JOIN note n 
+                        ON n.note_date = p.date
+                    WHERE 
+                        (
+                            p.version IS NULL
+                            OR p.version = (
+                                SELECT MAX(tp.version)
+                                FROM t_plan tp
+                                WHERE tp.date = p.date
+                                  AND tp.content_type_id = p.content_type_id
+                            )
+                        )
+                        AND COALESCE(p.date, n.note_date) = @TargetDate
+                    ORDER BY 
+                        COALESCE(p.date, n.note_date),
+                        p.content_type_id;
+                    ";
+
+                return db.Query<PlanRecordDto>(sql, new { TargetDate = targetDate }).ToList();
+            }
+        }
+
+        //------------------------------------------------------------------------------------------
+        // 追加登録（versionアップ）
+        //------------------------------------------------------------------------------------------
+        public void Insert(DateTime date, int contentTypeId, TestItem newItem, int version)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+            INSERT INTO t_plan (date, content_type_id, company, vol, time, version)
+            VALUES (@Date, @ContentTypeId, @Company, @Vol, @Time, @Version);
+        ";
+
+                db.Execute(sql, new
+                {
+                    Date = date,
+                    ContentTypeId = contentTypeId,
+                    Company = newItem.Company,
+                    Vol = newItem.Vol,
+                    Time = newItem.Time,
+                    Version = version
+                });
+            }
+        }
+
+        //------------------------------------------------------------------------------------------
+        // 既存データ削除（論理削除）
+        //------------------------------------------------------------------------------------------
+        public void InsertDeleted(DateTime date, int contentTypeId, int newVersion)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+            INSERT INTO t_plan (date, content_type_id, company, vol, time, version)
+            VALUES (@Date, @ContentTypeId, NULL, NULL, NULL, @Version);
+        ";
+
+                db.Execute(sql, new
+                {
+                    Date = date,
+                    ContentTypeId = contentTypeId,
+                    Version = newVersion
+                });
+            }
         }
     }
 }
