@@ -38,7 +38,7 @@ namespace backend.Services
                         .Select(grp => grp.First())
                         .ToDictionary(
                             ct => ct.content_type_id,
-                            ct => new TestItem { Company = 0, Vol = 0, Time = "", Version = 0 }
+                            ct => new TestItem { Company = null, Vol = null, Time = null, Version = 0 }
                         );
 
                     // 実際のデータで上書き
@@ -48,7 +48,7 @@ namespace backend.Services
                         {
                             Company = record.company,
                             Vol = record.vol,
-                            Time = record.time,
+                            Time = record.time.HasValue ? record.time.Value.ToString(@"hh\:mm") : null,
                             Version = record.version
                         };
                     }
@@ -197,9 +197,21 @@ namespace backend.Services
 
         bool IsSame(PlanRecordDto existing, TestItem newItem)
         {
+            string existingTimeStr = existing.time.HasValue
+                ? existing.time.Value.ToString(@"hh\:mm")
+                : null;
+
             return existing.company == newItem.Company
                 && existing.vol == newItem.Vol
-                && existing.time == newItem.Time;
+                && existingTimeStr == newItem.Time;
+        }
+
+        private bool IsEmptyPlan(PlanRecordDto plan)
+        {
+            // すべての主要カラムが NULL または空の場合に「空データ」と判定
+            return plan?.company == null
+                && plan?.vol == null
+                && plan?.time == null;
         }
 
         //---------------------------------------------------------------------
@@ -312,16 +324,6 @@ namespace backend.Services
                     var newIds = plan.ContentType.Keys.ToList();
                     var existingIds = existingPlans.Select(x => x.content_type_id).ToList();
 
-                    // ✅ case1: その日のデータが空なら ⇒ 全削除扱い
-                    if (newIds.Count == 0)
-                    {
-                        foreach (var e in existingPlans)
-                        {
-                            _repository.InsertDeleted(date, e.content_type_id, newVersion);
-                        }
-                        continue;
-                    }
-
                     // ✅ case2: 新規（既存にないID）
                     foreach (var id in newIds.Except(existingIds))
                     {
@@ -344,6 +346,12 @@ namespace backend.Services
                     // ✅ case4: 削除（既存にあって新にない）
                     foreach (var id in existingIds.Except(newIds))
                     {
+                        var existing = existingPlans.FirstOrDefault(e => e.content_type_id == id);
+
+                        // すでに空データなら（削除済み扱いなので）スキップ
+                        if (IsEmptyPlan(existing))
+                            continue;
+
                         _repository.InsertDeleted(date, id, newVersion);
                     }
                 }

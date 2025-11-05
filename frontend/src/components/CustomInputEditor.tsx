@@ -22,11 +22,11 @@ const CustomInputEditor: React.FC<Props> = ({ value, onValueChange, type = "stri
 
     switch (type) {
       case "number":
-        parsedValue = val === "" ? 0 : Number(val);
+        parsedValue = val === "" ? null : Number(val);
         break;
       case "time":
         // 時間列の場合は hh:mm 形式で保持する例
-        parsedValue = val;
+        parsedValue = val === "" ? null : val;
         break;
       case "string":
       default:

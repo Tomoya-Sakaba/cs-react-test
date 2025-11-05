@@ -28,9 +28,9 @@ export type fetchTestType = {
 }
 
 export type testItem = {
-  company: number,
-  vol: number,
-  time: string,
+  company: number | null,
+  vol: number | null,
+  time: string | null,
 }
 
 export type FetchPlanType = {
@@ -177,7 +177,7 @@ const AgTest = () => {
   }
   const getDefaultRecord = (IdList: number[]): Record<number, testItem> => {
     return IdList.reduce((acc, id) => {
-      acc[id] = { company: 0, vol: 0, time: "" };
+      acc[id] = { company: null, vol: null, time: null };
       return acc;
     }, {} as Record<number, testItem>);
   };

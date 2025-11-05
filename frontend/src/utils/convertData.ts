@@ -7,20 +7,25 @@ export const convertPlanData = (data: MapdePlan[]): FetchPlanType[] => {
 
       // contentType 内の空要素を除外
       Object.entries(item.contentType).forEach(([key, value]) => {
-        const isEmpty =
-          value.company === 0 &&
-          value.vol === 0 &&
-          value.time === "";
+        const company = value.company ?? 0;
+        const vol = value.vol ?? 0;
+        const time = value.time ?? "";
+
+        const isEmpty = company === 0 && vol === 0 && time === "";
 
         if (!isEmpty) {
-          filteredContentType[Number(key)] = value;
+          filteredContentType[Number(key)] = {
+            company,
+            vol,
+            time,
+          };
         }
       });
 
       return {
         date: item.date,
         contentType: filteredContentType,
-        note: item.note,
+        note: item.note ?? "",
       };
     })
     // contentType が空 かつ note が空文字 の場合は除外
