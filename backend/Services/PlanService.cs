@@ -173,7 +173,7 @@ namespace backend.Services
                                     Company = item.Company,
                                     Vol = item.Vol,
                                     Time = item.Time,
-                                    Version = 1,
+                                    Version = 0,
                                     IsActive = true,
                                     CreatedAt = DateTime.Now,
                                     CreatedUser = userName,
@@ -186,7 +186,7 @@ namespace backend.Services
                         }
                         tran.Commit();
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                         tran.Rollback();
                         throw;
@@ -277,103 +277,349 @@ namespace backend.Services
 
         //---------------------------------------------------------------------
         // 保存処理（追加・更新・削除 一括）
+        //
+        // 仕様:
+        // - 月の「現在バージョン」を plan_version_snapshot から取得
+        //   * 未作成(null) または 0 の場合: version=0 を対象に更新/挿入/削除（versionは上げない）
+        //   * 1以上の場合: その version を対象に更新/挿入/削除（versionは上げない）
+        //
+        // version=0 の場合:
+        // - UPDATE: 既存データと比較して変更がある場合のみ実行（変更がない場合は何もしない）
+        // - 削除: nullでUPDATEではなく、DELETE処理（物理削除）を実行
+        //
+        // version>=1 の場合:
+        // - 既存の最新versionのデータと比較して変更がない場合は何もしない
+        //   これにより、バージョンを切った後に変更がないまま保存してもレコードが増えない
+        // - 削除: 空データでINSERT/UPDATE（旧versionは保持）
+        //
+        // 日付単位の削除:
+        // - リクエストに含まれていない日付（その日付のレコードが全てない場合）も検知して削除処理を実行
+        //
+        // - バージョンアップは別API(CreateVersionSnapshot)でのみ実施
         //---------------------------------------------------------------------
         public void SavePlans2(List<TestPlanDto> plans)
         {
-            try
+            if (plans == null || plans.Count == 0)
+                throw new ArgumentException("プランデータが存在しません。");
+
+            using (IDbConnection db = new SqlConnection(connectionString))
             {
-                if (plans == null || plans.Count == 0)
-                    throw new ArgumentException("プランデータが存在しません。");
-
-                // すべてのplansの中から、月単位のversionを決定
-                var firstPlan = plans.First();
-                var baseDate = DateTime.Parse(firstPlan.Date);
-                int year = baseDate.Year;
-                int month = baseDate.Month;
-
-                // 今回保存分で共通のversionを取得
-                int newVersion = _repository.GetNextVersion(year, month);
-
-                //---------------------------------------------------------------
-                // まず、この月に存在する既存データを全件取得（最新version）
-                //---------------------------------------------------------------
-                var existingAll = _repository.GetAllPlanRecords(year, month);
-
-                // 既存日付の一覧（例: 2025-11-01, 2025-11-02 ...）
-                var existingDates = existingAll
-                    .Select(x => x.date.Date)
-                    .Distinct()
-                    .ToList();
-
-                // 新しく渡ってきた日付の一覧
-                var newDates = plans
-                    .Select(p => DateTime.Parse(p.Date).Date)
-                    .Distinct()
-                    .ToList();
-
-                //---------------------------------------------------------------
-                // 各日ごとに処理
-                //---------------------------------------------------------------
-                foreach (var plan in plans)
+                db.Open();
+                using (var tran = db.BeginTransaction())
                 {
-                    DateTime date = DateTime.Parse(plan.Date);
-                    var existingPlans = existingAll
-                        .Where(x => x.date.Date == date)
-                        .ToList();
-
-                    var newIds = plan.ContentType.Keys.ToList();
-                    var existingIds = existingPlans.Select(x => x.content_type_id).ToList();
-
-                    // ✅ case2: 新規（既存にないID）
-                    foreach (var id in newIds.Except(existingIds))
+                    try
                     {
-                        var item = plan.ContentType[id];
-                        _repository.Insert(date, id, item, newVersion);
-                    }
+                        // すべてのplansの中から、月単位のversionを決定
+                        var firstPlan = plans.First();
+                        var baseDate = DateTime.Parse(firstPlan.Date);
+                        int year = baseDate.Year;
+                        int month = baseDate.Month;
 
-                    // ✅ case3: 更新（既存にあり内容が異なる）
-                    foreach (var id in newIds.Intersect(existingIds))
-                    {
-                        var existing = existingPlans.First(x => x.content_type_id == id);
-                        var newItem = plan.ContentType[id];
+                        // 現在のバージョンを取得（plan_version_snapshotテーブルから）
+                        int? currentVersion = _repository.GetCurrentVersion(year, month);
+                        
+                        // バージョンがnullまたは0の場合は0、それ以外はそのバージョンを使用
+                        int targetVersion = currentVersion ?? 0;
 
-                        if (!IsSame(existing, newItem))
+                        //---------------------------------------------------------------
+                        // この月に存在する既存データ（最新version）を取得
+                        // 注意: latest を基準に existingIds を推定する（ver>=1 で version=0 のみ存在してもOK）
+                        //---------------------------------------------------------------
+                        var existingAll = _repository.GetAllPlanRecords(year, month);
+
+                        // リクエストに含まれる日付の一覧を取得
+                        var requestedDates = plans
+                            .Select(p => DateTime.Parse(p.Date).Date)
+                            .Distinct()
+                            .ToList();
+
+                        // 既存データに存在する日付の一覧を取得
+                        var existingDates = existingAll
+                            .Select(x => x.date.Date)
+                            .Distinct()
+                            .ToList();
+
+                        // リクエストに含まれていない日付（削除対象）を取得
+                        var datesToDelete = existingDates.Except(requestedDates).ToList();
+
+                        //---------------------------------------------------------------
+                        // 各日ごとに処理
+                        //---------------------------------------------------------------
+                        foreach (var plan in plans)
                         {
-                            _repository.Insert(date, id, newItem, newVersion);
+                            DateTime date = DateTime.Parse(plan.Date);
+                            var existingPlans = existingAll
+                                .Where(x => x.date.Date == date)
+                                .ToList();
+
+                            var newIds = plan.ContentType.Keys.ToList();
+                            var existingIds = existingPlans.Select(x => x.content_type_id).ToList();
+
+                            // 新規または更新処理
+                            foreach (var id in newIds)
+                            {
+                                var newItem = plan.ContentType[id];
+                                
+                                // 既存の最新versionのデータを取得（比較用）
+                                var existingLatest = existingPlans.FirstOrDefault(e => e.content_type_id == id);
+                                
+                                // 指定バージョンのレコードが存在するかチェック
+                                // existingLatest が null でない かつ version が targetVersion と一致する場合に存在
+                                bool existsAtTarget = existingLatest != null && existingLatest.version == targetVersion;
+
+                                if (targetVersion == 0)
+                                {
+                                    // version=0 期間：従来通り UPDATE/INSERT（上書き方式）
+                                    // ただし、UPDATEの場合は値が変わっている場合のみ実行
+                                    if (existsAtTarget)
+                                    {
+                                        // existingLatest が version=0 のデータなので、それを使用して比較
+                                        bool hasChanges = !IsSame(existingLatest, newItem);
+                                        if (hasChanges)
+                                        {
+                                            _repository.UpdatePlan(db, tran, date, id, newItem, targetVersion);
+                                        }
+                                        // 変更がない場合は何もしない
+                                    }
+                                    else
+                                    {
+                                        // 新規挿入
+                                        var planEntity = new PlanEntity
+                                        {
+                                            Date = date,
+                                            ContentTypeId = id,
+                                            Company = newItem.Company,
+                                            Vol = newItem.Vol,
+                                            Time = newItem.Time,
+                                            Version = targetVersion,
+                                            IsActive = true,
+                                            CreatedAt = DateTime.Now,
+                                            CreatedUser = "testUser",
+                                            UpdatedAt = DateTime.Now,
+                                            UpdatedUser = "testUser"
+                                        };
+                                        _repository.InsertPlan(db, tran, planEntity);
+                                    }
+                                }
+                                else
+                                {
+                                    // version>=1 期間：
+                                    // - 既存の最新versionのデータと比較して、変更がない場合は何もしない
+                                    // - 変更がある場合のみ、targetVersionに対してINSERT/UPDATE
+                                    
+                                    // 既存データがない、または既存データと異なる場合のみ処理
+                                    bool hasChanges = existingLatest == null || !IsSame(existingLatest, newItem);
+                                    
+                                    if (hasChanges)
+                                    {
+                                        if (existsAtTarget)
+                                        {
+                                            // 既存のtargetVersionレコードを更新
+                                            _repository.UpdatePlan(db, tran, date, id, newItem, targetVersion);
+                                        }
+                                        else
+                                        {
+                                            // 新規にtargetVersionレコードを挿入
+                                            var planEntity = new PlanEntity
+                                            {
+                                                Date = date,
+                                                ContentTypeId = id,
+                                                Company = newItem.Company,
+                                                Vol = newItem.Vol,
+                                                Time = newItem.Time,
+                                                Version = targetVersion,
+                                                IsActive = true,
+                                                CreatedAt = DateTime.Now,
+                                                CreatedUser = "testUser",
+                                                UpdatedAt = DateTime.Now,
+                                                UpdatedUser = "testUser"
+                                            };
+                                            _repository.InsertPlan(db, tran, planEntity);
+                                        }
+                                    }
+                                    // 変更がない場合は何もしない（スキップ）
+                                }
+                            }
+
+                            // 削除処理（既存にあって新にない）
+                            foreach (var id in existingIds.Except(newIds))
+                            {
+                                var existing = existingPlans.FirstOrDefault(e => e.content_type_id == id);
+
+                                // すでに空データならスキップ
+                                if (IsEmptyPlan(existing))
+                                    continue;
+
+                                // 指定バージョンのレコードが存在するかチェック
+                                // existing が null でない かつ version が targetVersion と一致する場合に存在
+                                bool existsAtTarget = existing != null && existing.version == targetVersion;
+
+                                if (targetVersion == 0)
+                                {
+                                    // version=0 期間：DELETE処理（物理削除）
+                                    if (existsAtTarget)
+                                    {
+                                        _repository.DeletePlan(db, tran, date, id, targetVersion);
+                                    }
+                                    // 存在しない場合は既に削除済みなので何もしない
+                                }
+                                else
+                                {
+                                    // version>=1 期間：
+                                    // - 既存データが空でない場合のみ、targetVersionに空データをINSERT/UPDATE
+                                    // - 既存データが既に空の場合は何もしない（変更がないため）
+                                    
+                                    // 既存データが空でない場合のみ処理
+                                    if (!IsEmptyPlan(existing))
+                                    {
+                                        if (existsAtTarget)
+                                        {
+                                            var emptyItem = new TestItem { Company = null, Vol = null, Time = null };
+                                            _repository.UpdatePlan(db, tran, date, id, emptyItem, targetVersion);
+                                        }
+                                        else
+                                        {
+                                            var planEntity = new PlanEntity
+                                            {
+                                                Date = date,
+                                                ContentTypeId = id,
+                                                Company = null,
+                                                Vol = null,
+                                                Time = null,
+                                                Version = targetVersion,
+                                                IsActive = true,
+                                                CreatedAt = DateTime.Now,
+                                                CreatedUser = "testUser",
+                                                UpdatedAt = DateTime.Now,
+                                                UpdatedUser = "testUser"
+                                            };
+                                            _repository.InsertPlan(db, tran, planEntity);
+                                        }
+                                    }
+                                    // 既存データが既に空の場合は何もしない（スキップ）
+                                }
+                            }
+
+                            // Noteの更新（必要に応じてUpdateNoteの実装を拡張）
+                            if (!string.IsNullOrEmpty(plan.Note))
+                            {
+                                // Noteの更新処理（既存の実装に合わせて）
+                                // ここでは簡略化のため、既存のInsertNoteを使用
+                                // 実際にはUpdateNoteが必要かもしれません
+                            }
                         }
+
+                        //---------------------------------------------------------------
+                        // リクエストに含まれていない日付の削除処理
+                        //---------------------------------------------------------------
+                        foreach (var dateToDelete in datesToDelete)
+                        {
+                            var existingPlansForDate = existingAll
+                                .Where(x => x.date.Date == dateToDelete)
+                                .ToList();
+
+                            foreach (var existing in existingPlansForDate)
+                            {
+                                // すでに空データならスキップ
+                                if (IsEmptyPlan(existing))
+                                    continue;
+
+                                // 指定バージョンのレコードが存在するかチェック
+                                // existing の version が targetVersion と一致する場合に存在
+                                bool existsAtTarget = existing.version == targetVersion;
+
+                                if (targetVersion == 0)
+                                {
+                                    // version=0 期間：DELETE処理（物理削除）
+                                    if (existsAtTarget)
+                                    {
+                                        _repository.DeletePlan(db, tran, dateToDelete, existing.content_type_id, targetVersion);
+                                    }
+                                }
+                                else
+                                {
+                                    // version>=1 期間：
+                                    // - 既存データが空でない場合のみ、targetVersionに空データをINSERT/UPDATE
+                                    // - 既存データが既に空の場合は何もしない（変更がないため）
+                                    
+                                    if (!IsEmptyPlan(existing))
+                                    {
+                                        if (existsAtTarget)
+                                        {
+                                            var emptyItem = new TestItem { Company = null, Vol = null, Time = null };
+                                            _repository.UpdatePlan(db, tran, dateToDelete, existing.content_type_id, emptyItem, targetVersion);
+                                        }
+                                        else
+                                        {
+                                            var planEntity = new PlanEntity
+                                            {
+                                                Date = dateToDelete,
+                                                ContentTypeId = existing.content_type_id,
+                                                Company = null,
+                                                Vol = null,
+                                                Time = null,
+                                                Version = targetVersion,
+                                                IsActive = true,
+                                                CreatedAt = DateTime.Now,
+                                                CreatedUser = "testUser",
+                                                UpdatedAt = DateTime.Now,
+                                                UpdatedUser = "testUser"
+                                            };
+                                            _repository.InsertPlan(db, tran, planEntity);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        tran.Commit();
                     }
-
-                    // ✅ case4: 削除（既存にあって新にない）
-                    foreach (var id in existingIds.Except(newIds))
+                    catch (Exception ex)
                     {
-                        var existing = existingPlans.FirstOrDefault(e => e.content_type_id == id);
-
-                        // すでに空データなら（削除済み扱いなので）スキップ
-                        if (IsEmptyPlan(existing))
-                            continue;
-
-                        _repository.InsertDeleted(date, id, newVersion);
-                    }
-                }
-
-                //---------------------------------------------------------------
-                // ✅ plansに含まれていない「日ごと削除」
-                // （＝フロントでその日付自体が送られてこなかった場合）
-                //---------------------------------------------------------------
-                var toDeleteDates = existingDates.Except(newDates);
-                foreach (var date in toDeleteDates)
-                {
-                    var existingPlans = existingAll.Where(x => x.date.Date == date).ToList();
-                    foreach (var e in existingPlans)
-                    {
-                        _repository.InsertDeleted(date, e.content_type_id, newVersion);
+                        tran.Rollback();
+                        throw new Exception("プラン保存処理でエラーが発生しました。", ex);
                     }
                 }
             }
-            catch (Exception ex)
+        }
+
+        //---------------------------------------------------------------------
+        // バージョンを切る処理
+        //
+        // 仕様（更新）:
+        // - データコピーは行わず、plan_version_snapshot の current_version を更新するのみ
+        //   * current_version が null/0 の場合 → 1 を設定
+        //   * current_version が 1 以上の場合 → +1 に更新
+        // - 以後の保存は、現在の current_version に対して INSERT/UPDATE を行う
+        //---------------------------------------------------------------------
+        public void CreateVersionSnapshot(int year, int month, string userName)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
             {
-                // 実運用ではログ出力推奨
-                throw new Exception("プラン保存処理でエラーが発生しました。", ex);
+                db.Open();
+                using (var tran = db.BeginTransaction())
+                {
+                    try
+                    {
+                        // 現在のバージョンを取得
+                        int? currentVersion = _repository.GetCurrentVersion(year, month);
+                        
+                        // データコピーは行わず、current_version の更新のみを行う
+                        int nextVersion = (currentVersion == null || currentVersion == 0)
+                            ? 1
+                            : currentVersion.Value + 1;
+
+                        // バージョンスナップショットを更新
+                        _repository.UpsertVersionSnapshot(db, tran, year, month, nextVersion, userName);
+
+                        tran.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        tran.Rollback();
+                        throw new Exception("バージョン作成処理でエラーが発生しました。", ex);
+                    }
+                }
             }
         }
     }

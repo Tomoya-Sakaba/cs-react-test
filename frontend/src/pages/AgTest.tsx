@@ -130,7 +130,7 @@ const AgTest = () => {
   //---------------------------------------------------------------------------
   // 初回レンダリング処理
   //---------------------------------------------------------------------------
-  const [isNew, setIsNew ] = useState(false);
+  const [isNew, setIsNew] = useState(false);
   useEffect(() => {
     const fetchData = async () => {
 
@@ -166,7 +166,7 @@ const AgTest = () => {
         setRowData(mapData);
         setAgRowData(JSON.parse(JSON.stringify(mapData)));
       }
-      
+
     }
     fetchData()
   }, [currentYear, currentIndexMonth, isNew])
@@ -213,7 +213,7 @@ const AgTest = () => {
   //---------------------------------------------------------------------------
   // 保存処理
   //---------------------------------------------------------------------------
-  const handleSave = async() => {
+  const handleSave = async () => {
     if (!gridRef.current) return;
 
     // --- 編集中のセルの値を確定 ---
@@ -239,11 +239,13 @@ const AgTest = () => {
         console.log("登録成功:", res);
         alert("新規登録が完了しました。");
 
+        setIsNew(false);
+
       } else {
         // --- API呼び出し（あなたのtestApi経由）---
         const res = await testApi.savePlan(reqData);
-        console.log("登録成功:", res);
-        alert("新規登録が完了しました。");
+        console.log("保存成功:", res);
+        alert("保存が完了しました。");
 
       }
 
@@ -257,6 +259,41 @@ const AgTest = () => {
     } catch (error) {
       console.error("登録エラー:", error);
       alert("登録に失敗しました。サーバーを確認してください。");
+    }
+  };
+
+  //---------------------------------------------------------------------------
+  // バージョンを切る処理
+  //
+  // 仕様:
+  // - 現在の年/月のスナップショットversionを +1 へ進める（0→1 も含む）
+  // - 以後の保存は新しいversionに対する上書き更新となる（保存ではversionを上げない）
+  //---------------------------------------------------------------------------
+  const handleCreateVersion = async () => {
+    if (!window.confirm("バージョンを切りますか？この操作は元に戻せません。")) {
+      return;
+    }
+
+    try {
+      const res = await testApi.createVersion(currentYear, currentIndexMonth + 1);
+      console.log("バージョン作成成功:", res);
+      alert("バージョンの作成が完了しました。");
+
+      // データを再取得
+      const fetchData = async () => {
+        const res = await testApi.fetchPlanData(currentYear, currentIndexMonth + 1);
+        const resContent = await testApi.fetchContentTypeList();
+        setContentType(resContent);
+        const contentTypeIdList = getContentTypeIdList(resContent);
+
+        const mapData = mapMonthlyTestData(res, currentYear, currentIndexMonth, getDefaultRecord, contentTypeIdList);
+        setRowData(mapData);
+        setAgRowData(JSON.parse(JSON.stringify(mapData)));
+      };
+      await fetchData();
+    } catch (error) {
+      console.error("バージョン作成エラー:", error);
+      alert("バージョンの作成に失敗しました。サーバーを確認してください。");
     }
   };
 
@@ -287,10 +324,17 @@ const AgTest = () => {
               pdf
             </button>
             <button
-              className="h-full w-24 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+              className="mr-5 h-full w-24 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
               onClick={handleSave}
             >
               保存
+            </button>
+            {/* バージョンを切る（断面固定化） */}
+            <button
+              className="h-full w-32 rounded-lg bg-green-500 px-4 py-2 text-sm text-white hover:bg-green-600"
+              onClick={handleCreateVersion}
+            >
+              バージョンを切る
             </button>
           </div>
           <div>

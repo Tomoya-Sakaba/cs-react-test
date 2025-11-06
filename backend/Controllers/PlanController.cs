@@ -40,7 +40,7 @@ namespace backend.Controllers
         public IHttpActionResult CreateNewPlan([FromBody] List<TestPlanDto> plans)
         {
             var userName = "testUser";
-            _service.CreateNewPlans(plans, userName); // version=1 固定で登録
+            _service.CreateNewPlans(plans, userName); // version=0 固定で登録
             return Ok();
         }
 
@@ -55,5 +55,32 @@ namespace backend.Controllers
             _service.SavePlans2(plans);
             return Ok();
         }
+
+        //------------------------------------------------------------------------------
+        // バージョンを切るAPI
+        //
+        // 仕様（更新）:
+        // - データのコピーは行わない
+        // - current_version が null/0 → 1 に設定
+        // - current_version が 1 以上 → +1 に更新
+        // - 以後、保存は常に current_version に対して上書き保存（保存では version を上げない）
+        //------------------------------------------------------------------------------
+        [HttpPost]
+        [Route("api/plan/create-version")]
+        public IHttpActionResult CreateVersion([FromBody] VersionRequest request)
+        {
+            if (request == null)
+                return BadRequest("リクエストが空です。");
+
+            var userName = "testUser";
+            _service.CreateVersionSnapshot(request.Year, request.Month, userName);
+            return Ok();
+        }
+    }
+
+    public class VersionRequest
+    {
+        public int Year { get; set; }
+        public int Month { get; set; }
     }
 }

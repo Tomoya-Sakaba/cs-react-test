@@ -307,5 +307,272 @@ namespace backend.Models.Repository
                 });
             }
         }
+
+        //------------------------------------------------------------------------------------------
+        // 既存レコードの更新（version指定）
+        //
+        // 指定された date + content_type_id + version に一致するレコードの値のみ更新します。
+        // バージョンは変更しません（据え置き）。
+        //------------------------------------------------------------------------------------------
+        public void UpdatePlan(IDbConnection db, IDbTransaction tran, DateTime date, int contentTypeId, TestItem item, int version)
+        {
+            string sql = @"
+                UPDATE t_plan
+                SET 
+                    company = @Company,
+                    vol = @Vol,
+                    time = @Time,
+                    updated_at = GETDATE()
+                WHERE 
+                    date = @Date
+                    AND content_type_id = @ContentTypeId
+                    AND version = @Version;
+            ";
+
+            db.Execute(sql, new
+            {
+                Date = date,
+                ContentTypeId = contentTypeId,
+                Company = item.Company,
+                Vol = item.Vol,
+                Time = item.Time,
+                Version = version
+            }, tran);
+        }
+
+        //------------------------------------------------------------------------------------------
+        // レコードの物理削除（version=0限定）
+        //------------------------------------------------------------------------------------------
+        public void DeletePlan(IDbConnection db, IDbTransaction tran, DateTime date, int contentTypeId, int version)
+        {
+            string sql = @"
+                DELETE FROM t_plan
+                WHERE 
+                    date = @Date
+                    AND content_type_id = @ContentTypeId
+                    AND version = @Version;
+            ";
+
+            db.Execute(sql, new
+            {
+                Date = date,
+                ContentTypeId = contentTypeId,
+                Version = version
+            }, tran);
+        }
+
+        //------------------------------------------------------------------------------------------
+        // 指定versionのレコードが存在するかチェック
+        //------------------------------------------------------------------------------------------
+        public bool ExistsPlanRecord(DateTime date, int contentTypeId, int version)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT COUNT(1)
+                    FROM t_plan
+                    WHERE 
+                        date = @Date
+                        AND content_type_id = @ContentTypeId
+                        AND version = @Version;
+                ";
+
+                int count = db.Query<int>(sql, new
+                {
+                    Date = date,
+                    ContentTypeId = contentTypeId,
+                    Version = version
+                }).FirstOrDefault();
+
+                return count > 0;
+            }
+        }
+
+        //------------------------------------------------------------------------------------------
+        // 月の現在のバージョンを取得
+        // plan_version_snapshot から current_version を取得（null の場合は未作成）
+        //------------------------------------------------------------------------------------------
+        public int? GetCurrentVersion(int year, int month)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT current_version
+                    FROM plan_version_snapshot
+                    WHERE year = @Year AND month = @Month;
+                ";
+
+                return db.Query<int?>(sql, new { Year = year, Month = month }).FirstOrDefault();
+            }
+        }
+
+        //------------------------------------------------------------------------------------------
+        // バージョンスナップショットを作成または更新
+        // 指定の (year, month) の current_version を upsert します。
+        //------------------------------------------------------------------------------------------
+        public void UpsertVersionSnapshot(IDbConnection db, IDbTransaction tran, int year, int month, int version, string userName)
+        {
+            string sql = @"
+                IF EXISTS (SELECT 1 FROM plan_version_snapshot WHERE year = @Year AND month = @Month)
+                BEGIN
+                    UPDATE plan_version_snapshot
+                    SET current_version = @Version,
+                        created_at = GETDATE(),
+                        created_user = @UserName
+                    WHERE year = @Year AND month = @Month;
+                END
+                ELSE
+                BEGIN
+                    INSERT INTO plan_version_snapshot (year, month, current_version, created_at, created_user)
+                    VALUES (@Year, @Month, @Version, GETDATE(), @UserName);
+                END;
+            ";
+
+            db.Execute(sql, new
+            {
+                Year = year,
+                Month = month,
+                Version = version,
+                UserName = userName
+            }, tran);
+        }
+
+        //------------------------------------------------------------------------------------------
+        // version=0のレコードを取得（日付とcontentTypeIdで）
+        //（必要に応じた個別参照用。今回は一括コピーAPIが主用途）
+        //------------------------------------------------------------------------------------------
+        public PlanRecordDto GetVersionZeroRecord(DateTime date, int contentTypeId)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT TOP 1
+                        date,
+                        content_type_id,
+                        company,
+                        vol,
+                        time,
+                        version,
+                        '' AS note_text
+                    FROM t_plan
+                    WHERE 
+                        date = @Date
+                        AND content_type_id = @ContentTypeId
+                        AND version = 0
+                    ORDER BY created_at DESC;
+                ";
+
+                return db.Query<PlanRecordDto>(sql, new
+                {
+                    Date = date,
+                    ContentTypeId = contentTypeId
+                }).FirstOrDefault();
+            }
+        }
+
+        //------------------------------------------------------------------------------------------
+        // version=0の全レコードをversion=1としてコピー
+        // バージョン切りの初回（0→1）に使用。
+        //------------------------------------------------------------------------------------------
+        public void CopyVersionZeroToVersionOne(IDbConnection db, IDbTransaction tran, int year, int month, string userName)
+        {
+            string sql = @"
+                INSERT INTO t_plan (date, content_type_id, company, vol, time, version, is_active, created_at, created_user, updated_at, updated_user)
+                SELECT 
+                    date,
+                    content_type_id,
+                    company,
+                    vol,
+                    time,
+                    1 AS version,
+                    is_active,
+                    GETDATE() AS created_at,
+                    @UserName AS created_user,
+                    GETDATE() AS updated_at,
+                    @UserName AS updated_user
+                FROM t_plan
+                WHERE 
+                    YEAR(date) = @Year
+                    AND MONTH(date) = @Month
+                    AND version = 0
+                    AND is_active = 1;
+            ";
+
+            db.Execute(sql, new
+            {
+                Year = year,
+                Month = month,
+                UserName = userName
+            }, tran);
+        }
+
+        //------------------------------------------------------------------------------------------
+        // 指定バージョンの全レコードを取得
+        //（デバッグ・検証用の補助API）
+        //------------------------------------------------------------------------------------------
+        public List<PlanRecordDto> GetPlanRecordsByVersion(int year, int month, int version)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT
+                        p.date,
+                        p.content_type_id,
+                        p.company,
+                        p.vol,
+                        p.time,
+                        p.version,
+                        COALESCE(n.note_text, '') AS note_text
+                    FROM t_plan p
+                    LEFT JOIN note n ON n.note_date = p.date
+                    WHERE 
+                        YEAR(p.date) = @Year
+                        AND MONTH(p.date) = @Month
+                        AND p.version = @Version
+                        AND p.is_active = 1
+                    ORDER BY p.date, p.content_type_id;
+                ";
+
+                return db.Query<PlanRecordDto>(sql, new { Year = year, Month = month, Version = version }).ToList();
+            }
+        }
+
+        //------------------------------------------------------------------------------------------
+        // 指定バージョンの全レコードを次のバージョンとしてコピー
+        // バージョン切り(>=1 → +1)時に使用。
+        //------------------------------------------------------------------------------------------
+        public void CopyVersionToNextVersion(IDbConnection db, IDbTransaction tran, int year, int month, int currentVersion, int nextVersion, string userName)
+        {
+            string sql = @"
+                INSERT INTO t_plan (date, content_type_id, company, vol, time, version, is_active, created_at, created_user, updated_at, updated_user)
+                SELECT 
+                    date,
+                    content_type_id,
+                    company,
+                    vol,
+                    time,
+                    @NextVersion AS version,
+                    is_active,
+                    GETDATE() AS created_at,
+                    @UserName AS created_user,
+                    GETDATE() AS updated_at,
+                    @UserName AS updated_user
+                FROM t_plan
+                WHERE 
+                    YEAR(date) = @Year
+                    AND MONTH(date) = @Month
+                    AND version = @CurrentVersion
+                    AND is_active = 1;
+            ";
+
+            db.Execute(sql, new
+            {
+                Year = year,
+                Month = month,
+                CurrentVersion = currentVersion,
+                NextVersion = nextVersion,
+                UserName = userName
+            }, tran);
+        }
     }
 }
