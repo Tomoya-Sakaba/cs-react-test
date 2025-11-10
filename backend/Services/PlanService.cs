@@ -236,6 +236,11 @@ namespace backend.Services
         //
         // - バージョンアップは別API(CreateVersionSnapshot)でのみ実施
         //---------------------------------------------------------------------
+        ///<summary>
+        /// 保存処理（追加・更新・削除 一括）
+        /// </summary>
+        /// <param name="plans">プランデータ</param>
+        /// <returns>なし</returns>
         public void SavePlans2(List<TestPlanDto> plans)
         {
             if (plans == null || plans.Count == 0)
