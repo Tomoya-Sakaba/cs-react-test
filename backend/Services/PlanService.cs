@@ -154,10 +154,10 @@ namespace backend.Services
                     {
                         foreach (var plan in plans)
                         {
-                            // --- note 登録 ---
+                            // --- note 登録（version=0固定） ---
                             if (!string.IsNullOrEmpty(plan.Note))
                             {
-                                _repository.InsertNote(db, tran, plan.Date, plan.Note, userName);
+                                _repository.InsertNote(db, tran, plan.Date, plan.Note, 0, userName);
                             }
 
                             // --- t_plan 登録 ---
@@ -212,67 +212,6 @@ namespace backend.Services
             return plan?.company == null
                 && plan?.vol == null
                 && plan?.time == null;
-        }
-
-        //---------------------------------------------------------------------
-        // 保存処理
-        //---------------------------------------------------------------------
-        public void SavePlans(List<TestPlanDto> plans)
-        {
-            try
-            {
-                // 本リクエストの共通 version を取得
-                var firstPlan = plans.First();
-                var date = DateTime.Parse(firstPlan.Date);
-                int year = date.Year;
-                int month = date.Month;
-
-                int newVersion = _repository.GetNextVersion(year, month);
-
-                foreach (var plan in plans)
-                {
-                    // 1. 既存データをその日の分取得（最新ver）
-                    var existingPlans = _repository.GetLatestByDate(DateTime.Parse(plan.Date));
-
-                    // 2. 新データの contentTypeId 一覧
-                    var newIds = plan.ContentType.Keys;
-
-                    // 3. 既存データの contentTypeId 一覧
-                    var existingIds = existingPlans.Select(x => x.content_type_id);
-
-
-                    // 4. 追加（新にあって既存にない）
-                    foreach (var id in newIds.Except(existingIds))
-                    {
-                        var item = plan.ContentType[id];
-                        _repository.Insert(DateTime.Parse(plan.Date), id, item, newVersion);
-                    }
-
-                    // 5. 更新（既存にあり内容が違う）
-                    foreach (var id in newIds.Intersect(existingIds))
-                    {
-                        var existing = existingPlans.First(x => x.content_type_id == id);
-                        var newItem = plan.ContentType[id];
-
-                        if (!IsSame(existing, newItem))
-                        {
-                            _repository.Insert(DateTime.Parse(plan.Date), id, newItem, newVersion);
-                        }
-                    }
-
-                    // 6. 削除（既存にあって新にない）
-                    // TODO: フロントからわたってくるときにそもそもレコード事消えてしまったら、一番最初のplansに含まれてないのでforeachに引っかからない
-                    foreach (var id in existingIds.Except(newIds))
-                    {
-                        _repository.InsertDeleted(DateTime.Parse(plan.Date), id, newVersion);
-                    }
-
-                }
-            }
-            catch
-            {
-                throw;
-            }
         }
 
         //---------------------------------------------------------------------
@@ -500,13 +439,61 @@ namespace backend.Services
                                 }
                             }
 
-                            // Noteの更新（必要に応じてUpdateNoteの実装を拡張）
-                            if (!string.IsNullOrEmpty(plan.Note))
+                            // Noteの更新処理（バージョン管理対応）
+                            string existingNote = existingPlans.FirstOrDefault()?.note_text ?? "";
+                            string newNote = plan.Note ?? "";
+                            
+                            // Noteが変更されている場合のみ処理
+                            if (existingNote != newNote)
                             {
-                                // Noteの更新処理（既存の実装に合わせて）
-                                // ここでは簡略化のため、既存のInsertNoteを使用
-                                // 実際にはUpdateNoteが必要かもしれません
+                                bool noteExistsAtTarget = _repository.NoteExists(date, targetVersion);
+                                string userName = "testUser";
+                                
+                                if (targetVersion == 0)
+                                {
+                                    // version=0 期間
+                                    if (string.IsNullOrEmpty(newNote))
+                                    {
+                                        // Noteが空になった場合は物理削除
+                                        if (noteExistsAtTarget)
+                                        {
+                                            _repository.DeleteNote(db, tran, date, targetVersion);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Noteが空でない場合
+                                        if (noteExistsAtTarget)
+                                        {
+                                            // 既存のNoteを更新
+                                            _repository.UpdateNote(db, tran, plan.Date, newNote, targetVersion, userName);
+                                        }
+                                        else
+                                        {
+                                            // 新規にNoteを挿入
+                                            _repository.InsertNote(db, tran, plan.Date, newNote, targetVersion, userName);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    // version>=1 期間
+                                    if (noteExistsAtTarget)
+                                    {
+                                        // 既存のtargetVersionのNoteを更新（空文字も含む）
+                                        _repository.UpdateNote(db, tran, plan.Date, newNote, targetVersion, userName);
+                                    }
+                                    else
+                                    {
+                                        // 新規にtargetVersionのNoteを挿入（空文字でない場合のみ）
+                                        if (!string.IsNullOrEmpty(newNote))
+                                        {
+                                            _repository.InsertNote(db, tran, plan.Date, newNote, targetVersion, userName);
+                                        }
+                                    }
+                                }
                             }
+                            // 変更がない場合は何もしない
                         }
 
                         //---------------------------------------------------------------
@@ -517,6 +504,38 @@ namespace backend.Services
                             var existingPlansForDate = existingAll
                                 .Where(x => x.date.Date == dateToDelete)
                                 .ToList();
+
+                            // その日付のNoteを取得
+                            string existingNoteForDate = existingPlansForDate.FirstOrDefault()?.note_text ?? "";
+                            
+                            // Noteの削除処理（バージョン管理対応）
+                            if (!string.IsNullOrEmpty(existingNoteForDate))
+                            {
+                                bool noteExistsAtTarget = _repository.NoteExists(dateToDelete, targetVersion);
+                                string userName = "testUser";
+                                
+                                if (targetVersion == 0)
+                                {
+                                    // version=0 期間：物理削除
+                                    if (noteExistsAtTarget)
+                                    {
+                                        _repository.DeleteNote(db, tran, dateToDelete, targetVersion);
+                                    }
+                                }
+                                else
+                                {
+                                    // version>=1 期間：空文字で更新
+                                    if (noteExistsAtTarget)
+                                    {
+                                        _repository.UpdateNote(db, tran, dateToDelete.ToString("yyyy-MM-dd"), "", targetVersion, userName);
+                                    }
+                                    else
+                                    {
+                                        // 新規に空文字のNoteを挿入
+                                        _repository.InsertNote(db, tran, dateToDelete.ToString("yyyy-MM-dd"), "", targetVersion, userName);
+                                    }
+                                }
+                            }
 
                             foreach (var existing in existingPlansForDate)
                             {

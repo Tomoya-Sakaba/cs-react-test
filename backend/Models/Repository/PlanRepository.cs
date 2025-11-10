@@ -32,8 +32,17 @@ namespace backend.Models.Repository
                     p.version,
                     n.note_text
                 FROM t_plan p
-                FULL OUTER JOIN note n 
-                    ON n.note_date = p.date
+                FULL OUTER JOIN (
+                    SELECT 
+                        note_date,
+                        note_text
+                    FROM note n2
+                    WHERE n2.version = (
+                        SELECT MAX(n3.version)
+                        FROM note n3
+                        WHERE n3.note_date = n2.note_date
+                    )
+                ) n ON n.note_date = p.date
                 WHERE 
                     (
                         p.version IS NULL
@@ -82,7 +91,18 @@ namespace backend.Models.Repository
                 END AS IsChanged,
                 n.note_text AS NoteText
             FROM t_plan p
-            LEFT JOIN note n ON n.note_date = p.date
+            LEFT JOIN (
+                SELECT 
+                    note_date,
+                    note_text
+                FROM note n2
+                WHERE n2.version = (
+                    SELECT MAX(n3.version)
+                    FROM note n3
+                    WHERE n3.note_date = n2.note_date
+                      AND n3.version <= @TargetVersion
+                )
+            ) n ON n.note_date = p.date
             WHERE p.version = (
                 SELECT MAX(version) 
                 FROM t_plan 
@@ -172,12 +192,14 @@ namespace backend.Models.Repository
         }
 
         // 新規登録（備考）
-        public void InsertNote(IDbConnection db, IDbTransaction tran, string date, string noteText, string userName)
+        public void InsertNote(IDbConnection db, IDbTransaction tran, string date, string noteText, int version, string userName)
         {
             const string sql = @"
                 INSERT INTO note (
                     note_date,
                     note_text,
+                    version,
+                    is_active,
                     created_at,
                     created_user,
                     updated_at,
@@ -186,6 +208,8 @@ namespace backend.Models.Repository
                 VALUES (
                     @NoteDate,
                     @NoteText,
+                    @Version,
+                    1,
                     GETDATE(),
                     @UserName,
                     GETDATE(),
@@ -197,7 +221,71 @@ namespace backend.Models.Repository
             {
                 NoteDate = DateTime.Parse(date),
                 NoteText = noteText,
+                Version = version,
                 UserName = userName
+            }, tran);
+        }
+
+        //------------------------------------------------------------------------------------------
+        // Noteの更新（version指定）
+        //------------------------------------------------------------------------------------------
+        public void UpdateNote(IDbConnection db, IDbTransaction tran, string date, string noteText, int version, string userName)
+        {
+            const string sql = @"
+                UPDATE note
+                SET 
+                    note_text = @NoteText,
+                    updated_at = GETDATE(),
+                    updated_user = @UserName
+                WHERE 
+                    note_date = @NoteDate
+                    AND version = @Version;
+            ";
+
+            db.Execute(sql, new
+            {
+                NoteDate = DateTime.Parse(date),
+                NoteText = noteText,
+                Version = version,
+                UserName = userName
+            }, tran);
+        }
+
+        //------------------------------------------------------------------------------------------
+        // Noteの存在チェック（version指定）
+        //------------------------------------------------------------------------------------------
+        public bool NoteExists(DateTime date, int version)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                const string sql = @"
+                    SELECT COUNT(1)
+                    FROM note
+                    WHERE note_date = @NoteDate
+                      AND version = @Version;
+                ";
+
+                int count = db.Query<int>(sql, new { NoteDate = date, Version = version }).FirstOrDefault();
+                return count > 0;
+            }
+        }
+
+        //------------------------------------------------------------------------------------------
+        // Noteの物理削除（version=0限定）
+        //------------------------------------------------------------------------------------------
+        public void DeleteNote(IDbConnection db, IDbTransaction tran, DateTime date, int version)
+        {
+            const string sql = @"
+                DELETE FROM note
+                WHERE 
+                    note_date = @NoteDate
+                    AND version = @Version;
+            ";
+
+            db.Execute(sql, new
+            {
+                NoteDate = date,
+                Version = version
             }, tran);
         }
 
@@ -241,8 +329,17 @@ namespace backend.Models.Repository
                         p.version,
                         n.note_text
                     FROM t_plan p
-                    FULL OUTER JOIN note n 
-                        ON n.note_date = p.date
+                    FULL OUTER JOIN (
+                        SELECT 
+                            note_date,
+                            note_text
+                        FROM note n2
+                        WHERE n2.version = (
+                            SELECT MAX(n3.version)
+                            FROM note n3
+                            WHERE n3.note_date = n2.note_date
+                        )
+                    ) n ON n.note_date = p.date
                     WHERE 
                         (
                             p.version IS NULL
