@@ -2,7 +2,12 @@ import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import type { ColDef, ColGroupDef } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
-import { fetchTestData, usePdfPreview, type PdfPreviewData, type TestPdfData } from '../hooks/usePdfPreview';
+import {
+  fetchTestData,
+  usePdfPreview,
+  type PdfPreviewData,
+  type TestPdfData,
+} from '../hooks/usePdfPreview';
 import TestPdf from '../components/TestPdf';
 import PdfPreview from '../components/PdfPreview';
 import { useEffect, useRef, useState } from 'react';
@@ -12,119 +17,147 @@ import { useYearMonthParams } from '../hooks/useYearMonthParams';
 import { mapMonthlyTestData } from '../utils/mappingData';
 import Toggle from '../components/Toggle';
 import CustomInputEditor from '../components/CustomInputEditor';
-import type { AgGridReact as AgGridReactType } from "ag-grid-react"; // 型補完用
+import type { AgGridReact as AgGridReactType } from 'ag-grid-react'; // 型補完用
 import { convertPlanData } from '../utils/convertData';
 
 // モジュール登録
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 export type fetchTestType = {
-  date: string,
-  contentType: number,
-  company: number,
-  vol: number,
-  time: string,
-  note: string,
-}
+  date: string;
+  contentType: number;
+  company: number;
+  vol: number;
+  time: string;
+  note: string;
+};
 
 export type testItem = {
-  company: number | null,
-  vol: number | null,
-  time: string | null,
-}
+  company: number | null;
+  vol: number | null;
+  time: string | null;
+};
 
 export type FetchPlanType = {
-  date: string,
-  contentType: Record<number, testItem>,
-  note: string
-}
+  date: string;
+  contentType: Record<number, testItem>;
+  note: string;
+};
 
 export type MapdePlan = {
-  date: string,
-  dayLabel: string, // 例: "1日(月)"
-  isHoliday: boolean,
-  isSturday: boolean,
-  contentType: Record<number, testItem>,
-  note: string
-}
+  date: string;
+  dayLabel: string; // 例: "1日(月)"
+  isHoliday: boolean;
+  isSturday: boolean;
+  contentType: Record<number, testItem>;
+  note: string;
+};
 
 export type ContentTypeList = {
   contentTypeId: number;
   contentName: string;
-}
+};
 
 export type MapedTestType = {
-  date: string,
-  dayLabel: string, // 例: "1日(月)"
-  isHoliday: boolean,
-  isSturday: boolean,
-  contentA: testItem,
-  contentB: testItem,
-  contentC: testItem,
-  contentD: testItem,
-  note: string
-}
+  date: string;
+  dayLabel: string; // 例: "1日(月)"
+  isHoliday: boolean;
+  isSturday: boolean;
+  contentA: testItem;
+  contentB: testItem;
+  contentC: testItem;
+  contentD: testItem;
+  note: string;
+};
 
-const getColumnDefs = (isEditing: boolean, contentTypeList: ContentTypeList[]): (ColDef<MapdePlan> | ColGroupDef<MapdePlan>)[] => [
-  {
-    headerName: "日付",
-    field: "dayLabel",
-    width: 100,
-    pinned: "left",
-    cellClass: params => {
-      if (params.data?.isHoliday) return "text-red-500 font-bold";
-      if (params.data?.isSturday) return "text-blue-500 font-bold";
-      return "text-gray-800";
+const getColumnDefs = (
+  isEditing: boolean,
+  selectedIds: number[],
+  originalList: ContentTypeList[]
+): (ColDef<MapdePlan> | ColGroupDef<MapdePlan>)[] => {
+  // 選択されたIDのみをフィルタリングし、オリジナルの順序でソート
+  const filteredAndSorted = originalList
+    .filter((type) => selectedIds.includes(type.contentTypeId))
+    .sort((a, b) => {
+      const indexA = originalList.findIndex(
+        (t) => t.contentTypeId === a.contentTypeId
+      );
+      const indexB = originalList.findIndex(
+        (t) => t.contentTypeId === b.contentTypeId
+      );
+      return indexA - indexB;
+    });
+
+  return [
+    {
+      headerName: '日付',
+      field: 'dayLabel',
+      width: 100,
+      pinned: 'left',
+      cellClass: (params) => {
+        if (params.data?.isHoliday) return 'text-red-500 font-bold';
+        if (params.data?.isSturday) return 'text-blue-500 font-bold';
+        return 'text-gray-800';
+      },
     },
-  },
-  ...contentTypeList.map(type => ({
-    headerName: type.contentName,
-    children: [
-      {
-        headerName: "会社",
-        field: `contentType.${type.contentTypeId}.company`,
-        minWidth: 90,
-        flex: 1,
-        editable: isEditing,
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "number" },
-      },
-      {
-        headerName: "数量",
-        field: `contentType.${type.contentTypeId}.vol`,
-        minWidth: 90,
-        flex: 1,
-        editable: isEditing,
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "number" },
-      },
-      {
-        headerName: "時間",
-        field: `contentType.${type.contentTypeId}.time`,
-        flex: 1,
-        minWidth: 90,
-        editable: isEditing,
-        cellEditor: CustomInputEditor,
-        cellEditorParams: { type: "time" },
-      },
-    ],
-  })),
-  {
-    headerName: "備考",
-    field: "note",
-    minWidth: 200,
-    editable: isEditing, // ここで toggle 状態で編集可否切替
-    cellEditor: CustomInputEditor,
-    cellEditorParams: { type: "text" },
-  },
-];
+    ...filteredAndSorted.map((type) => ({
+      headerName: type.contentName,
+      children: [
+        {
+          headerName: '会社',
+          field: `contentType.${type.contentTypeId}.company`,
+          minWidth: 90,
+          flex: 1,
+          editable: isEditing,
+          cellEditor: CustomInputEditor,
+          cellEditorParams: { type: 'number' },
+        },
+        {
+          headerName: '数量',
+          field: `contentType.${type.contentTypeId}.vol`,
+          minWidth: 90,
+          flex: 1,
+          editable: isEditing,
+          cellEditor: CustomInputEditor,
+          cellEditorParams: { type: 'number' },
+        },
+        {
+          headerName: '時間',
+          field: `contentType.${type.contentTypeId}.time`,
+          flex: 1,
+          minWidth: 90,
+          editable: isEditing,
+          cellEditor: CustomInputEditor,
+          cellEditorParams: { type: 'time' },
+        },
+      ],
+    })),
+    {
+      headerName: '備考',
+      field: 'note',
+      minWidth: 200,
+      editable: isEditing, // ここで toggle 状態で編集可否切替
+      cellEditor: CustomInputEditor,
+      cellEditorParams: { type: 'text' },
+    },
+  ];
+};
 
 const AgTest = () => {
   const { currentYear, currentIndexMonth } = useYearMonthParams();
   const [isEditing, setIsEditing] = useState(false);
   const [rowData, setRowData] = useState<MapdePlan[]>([]);
   const [agRowData, setAgRowData] = useState<MapdePlan[]>([]);
-  const [constentType, setContentType] = useState<ContentTypeList[]>([])
+  // オリジナルのcontentTypeリスト（順序保持用）
+  const [originalContentType, setOriginalContentType] = useState<
+    ContentTypeList[]
+  >([]);
+  // 表示するcontentTypeのIDリスト
+  const [selectedContentTypeIds, setSelectedContentTypeIds] = useState<
+    number[]
+  >([]);
+  // ヘッダー設定モーダルの表示状態
+  const [isHeaderConfigOpen, setIsHeaderConfigOpen] = useState(false);
   const gridRef = useRef<AgGridReactType<MapdePlan>>(null);
 
   //---------------------------------------------------------------------------
@@ -133,55 +166,69 @@ const AgTest = () => {
   const [isNew, setIsNew] = useState(false);
   useEffect(() => {
     const fetchData = async () => {
-
       // fetch
-      const res = await testApi.fetchPlanData(currentYear, currentIndexMonth + 1);
-      console.log("res", res);
+      const res = await testApi.fetchPlanData(
+        currentYear,
+        currentIndexMonth + 1
+      );
+      console.log('res', res);
 
       // fetch
       const resContent = await testApi.fetchContentTypeList();
-      console.log("resContent", resContent);
+      console.log('resContent', resContent);
 
-      setContentType(resContent);
+      // オリジナルの順序を保持
+      setOriginalContentType(resContent);
+      // 初期状態では全て選択
+      const allIds = resContent.map((item) => item.contentTypeId);
+      setSelectedContentTypeIds(allIds);
       const contentTypeIdList = getContentTypeIdList(resContent);
-      console.log("contentTypeIdList", contentTypeIdList);
+      console.log('contentTypeIdList', contentTypeIdList);
 
       //const defaultData = getDefaultRecord(contentTypeIdList);
       //console.log("defaultData", defaultData);
 
       if (res.length === 0 || !res) {
         setIsNew(true);
-        console.log("isNew:", isNew);
+        console.log('isNew:', isNew);
 
         // 全日マッピング処理
-        const mapData = mapMonthlyTestData([], currentYear, currentIndexMonth, getDefaultRecord, contentTypeIdList)
-        console.log("mapData(新規)", mapData)
+        const mapData = mapMonthlyTestData(
+          [],
+          currentYear,
+          currentIndexMonth,
+          getDefaultRecord,
+          contentTypeIdList
+        );
+        console.log('mapData(新規)', mapData);
         setRowData(mapData);
         setAgRowData(JSON.parse(JSON.stringify(mapData)));
-
       } else {
         // 全日マッピング処理
-        const mapData = mapMonthlyTestData(res, currentYear, currentIndexMonth, getDefaultRecord, contentTypeIdList)
-        console.log("mapData(既存)", mapData)
+        const mapData = mapMonthlyTestData(
+          res,
+          currentYear,
+          currentIndexMonth,
+          getDefaultRecord,
+          contentTypeIdList
+        );
+        console.log('mapData(既存)', mapData);
         setRowData(mapData);
         setAgRowData(JSON.parse(JSON.stringify(mapData)));
       }
-
-    }
-    fetchData()
-  }, [currentYear, currentIndexMonth, isNew])
-
+    };
+    fetchData();
+  }, [currentYear, currentIndexMonth, isNew]);
 
   const getContentTypeIdList = (list: ContentTypeList[]): number[] => {
-    return list.map(item => item.contentTypeId);
-  }
+    return list.map((item) => item.contentTypeId);
+  };
   const getDefaultRecord = (IdList: number[]): Record<number, testItem> => {
     return IdList.reduce((acc, id) => {
       acc[id] = { company: null, vol: null, time: null };
       return acc;
     }, {} as Record<number, testItem>);
   };
-
 
   //---------------------------------------------------------------------------
   // 編集
@@ -192,7 +239,7 @@ const AgTest = () => {
 
       if (hasChanges) {
         const confirmDiscard = window.confirm(
-          "変更内容を破棄して編集モードを解除しますか？"
+          '変更内容を破棄して編集モードを解除しますか？'
         );
 
         if (confirmDiscard) {
@@ -221,32 +268,28 @@ const AgTest = () => {
 
     const updatedRows: MapdePlan[] = [];
 
-    gridRef.current.api.forEachNode(node => {
+    gridRef.current.api.forEachNode((node) => {
       if (node.data) updatedRows.push(node.data);
     });
 
-    console.log("保存処理：", updatedRows);
-
+    console.log('保存処理：', updatedRows);
 
     const reqData = convertPlanData(updatedRows);
-    console.log("コンバート後：", reqData);
+    console.log('コンバート後：', reqData);
 
     try {
-
       if (isNew) {
         // --- API呼び出し（あなたのtestApi経由）---
         const res = await testApi.createNewPlan(reqData);
-        console.log("登録成功:", res);
-        alert("新規登録が完了しました。");
+        console.log('登録成功:', res);
+        alert('新規登録が完了しました。');
 
         setIsNew(false);
-
       } else {
         // --- API呼び出し（あなたのtestApi経由）---
         const res = await testApi.savePlan(reqData);
-        console.log("保存成功:", res);
-        alert("保存が完了しました。");
-
+        console.log('保存成功:', res);
+        alert('保存が完了しました。');
       }
 
       // 編集モード解除
@@ -255,10 +298,9 @@ const AgTest = () => {
       // Grid内の現在の状態をagRowDataとrowDataにセット
       setAgRowData(updatedRows);
       setRowData(updatedRows);
-
     } catch (error) {
-      console.error("登録エラー:", error);
-      alert("登録に失敗しました。サーバーを確認してください。");
+      console.error('登録エラー:', error);
+      alert('登録に失敗しました。サーバーを確認してください。');
     }
   };
 
@@ -270,43 +312,83 @@ const AgTest = () => {
   // - 以後の保存は新しいversionに対する上書き更新となる（保存ではversionを上げない）
   //---------------------------------------------------------------------------
   const handleCreateVersion = async () => {
-    if (!window.confirm("バージョンを切りますか？この操作は元に戻せません。")) {
+    if (!window.confirm('バージョンを切りますか？この操作は元に戻せません。')) {
       return;
     }
 
     try {
-      const res = await testApi.createVersion(currentYear, currentIndexMonth + 1);
-      console.log("バージョン作成成功:", res);
-      alert("バージョンの作成が完了しました。");
+      const res = await testApi.createVersion(
+        currentYear,
+        currentIndexMonth + 1
+      );
+      console.log('バージョン作成成功:', res);
+      alert('バージョンの作成が完了しました。');
 
       // データを再取得
       const fetchData = async () => {
-        const res = await testApi.fetchPlanData(currentYear, currentIndexMonth + 1);
+        const res = await testApi.fetchPlanData(
+          currentYear,
+          currentIndexMonth + 1
+        );
         const resContent = await testApi.fetchContentTypeList();
-        setContentType(resContent);
+        setOriginalContentType(resContent);
+        const allIds = resContent.map((item) => item.contentTypeId);
+        setSelectedContentTypeIds(allIds);
         const contentTypeIdList = getContentTypeIdList(resContent);
 
-        const mapData = mapMonthlyTestData(res, currentYear, currentIndexMonth, getDefaultRecord, contentTypeIdList);
+        const mapData = mapMonthlyTestData(
+          res,
+          currentYear,
+          currentIndexMonth,
+          getDefaultRecord,
+          contentTypeIdList
+        );
         setRowData(mapData);
         setAgRowData(JSON.parse(JSON.stringify(mapData)));
       };
       await fetchData();
     } catch (error) {
-      console.error("バージョン作成エラー:", error);
-      alert("バージョンの作成に失敗しました。サーバーを確認してください。");
+      console.error('バージョン作成エラー:', error);
+      alert('バージョンの作成に失敗しました。サーバーを確認してください。');
     }
   };
-
 
   //---------------------------------------------------------------------------
   // PDF
   //---------------------------------------------------------------------------
-  const pdfHook = usePdfPreview<PdfPreviewData<TestPdfData[]>>(2025, 9)
+  const pdfHook = usePdfPreview<PdfPreviewData<TestPdfData[]>>(2025, 9);
 
   const handleClick = async () => {
     const pdfData = await fetchTestData(2025, 9 + 1);
 
     await pdfHook.handlePreviewPdf(pdfData, TestPdf);
+  };
+
+  //---------------------------------------------------------------------------
+  // ヘッダー設定関連
+  //---------------------------------------------------------------------------
+  const handleContentTypeToggle = (contentTypeId: number) => {
+    setSelectedContentTypeIds((prev) => {
+      if (prev.includes(contentTypeId)) {
+        return prev.filter((id) => id !== contentTypeId);
+      } else {
+        return [...prev, contentTypeId];
+      }
+    });
+  };
+
+  const handleResetToOriginal = () => {
+    const allIds = originalContentType.map((item) => item.contentTypeId);
+    setSelectedContentTypeIds(allIds);
+  };
+
+  const handleSelectAll = () => {
+    const allIds = originalContentType.map((item) => item.contentTypeId);
+    setSelectedContentTypeIds(allIds);
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedContentTypeIds([]);
   };
 
   //---------------------------------------------------------------------------
@@ -336,6 +418,12 @@ const AgTest = () => {
             >
               バージョンを切る
             </button>
+            <button
+              className="ml-5 h-full w-32 rounded-lg bg-purple-500 px-4 py-2 text-sm text-white hover:bg-purple-600"
+              onClick={() => setIsHeaderConfigOpen(true)}
+            >
+              ヘッダー設定
+            </button>
           </div>
           <div>
             <p className="mb-2 text-xl">編集モード</p>
@@ -352,20 +440,23 @@ const AgTest = () => {
             <AgGridReact
               ref={gridRef}
               rowData={agRowData}
-              columnDefs={getColumnDefs(isEditing, constentType)}
+              columnDefs={getColumnDefs(
+                isEditing,
+                selectedContentTypeIds,
+                originalContentType
+              )}
               defaultColDef={{
                 resizable: false,
                 singleClickEdit: true,
                 valueFormatter: (params) => {
                   const v = params.value;
-                  if (v === "" || v === 0) return "-";
+                  if (v === '' || v === 0) return '-';
                   return v;
-                }
+                },
               }}
             />
           </div>
         </div>
-
 
         {/* PDFプレビューモーダル */}
         {pdfHook.isOpen && pdfHook.previewData && (
@@ -377,9 +468,74 @@ const AgTest = () => {
             error={pdfHook.error}
           />
         )}
+
+        {/* ヘッダー設定モーダル */}
+        {isHeaderConfigOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="w-96 rounded-lg bg-white p-6 shadow-xl">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-xl font-bold">ヘッダー設定</h2>
+                <button
+                  onClick={() => setIsHeaderConfigOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="mb-4 flex gap-2">
+                <button
+                  onClick={handleSelectAll}
+                  className="rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+                >
+                  全て選択
+                </button>
+                <button
+                  onClick={handleDeselectAll}
+                  className="rounded bg-gray-500 px-3 py-1 text-sm text-white hover:bg-gray-600"
+                >
+                  全て解除
+                </button>
+                <button
+                  onClick={handleResetToOriginal}
+                  className="rounded bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+                >
+                  元の順序に戻す
+                </button>
+              </div>
+              <div className="max-h-96 space-y-2 overflow-y-auto">
+                {originalContentType.map((type) => (
+                  <label
+                    key={type.contentTypeId}
+                    className="flex items-center space-x-2 rounded p-2 hover:bg-gray-100"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedContentTypeIds.includes(
+                        type.contentTypeId
+                      )}
+                      onChange={() =>
+                        handleContentTypeToggle(type.contentTypeId)
+                      }
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm">{type.contentName}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => setIsHeaderConfigOpen(false)}
+                  className="rounded bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+                >
+                  閉じる
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
-  )
+  );
 };
 
 export default AgTest;

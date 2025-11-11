@@ -85,12 +85,18 @@ export const testApi = {
   },
 
   async fetchContentTypeList(): Promise<ContentTypeList[]> {
-    const res = await axios.get<ContentTypeList[]>('/api/content', {
-      headers: {
-        Accept: 'application/json',
-      },
-    });
-    return res.data;
+    // const res = await axios.get<ContentTypeList[]>('/api/content', {
+    //   headers: {
+    //     Accept: 'application/json',
+    //   },
+    // });
+    const res: ContentTypeList[] = [
+      { contentTypeId: 1, contentName: 'コンテンツA' },
+      { contentTypeId: 2, contentName: 'コンテンツB' },
+      { contentTypeId: 3, contentName: 'コンテンツC' },
+      { contentTypeId: 4, contentName: 'コンテンツD' },
+    ];
+    return res;
   },
 
   async createNewPlan(form: FetchPlanType[]) {
