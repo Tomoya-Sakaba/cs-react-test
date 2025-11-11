@@ -23,6 +23,42 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
+                WITH latest_plan AS (
+                    -- 最新バージョンのt_planを先に取得
+                    SELECT 
+                        p.date,
+                        p.content_type_id,
+                        p.company,
+                        p.vol,
+                        p.time,
+                        p.version
+                    FROM t_plan p
+                    INNER JOIN (
+                        SELECT 
+                            date,
+                            content_type_id,
+                            MAX(version) AS max_version
+                        FROM t_plan
+                        GROUP BY date, content_type_id
+                    ) max_p ON p.date = max_p.date 
+                           AND p.content_type_id = max_p.content_type_id 
+                           AND p.version = max_p.max_version
+                ),
+                latest_note AS (
+                    -- 最新バージョンのnoteを先に取得
+                    SELECT 
+                        n.note_date,
+                        n.note_text
+                    FROM note n
+                    INNER JOIN (
+                        SELECT 
+                            note_date,
+                            MAX(version) AS max_version
+                        FROM note
+                        GROUP BY note_date
+                    ) max_n ON n.note_date = max_n.note_date 
+                          AND n.version = max_n.max_version
+                )
                 SELECT
                     COALESCE(p.date, n.note_date) AS date,
                     p.content_type_id,
@@ -31,29 +67,10 @@ namespace backend.Models.Repository
                     p.time,
                     p.version,
                     n.note_text
-                FROM t_plan p
-                FULL OUTER JOIN (
-                    SELECT 
-                        note_date,
-                        note_text
-                    FROM note n2
-                    WHERE n2.version = (
-                        SELECT MAX(n3.version)
-                        FROM note n3
-                        WHERE n3.note_date = n2.note_date
-                    )
-                ) n ON n.note_date = p.date
+                FROM latest_plan p
+                FULL OUTER JOIN latest_note n ON n.note_date = p.date
                 WHERE 
-                    (
-                        p.version IS NULL
-                        OR p.version = (
-                            SELECT MAX(tp.version)
-                            FROM t_plan tp
-                            WHERE tp.date = p.date
-                              AND tp.content_type_id = p.content_type_id
-                        )
-                    )
-                    AND YEAR(COALESCE(p.date, n.note_date)) = @Year
+                    YEAR(COALESCE(p.date, n.note_date)) = @Year
                     AND MONTH(COALESCE(p.date, n.note_date)) = @Month
                 ORDER BY 
                     COALESCE(p.date, n.note_date),
@@ -70,49 +87,60 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-            SELECT
-                p.date AS Date,
-                p.content_type_id AS ContentTypeId,
-                p.company AS Company,
-                p.vol AS Vol,
-                p.time AS Time,
-                p.version AS Version,
-                p.is_active AS IsActive,
-                CASE 
-                    WHEN EXISTS (
-                        SELECT 1
-                        FROM t_plan newer
-                        WHERE newer.date = p.date
-                          AND newer.content_type_id = p.content_type_id
-                          AND newer.version > p.version
-                          AND newer.is_active = 1
-                    ) THEN 1
-                    ELSE 0
-                END AS IsChanged,
-                n.note_text AS NoteText
-            FROM t_plan p
-            LEFT JOIN (
-                SELECT 
-                    note_date,
-                    note_text
-                FROM note n2
-                WHERE n2.version = (
-                    SELECT MAX(n3.version)
-                    FROM note n3
-                    WHERE n3.note_date = n2.note_date
-                      AND n3.version <= @TargetVersion
-                )
-            ) n ON n.note_date = p.date
-            WHERE p.version = (
-                SELECT MAX(version) 
-                FROM t_plan 
-                WHERE date = p.date
-                  AND content_type_id = p.content_type_id
-                  AND version <= @TargetVersion
-                )
-                AND YEAR(p.date) = @Year
-                AND MONTH(p.date) = @Month
-            ORDER BY p.date, p.content_type_id;
+                    WITH latest_plan AS (
+                            -- 最新バージョンのt_planを先に取得
+                            SELECT 
+                                p.date,
+                                p.content_type_id,
+                                p.company,
+                                p.vol,
+                                p.time,
+                                p.version
+                            FROM t_plan p
+                            INNER JOIN (
+                                SELECT 
+                                    date,
+                                    content_type_id,
+                                    MAX(version) AS max_version
+                                FROM t_plan
+                                WHERE version <= @TargetVersion
+                                GROUP BY date, content_type_id
+                            ) max_p ON p.date = max_p.date 
+                                   AND p.content_type_id = max_p.content_type_id 
+                                   AND p.version = max_p.max_version
+                        ),
+                        latest_note AS (
+                            -- 最新バージョンのnoteを先に取得
+                            SELECT 
+                                n.note_date,
+                                n.note_text
+                            FROM note n
+                            INNER JOIN (
+                                SELECT 
+                                    note_date,
+                                    MAX(version) AS max_version
+                                FROM note
+                                WHERE version <= @TargetVersion
+                                GROUP BY note_date
+                            ) max_n ON n.note_date = max_n.note_date 
+                                  AND n.version = max_n.max_version
+                        )
+                        SELECT
+                            COALESCE(p.date, n.note_date) AS date,
+                            p.content_type_id,
+                            p.company,
+                            p.vol,
+                            p.time,
+                            p.version,
+                            n.note_text
+                        FROM latest_plan p
+                        FULL OUTER JOIN latest_note n ON n.note_date = p.date
+                        WHERE 
+                            YEAR(COALESCE(p.date, n.note_date)) = @Year
+                            AND MONTH(COALESCE(p.date, n.note_date)) = @Month
+                        ORDER BY 
+                            COALESCE(p.date, n.note_date),
+                            p.content_type_id;
         ";
 
                 return db.Query<PlanHistoryDto>(
