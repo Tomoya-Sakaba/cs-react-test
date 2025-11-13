@@ -158,6 +158,7 @@
     <Compile Include="Areas\HelpPage\SampleGeneration\SampleDirection.cs" />
     <Compile Include="Areas\HelpPage\SampleGeneration\TextSample.cs" />
     <Compile Include="Areas\HelpPage\XmlDocumentationProvider.cs" />
+    <Compile Include="Controllers\ApprovalController.cs" />
     <Compile Include="Controllers\HelloController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Controllers\PdfController.cs" />
@@ -167,6 +168,7 @@
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
+    <Compile Include="Models\DTOs\ApprovalDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeListDto.cs" />
     <Compile Include="Models\DTOs\PlanHistoryDto.cs" />
@@ -178,13 +180,16 @@
     <Compile Include="Models\DTOs\TestPlanHistoryDto.cs" />
     <Compile Include="Models\DTOs\UpdateUserRepuest.cs" />
     <Compile Include="Models\DTOs\UserResponse.cs" />
+    <Compile Include="Models\Entities\ApprovalEntity.cs" />
     <Compile Include="Models\Entities\PlanEntity.cs" />
     <Compile Include="Models\Entities\PlanVersionSnapshotEntity.cs" />
     <Compile Include="Models\Entities\UsersEntity.cs" />
+    <Compile Include="Models\Repository\ApprovalRepository.cs" />
     <Compile Include="Models\Repository\PlanRepository.cs" />
     <Compile Include="Models\Repository\UsersRepository.cs" />
     <Compile Include="Models\DTOs\CreateUserRequest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Services\ApprovalService.cs" />
     <Compile Include="Services\PlanService.cs" />
     <Compile Include="Services\TestService.cs" />
   </ItemGroup>

@@ -19,6 +19,8 @@ import Toggle from '../components/Toggle';
 import CustomInputEditor from '../components/CustomInputEditor';
 import type { AgGridReact as AgGridReactType } from 'ag-grid-react'; // 型補完用
 import { convertPlanData } from '../utils/convertData';
+import ApprovalDrawer from '../components/ApprovalDrawer';
+import { useApproval } from '../hooks/useApproval';
 
 // モジュール登録
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -143,6 +145,7 @@ const getColumnDefs = (
   ];
 };
 
+
 const AgTest = () => {
   const { currentYear, currentIndexMonth } = useYearMonthParams();
   const [isEditing, setIsEditing] = useState(false);
@@ -158,6 +161,8 @@ const AgTest = () => {
   >([]);
   // ヘッダー設定モーダルの表示状態
   const [isHeaderConfigOpen, setIsHeaderConfigOpen] = useState(false);
+  // 上程Drawerの表示状態
+  const [isApprovalDrawerOpen, setIsApprovalDrawerOpen] = useState(false);
   const gridRef = useRef<AgGridReactType<MapdePlan>>(null);
 
   //---------------------------------------------------------------------------
@@ -234,6 +239,18 @@ const AgTest = () => {
   // 編集
   //---------------------------------------------------------------------------
   const toggleEditMode = () => {
+    // 上程完了済みの場合は編集不可
+    if (approvalStatus.some((a) => a.status === 5)) {
+      alert('上程が完了しているため、編集できません。');
+      return;
+    }
+
+    // 上程中は承認者のみが編集可能
+    if (!canEdit()) {
+      alert('上程中です。承認者のみが編集できます。');
+      return;
+    }
+
     if (isEditing) {
       const hasChanges = JSON.stringify(agRowData) !== JSON.stringify(rowData);
 
@@ -392,6 +409,28 @@ const AgTest = () => {
   };
 
   //---------------------------------------------------------------------------
+  // 上程関連（useApproval hookを使用）
+  //---------------------------------------------------------------------------
+  const {
+    approvalStatus,
+    canEdit,
+    isCompleted,
+  } = useApproval({
+    year: currentYear,
+    month: currentIndexMonth + 1,
+    autoFetch: true,
+  });
+
+  // 上程状態をチェック（承認者のみが操作可能かどうか）
+  const checkCanEdit = (): boolean => {
+    // 完了済みの場合は編集不可
+    if (isCompleted()) {
+      return false;
+    }
+    return canEdit();
+  };
+
+  //---------------------------------------------------------------------------
   // 描画JSX
   //---------------------------------------------------------------------------
   return (
@@ -424,6 +463,12 @@ const AgTest = () => {
             >
               ヘッダー設定
             </button>
+            <button
+              className="ml-5 h-full w-32 rounded-lg bg-orange-500 px-4 py-2 text-sm text-white hover:bg-orange-600"
+              onClick={() => setIsApprovalDrawerOpen(true)}
+            >
+              上程
+            </button>
           </div>
           <div>
             <p className="mb-2 text-xl">編集モード</p>
@@ -441,7 +486,7 @@ const AgTest = () => {
               ref={gridRef}
               rowData={agRowData}
               columnDefs={getColumnDefs(
-                isEditing,
+                isEditing && checkCanEdit(), // 編集可能かつ承認対象の場合のみ編集可能
                 selectedContentTypeIds,
                 originalContentType
               )}
@@ -533,6 +578,33 @@ const AgTest = () => {
             </div>
           </div>
         )}
+
+        {/* 上程状態表示（簡易表示） */}
+        {approvalStatus.length > 0 && (
+          <div className="mb-4 rounded-lg border-2 border-orange-500 bg-orange-50 p-3">
+            <div className="text-sm font-bold text-orange-700">
+              上程中 -{' '}
+              {approvalStatus
+                .filter((a) => a.status === 1)
+                .map((a) => a.userName)
+                .join(', ')}{' '}
+              が承認待ち
+            </div>
+            {isCompleted() && (
+              <div className="mt-1 text-sm font-bold text-green-700">
+                上程が完了しました
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 上程Drawer */}
+        <ApprovalDrawer
+          isOpen={isApprovalDrawerOpen}
+          onClose={() => setIsApprovalDrawerOpen(false)}
+          year={currentYear}
+          month={currentIndexMonth + 1}
+        />
       </div>
     </>
   );

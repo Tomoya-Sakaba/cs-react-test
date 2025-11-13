@@ -48,6 +48,9 @@ namespace backend.Controllers
             {
                 Id = e.Id,
                 Name = e.Name,
+                Email = e.Email,
+                Department = e.Department,
+                Position = e.Position,
                 CreatedAt = e.CreatedAt,
                 UpdatedAt = e.UpdatedAt
             }).ToList();
@@ -65,6 +68,9 @@ namespace backend.Controllers
             {
                 Id = e.Id,
                 Name = e.Name,
+                Email = e.Email,
+                Department = e.Department,
+                Position = e.Position,
                 CreatedAt = e.CreatedAt,
                 UpdatedAt = e.UpdatedAt
             }).ToList();

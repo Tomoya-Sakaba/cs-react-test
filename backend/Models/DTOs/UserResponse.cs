@@ -17,6 +17,15 @@ namespace backend.Models.DTOs
         [JsonProperty("updatedAt")]
         public DateTime UpdatedAt { get; set; }
 
+        [JsonProperty("email")]
+        public string Email { get; set; }
+
+        [JsonProperty("department")]
+        public string Department { get; set; }
+
+        [JsonProperty("position")]
+        public string Position { get; set; }
+
         // Password は返さない
     }
 }

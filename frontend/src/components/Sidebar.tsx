@@ -1,5 +1,8 @@
 //import { useAuth } from "../hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import NavigationItem from "./NavigationItem";
+import { useSetAtom } from "jotai";
+import { currentUserAtom } from "../atoms/authAtom";
 
 type Props = {
   isHovered: boolean;
@@ -8,6 +11,13 @@ type Props = {
 
 const Sidebar = ({ isHovered, setIsHovered }: Props) => {
   //const { handleLogout } = useAuth();
+  const navigate = useNavigate();
+  const setCurrentUser = useSetAtom(currentUserAtom);
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    navigate("/login");
+  };
   return (
     <>
       <nav
@@ -36,20 +46,20 @@ const Sidebar = ({ isHovered, setIsHovered }: Props) => {
 
         {/* ログアウトボタン */}
         <div className="relative m-4 flex h-12 items-center">
-          {/*<button*/}
-          {/*  onClick={handleLogout}*/}
-          {/*  className={`bg-gray-500 hover:bg-gray-600 text-white font-medium p-2 rounded-lg transition-all duration-300 w-full flex justify-center ${isHovered ? "opacity-0" : "opacity-100"*/}
-          {/*    }`}*/}
-          {/*>*/}
-          {/*  <span className="i-mdi-logout text-xl"></span>*/}
-          {/*</button>*/}
-          {/*<button*/}
-          {/*  onClick={handleLogout}*/}
-          {/*  className={`bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg w-full absolute whitespace-nowrap transition-opacity duration-300 ${isHovered ? "opacity-100" : "opacity-0"*/}
-          {/*    }`}*/}
-          {/*>*/}
-          {/*  ログアウト*/}
-          {/*</button>*/}
+          <button
+            onClick={handleLogout}
+            className={`bg-gray-500 hover:bg-gray-600 text-white font-medium p-2 rounded-lg transition-all duration-300 w-full flex justify-center ${isHovered ? "opacity-0" : "opacity-100"
+              }`}
+          >
+            <span className="i-mdi-logout text-xl"></span>
+          </button>
+          <button
+            onClick={handleLogout}
+            className={`bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg w-full absolute whitespace-nowrap transition-opacity duration-300 ${isHovered ? "opacity-100" : "opacity-0"
+              }`}
+          >
+            ログアウト
+          </button>
         </div>
       </nav>
     </>
