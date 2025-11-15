@@ -20,42 +20,45 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     INSERT INTO dbo.Approvals (
-                        ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, Created_At, Updated_At
+                        PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, Created_At, Updated_At
                     )
                     VALUES (
-                        @ReportNo, @Year, @Month, @UserName, @FlowOrder, @Status, @Comment, @ActionDate, GETDATE(), GETDATE()
+                        @PageCode, @ReportNo, @Year, @Month, @UserName, @FlowOrder, @Status, @Comment, @ActionDate, GETDATE(), GETDATE()
                     )";
                 db.Execute(sql, approval);
             }
         }
 
-        // 報告書No、年、月で上程データを取得
-        public List<ApprovalEntity> GetApprovalsByReport(string reportNo, int year, int month)
+        // PageCode、報告書No、年、月で上程データを取得
+        public List<ApprovalEntity> GetApprovalsByReport(int pageCode, string reportNo, int year, int month)
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
-                // reportNoが空の場合は年・月のみで検索
+                // PageCode=1（複数レコード型）の場合はReportNoを無視、PageCode=2（1レコード型）の場合はReportNo必須
                 string sql;
-                if (string.IsNullOrEmpty(reportNo))
+                if (pageCode == 1)
                 {
+                    // 複数レコード型ページ：PageCode、Year、Monthのみで検索
                     sql = @"
-                        SELECT Id, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, 
+                        SELECT Id, PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, 
                                Created_At AS CreatedAt, Updated_At AS UpdatedAt
                         FROM dbo.Approvals
-                        WHERE Year = @Year AND Month = @Month
+                        WHERE PageCode = @PageCode AND Year = @Year AND Month = @Month
+                          AND (ReportNo IS NULL OR ReportNo = '')
                         ORDER BY FlowOrder";
                 }
                 else
                 {
+                    // 1レコード型ページ：PageCode、ReportNo、Year、Monthで検索
                     sql = @"
-                        SELECT Id, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, 
+                        SELECT Id, PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, 
                                Created_At AS CreatedAt, Updated_At AS UpdatedAt
                         FROM dbo.Approvals
-                        WHERE ReportNo = @ReportNo AND Year = @Year AND Month = @Month
+                        WHERE PageCode = @PageCode AND ReportNo = @ReportNo AND Year = @Year AND Month = @Month
                         ORDER BY FlowOrder";
                 }
                 
-                var parameters = new { ReportNo = reportNo, Year = year, Month = month };
+                var parameters = new { PageCode = pageCode, ReportNo = reportNo ?? string.Empty, Year = year, Month = month };
                 return db.Query<ApprovalEntity>(sql, parameters).ToList();
             }
         }
@@ -66,7 +69,7 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    SELECT Id, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, 
+                    SELECT Id, PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, 
                            Created_At AS CreatedAt, Updated_At AS UpdatedAt
                     FROM dbo.Approvals
                     WHERE UserName = @UserName AND Status = 1
@@ -88,15 +91,28 @@ namespace backend.Models.Repository
             }
         }
 
-        // 報告書No、年、月で上程データを削除（取り戻し時など）
-        public void DeleteApprovalsByReport(string reportNo, int year, int month)
+        // PageCode、報告書No、年、月で上程データを削除（取り戻し時など）
+        public void DeleteApprovalsByReport(int pageCode, string reportNo, int year, int month)
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
-                string sql = @"
-                    DELETE FROM dbo.Approvals
-                    WHERE ReportNo = @ReportNo AND Year = @Year AND Month = @Month";
-                db.Execute(sql, new { ReportNo = reportNo, Year = year, Month = month });
+                string sql;
+                if (pageCode == 1)
+                {
+                    // 複数レコード型ページ：PageCode、Year、Monthのみで削除
+                    sql = @"
+                        DELETE FROM dbo.Approvals
+                        WHERE PageCode = @PageCode AND Year = @Year AND Month = @Month
+                          AND (ReportNo IS NULL OR ReportNo = '')";
+                }
+                else
+                {
+                    // 1レコード型ページ：PageCode、ReportNo、Year、Monthで削除
+                    sql = @"
+                        DELETE FROM dbo.Approvals
+                        WHERE PageCode = @PageCode AND ReportNo = @ReportNo AND Year = @Year AND Month = @Month";
+                }
+                db.Execute(sql, new { PageCode = pageCode, ReportNo = reportNo ?? string.Empty, Year = year, Month = month });
             }
         }
 

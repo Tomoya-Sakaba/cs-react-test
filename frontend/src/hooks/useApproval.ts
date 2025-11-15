@@ -11,6 +11,7 @@ import { currentUserAtom } from '../atoms/authAtom';
 
 export type ApprovalStatus = {
   id: number;
+  pageCode: number; // ページタイプコード（1: 複数レコード型, 2: 1レコード型）
   reportNo: string;
   year: number;
   month: number;
@@ -22,7 +23,8 @@ export type ApprovalStatus = {
 };
 
 export type ApprovalRequest = {
-  reportNo: string;
+  pageCode: number; // ページタイプコード（1: 複数レコード型, 2: 1レコード型）
+  reportNo: string; // PageCode=2の場合は必須、PageCode=1の場合は空文字列またはnull可
   year: number;
   month: number;
   comment: string;
@@ -31,9 +33,10 @@ export type ApprovalRequest = {
 };
 
 type UseApprovalOptions = {
+  pageCode: number; // ページタイプコード（1: 複数レコード型, 2: 1レコード型）
   year: number;
   month: number;
-  reportNo?: string; // 特定の報告書Noで取得する場合
+  reportNo?: string; // 特定の報告書Noで取得する場合（PageCode=2の場合は必須）
   autoFetch?: boolean; // 自動で上程状態を取得するか（デフォルト: true）
 };
 
@@ -43,11 +46,16 @@ type UseApprovalReturn = {
   loading: boolean;
   error: string | null;
 
+  // Drawerの開閉状態
+  isDrawerOpen: boolean;
+  setIsDrawerOpen: (open: boolean) => void;
+
   // 上程者情報
   submitterRecord: ApprovalStatus | null;
   approverRecords: ApprovalStatus[];
 
   // 判定関数
+  hasExistingFlow: () => boolean; // 既存の上程フローがあるか
   isApprovalTarget: () => boolean;
   canEdit: () => boolean;
   isRejected: () => boolean; // 差し戻しされているか
@@ -64,11 +72,12 @@ type UseApprovalReturn = {
 };
 
 export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
-  const { year, month, reportNo, autoFetch = true } = options;
+  const { pageCode, year, month, reportNo, autoFetch = true } = options;
   const [currentUser] = useAtom(currentUserAtom);
   const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // 上程者レコード
   const submitterRecord = approvalStatus.find((a) => a.flowOrder === 0) || null;
@@ -78,18 +87,29 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
     .filter((a) => a.flowOrder > 0)
     .sort((a, b) => a.flowOrder - b.flowOrder);
 
-  // 上程状態を取得
+  /**
+   * 上程状態を取得
+   *
+   * 処理内容：
+   * 1. APIリクエストを送信（/api/approval）
+   * 2. レスポンスデータを受け取る
+   * 3. setApprovalStatus(res.data)で状態を更新
+   * 4. Reactの再レンダリングが発生し、approvalStatusが更新される
+   */
   const fetchApprovalStatus = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      // APIリクエストを送信して最新の上程状態を取得
       const res = await axios.get<ApprovalStatus[]>('/api/approval', {
         params: {
+          pageCode,
           reportNo: reportNo || '',
           year,
           month,
         },
       });
+      // 取得したデータで状態を更新（これにより再レンダリングが発生）
       setApprovalStatus(res.data);
     } catch (err) {
       const errorMessage =
@@ -100,7 +120,7 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
     } finally {
       setLoading(false);
     }
-  }, [year, month, reportNo]);
+  }, [pageCode, year, month, reportNo]);
 
   // 自動取得
   useEffect(() => {
@@ -108,6 +128,11 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
       fetchApprovalStatus();
     }
   }, [autoFetch, fetchApprovalStatus]);
+
+  // 既存の上程フローがあるか
+  const hasExistingFlow = useCallback((): boolean => {
+    return approvalStatus.length > 0;
+  }, [approvalStatus]);
 
   // 承認対象ユーザーかどうかをチェック（承認待ちまたは承認スキップ）
   const isApprovalTarget = useCallback((): boolean => {
@@ -150,12 +175,16 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
     return approvalStatus.some((a) => a.status === 5);
   }, [approvalStatus]);
 
-  // 再上程可能か（差し戻しされていて、再上程がまだない）
-  // 誰でも再上程できる（元の上程者でなくても可）
+  // 再上程可能か（差し戻し対象者レコードが存在し、まだ再上程されていない）
+  // ただし、差し戻しした承認者本人は再上程できない
   const canResubmit = useCallback((): boolean => {
     if (!currentUser) return false;
     if (isCompleted()) return false;
     if (!isRejected()) return false;
+
+    // 差し戻し対象者レコード（Status=7）を取得
+    const rejectionTarget = approvalStatus.find((a) => a.status === 7);
+    if (!rejectionTarget) return false;
 
     // 最新の差し戻し（最大FlowOrder）を取得（approvalStatus全体から）
     const rejectedApprovals = approvalStatus.filter((a) => a.status === 3);
@@ -166,9 +195,14 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
       current.flowOrder > latest.flowOrder ? current : latest
     );
 
-    // 差し戻し以降に再上程があるかチェック
+    // 差し戻しした承認者本人は再上程できない
+    if (rejectedApprover.userName === currentUser.name) {
+      return false;
+    }
+
+    // 差し戻し対象者レコード以降に再上程があるかチェック（Status=0のレコードが存在するか）
     const hasResubmission = approvalStatus.some(
-      (a) => a.flowOrder > rejectedApprover.flowOrder
+      (a) => a.flowOrder > rejectionTarget.flowOrder && a.status === 0
     );
 
     return !hasResubmission;
@@ -313,8 +347,11 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
     [currentUser, canResubmit, fetchApprovalStatus]
   );
 
-  // 状態を再取得
+  /**
+   * 状態を再取得
+   */
   const refresh = useCallback(async () => {
+    // この行でfetchApprovalStatus()関数を直接呼び出している
     await fetchApprovalStatus();
   }, [fetchApprovalStatus]);
 
@@ -324,11 +361,16 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
     loading,
     error,
 
+    // Drawerの開閉状態
+    isDrawerOpen,
+    setIsDrawerOpen,
+
     // 上程者情報
     submitterRecord,
     approverRecords,
 
     // 判定関数
+    hasExistingFlow,
     isApprovalTarget,
     canEdit,
     isRejected,

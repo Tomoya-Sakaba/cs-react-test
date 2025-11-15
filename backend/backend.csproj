@@ -163,6 +163,7 @@
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Controllers\PdfController.cs" />
     <Compile Include="Controllers\PlanController.cs" />
+    <Compile Include="Controllers\ReportController.cs" />
     <Compile Include="Controllers\UsersController.cs" />
     <Compile Include="Controllers\ValuesController.cs" />
     <Compile Include="Global.asax.cs">
@@ -174,6 +175,7 @@
     <Compile Include="Models\DTOs\PlanHistoryDto.cs" />
     <Compile Include="Models\DTOs\PlanRecordDto.cs" />
     <Compile Include="Models\DTOs\PlanVersionSnapshotDto.cs" />
+    <Compile Include="Models\DTOs\ReportDto.cs" />
     <Compile Include="Models\DTOs\TestItem.cs" />
     <Compile Include="Models\DTOs\TestItemHistory.cs" />
     <Compile Include="Models\DTOs\TestPlanDto.cs" />
@@ -183,14 +185,17 @@
     <Compile Include="Models\Entities\ApprovalEntity.cs" />
     <Compile Include="Models\Entities\PlanEntity.cs" />
     <Compile Include="Models\Entities\PlanVersionSnapshotEntity.cs" />
+    <Compile Include="Models\Entities\ReportEntity.cs" />
     <Compile Include="Models\Entities\UsersEntity.cs" />
     <Compile Include="Models\Repository\ApprovalRepository.cs" />
     <Compile Include="Models\Repository\PlanRepository.cs" />
+    <Compile Include="Models\Repository\ReportRepository.cs" />
     <Compile Include="Models\Repository\UsersRepository.cs" />
     <Compile Include="Models\DTOs\CreateUserRequest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\ApprovalService.cs" />
     <Compile Include="Services\PlanService.cs" />
+    <Compile Include="Services\ReportService.cs" />
     <Compile Include="Services\TestService.cs" />
   </ItemGroup>
   <ItemGroup>

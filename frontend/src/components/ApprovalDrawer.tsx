@@ -16,14 +16,18 @@ export type User = {
 };
 
 type ApprovalDrawerProps = {
-  isOpen: boolean;
   onClose: () => void;
+  pageCode: number; // ページタイプコード（1: 複数レコード型, 2: 1レコード型）
   year: number;
   month: number;
-  reportNo?: string; // 特定の報告書Noで取得する場合
+  reportNo?: string; // 特定の報告書Noで取得する場合（PageCode=2の場合は必須）
+  onApprovalChange?: () => void; // 上程状態が変更された時に呼ばれるコールバック
 };
 
-const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDrawerProps) => {
+const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalChange }: ApprovalDrawerProps) => {
+  // ============================================================================
+  // 状態管理
+  // ============================================================================
   const [currentUser] = useAtom(currentUserAtom);
   const [users, setUsers] = useState<User[]>([]);
   const [comment, setComment] = useState('');
@@ -37,9 +41,7 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
   const {
     approvalStatus,
     loading: approvalLoading,
-    submitterRecord,
-    approverRecords,
-    isApprovalTarget,
+    hasExistingFlow,
     canResubmit,
     isCompleted,
     submitApproval,
@@ -48,162 +50,22 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
     resubmit,
     refresh,
   } = useApproval({
+    pageCode,
     year,
     month,
     reportNo,
-    autoFetch: isOpen, // Drawerが開いている時のみ自動取得
+    autoFetch: true, // コンポーネントがマウントされている = 開いている状態
   });
 
   // 既存の上程状態がある場合、それを表示用に設定
-  const existingFlow = approvalStatus.length > 0;
+  const existingFlow = hasExistingFlow();
 
-  /**
-   * 最新の差し戻しされた承認者を取得
-   * 
-   * 複数の差し戻しがある場合、最新（最大flowOrder）の差し戻しを取得
-   * 再上程の判定や色付けロジックで使用される
-   */
-  const rejectedApprover = useMemo(() => {
-    const rejectedApprovals = approvalStatus.filter((a) => a.status === 3);
-    if (rejectedApprovals.length === 0) return undefined;
-    // 最大flowOrderの差し戻しを取得（最新の差し戻し）
-    return rejectedApprovals.reduce((latest, current) =>
-      current.flowOrder > latest.flowOrder ? current : latest
-    );
-  }, [approvalStatus]);
-
-  // approverRecordsのIDとstatusの組み合わせで判定（依存配列用）
-  const approverRecordsKey = useMemo(() => {
-    return approverRecords.map(a => `${a.id}-${a.status}`).join(',');
-  }, [approverRecords]);
-
-  /**
-   * 差し戻し以降のフロー（再上程）を取得
-   * 
-   * 最新の差し戻しのFlowOrderより大きいFlowOrderのレコードを取得
-   * 再上程の上程者と承認者を判定するために使用
-   */
-  const resubmissionFlow = useMemo(() => {
-    if (!rejectedApprover) return [];
-    return approvalStatus
-      .filter((a) => a.flowOrder > rejectedApprover.flowOrder)
-      .sort((a, b) => a.flowOrder - b.flowOrder);
-  }, [approvalStatus, rejectedApprover]);
-
-  // フロー全体を表示用に整理（すべてのレコードをflowOrder順に並べる）
-  const allFlowRecords = useMemo(() => {
-    return approvalStatus.sort((a, b) => a.flowOrder - b.flowOrder);
-  }, [approvalStatus]);
-
-  // 再上程の上程者レコード（差し戻しされた承認者の次のFlowOrderでStatus=0のもの）
-  const resubmissionSubmitter = useMemo(() => {
-    if (!rejectedApprover) return null;
-    return resubmissionFlow.find((a) => a.flowOrder === rejectedApprover.flowOrder + 1 && a.status === 0) || null;
-  }, [resubmissionFlow, rejectedApprover]);
-
-  // 再上程の承認者レコード（useMemoでメモ化）
-  const resubmissionApprovers = useMemo(() => {
-    return resubmissionFlow
-      .filter((a) => a.flowOrder > (resubmissionSubmitter?.flowOrder || 0))
-      .sort((a, b) => a.flowOrder - b.flowOrder);
-  }, [resubmissionFlow, resubmissionSubmitter]);
-
-  // 差し戻しがあるかどうか（useMemoでメモ化）
-  const hasRejection = useMemo(() => {
-    return rejectedApprover !== undefined;
-  }, [rejectedApprover]);
-
-  /**
-   * 再上程フォームが表示されているかどうかを判定
-   * 
-   * 条件：
-   * - 最新の差し戻しが存在する
-   * - 差し戻し以降に再上程がまだない
-   * 
-   * 再上程フォームが表示されている場合、新規上程ではなく再上程として処理される
-   */
-  const showResubmissionForm = useMemo(() => {
-    if (!rejectedApprover) return false;
-    // 差し戻し以降に再上程があるかチェック
-    const hasResubmission = approvalStatus.some(
-      (a) => a.flowOrder > rejectedApprover.flowOrder
-    );
-    return !hasResubmission;
-  }, [rejectedApprover, approvalStatus]);
-
-  // 既存のフローがある場合、承認者を設定（再上程フォームが表示されている場合は設定しない）
+  // ============================================================================
+  // 初期化処理（コンポーネントマウント時）
+  // ============================================================================
   useEffect(() => {
-    // 再上程フォームが表示されている場合は何もしない（ユーザーが手動で選択できるように）
-    if (showResubmissionForm) {
-      return;
-    }
-
-    if (!existingFlow || users.length === 0) {
-      return;
-    }
-
-    // 再上程がある場合は、再上程の承認者を設定
-    if (resubmissionFlow.length > 0 && resubmissionApprovers.length > 0) {
-      const approverUsers = resubmissionApprovers
-        .map((record) => users.find((u) => u.name === record.userName))
-        .filter((u): u is User => u !== undefined);
-      // 既に同じ承認者が設定されている場合はスキップ
-      setSelectedApprovers((prev) => {
-        const currentApproverIds = prev.map(a => a.id).sort().join(',');
-        const newApproverIds = approverUsers.map(a => a.id).sort().join(',');
-        if (currentApproverIds !== newApproverIds) {
-          return approverUsers;
-        }
-        return prev;
-      });
-      setComment((prev) => {
-        if (resubmissionSubmitter?.comment && prev !== resubmissionSubmitter.comment) {
-          return resubmissionSubmitter.comment;
-        }
-        return prev;
-      });
-    } else if (approverRecords.length > 0 && !hasRejection) {
-      // 再上程がなく、差し戻しもない場合は、既存の承認者を設定
-      const approverUsers = approverRecords
-        .map((record) => users.find((u) => u.name === record.userName))
-        .filter((u): u is User => u !== undefined);
-      // 既に同じ承認者が設定されている場合はスキップ
-      setSelectedApprovers((prev) => {
-        const currentApproverIds = prev.map(a => a.id).sort().join(',');
-        const newApproverIds = approverUsers.map(a => a.id).sort().join(',');
-        if (currentApproverIds !== newApproverIds) {
-          return approverUsers;
-        }
-        return prev;
-      });
-      setComment((prev) => {
-        if (submitterRecord?.comment && prev !== submitterRecord.comment) {
-          return submitterRecord.comment;
-        }
-        return prev;
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existingFlow, users.length, approverRecordsKey, submitterRecord?.comment, showResubmissionForm, resubmissionFlow.length, resubmissionApprovers.length]);
-
-  // 再上程フォームが表示されたら、選択済み承認者をリセット（初回のみ）
-  const [hasResetResubmissionForm, setHasResetResubmissionForm] = useState(false);
-  useEffect(() => {
-    if (showResubmissionForm && !hasResetResubmissionForm) {
-      setSelectedApprovers([]);
-      setComment('');
-      setHasResetResubmissionForm(true);
-    } else if (!showResubmissionForm) {
-      setHasResetResubmissionForm(false);
-    }
-  }, [showResubmissionForm, hasResetResubmissionForm]);
-
-  // ユーザー一覧を取得
-  useEffect(() => {
-    if (isOpen) {
-      fetchUsers();
-    }
-  }, [isOpen]);
+    fetchUsers();
+  }, []); // マウント時のみ実行
 
   const fetchUsers = async () => {
     try {
@@ -218,155 +80,122 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
     }
   };
 
-  // 承認者を追加
-  const handleAddApprover = (index: number, userId: number) => {
+  // ============================================================================
+  // 【最初の上程フェーズ】新規上程関連の処理
+  // ============================================================================
+
+  /**
+   * 承認者のチェックボックスのトグル処理
+   * チェックされた場合は追加、チェックが外れた場合は削除
+   */
+  const handleToggleApprover = (userId: number) => {
     const selectedUser = users.find((u) => u.id === userId);
     if (!selectedUser) return;
 
-    // 既に選択されているユーザーや上程者は選択不可
-    if (
-      selectedUser.name === currentUser?.name ||
-      selectedApprovers.some((a) => a.id === userId)
-    ) {
+    // 上程者は選択不可
+    if (selectedUser.name === currentUser?.name) {
       return;
     }
 
     setSelectedApprovers((prev) => {
-      const newApprovers = [...prev];
-      if (index < newApprovers.length) {
-        // 既存の位置を更新
-        newApprovers[index] = selectedUser;
+      const isSelected = prev.some((a) => a.id === userId);
+      if (isSelected) {
+        // 既に選択されている場合は削除
+        return prev.filter((a) => a.id !== userId);
       } else {
-        // 新しい承認者を追加
-        newApprovers.push(selectedUser);
+        // 選択されていない場合は追加（選択した順序を保持）
+        return [...prev, selectedUser];
       }
-      return newApprovers;
     });
   };
 
-  // 承認者を削除
-  const handleRemoveApprover = (index: number) => {
-    setSelectedApprovers((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // 次の承認者を選択できるユーザーリスト（既に選択されたユーザーと上程者を除外）
-  const getAvailableUsers = (currentIndex: number) => {
-    return users.filter(
-      (user) =>
-        user.name !== currentUser?.name &&
-        !selectedApprovers.some((a, idx) => idx !== currentIndex && a.id === user.id)
-    );
+  /**
+   * 承認者が選択されているかどうかを判定
+   */
+  const isApproverSelected = (userId: number) => {
+    return selectedApprovers.some((a) => a.id === userId);
   };
 
   /**
-   * 上程・再上程の送信処理
+   * 承認者として選択可能なユーザーリスト（上程者を除外）
+   */
+  const getAvailableUsers = () => {
+    return users.filter((user) => user.name !== currentUser?.name);
+  };
+
+  /**
+   * 【最初の上程フェーズ】新規上程の送信処理
    * 
    * 処理フロー：
-   * 1. バリデーション（ログインチェック、承認者選択、コメント入力）
-   * 2. 報告書Noの決定
-   *    - 既存のフローがある場合：既存のreportNoを使用（再上程の場合も同じreportNo）
-   *    - 新規上程の場合：新しいreportNoを生成
-   * 3. 再上程フォームが表示されている場合は再上程、それ以外は新規上程
-   * 4. フォームをリセットし、状態を更新
+   * 1. 報告書Noの生成（新規上程の場合は新しいreportNoを生成）
+   * 2. 新規上程APIを呼び出し
+   * 3. フォームをリセットし、状態を更新
+   * 
+   * 注意：バリデーションはボタンのdisabled属性で制御しているため、
+   * この関数が呼ばれる時点では既にバリデーションは通過している
    */
-  const handleSubmit = async () => {
+  const handleNewSubmission = async () => {
+    // ボタンがdisabledになっているため、通常は呼ばれないが、型安全性のためチェック
     if (!currentUser) {
-      alert('ログインが必要です。');
-      return;
-    }
-    if (selectedApprovers.length === 0) {
-      alert('承認者を1人以上選択してください。');
-      return;
-    }
-    if (!comment.trim()) {
-      alert('コメントを入力してください。');
       return;
     }
 
     try {
-      // 報告書Noを決定
-      // 既存のフローがある場合は、既存のreportNoを使用（すべてのレコードは同じreportNoを持つ）
-      // 再上程の場合は、必ず既存のreportNoを使用する必要がある
-      let newReportNo: string;
-      if (existingFlow && approvalStatus.length > 0) {
-        // 既存のレコードからreportNoを取得（どのレコードでも同じ値）
-        newReportNo = approvalStatus[0].reportNo;
-      } else {
-        // 新規上程の場合は新しいreportNoを生成
-        newReportNo = `RPT-${year}-${String(month).padStart(2, '0')}-${Date.now()}`;
-      }
+      // PageCode=2（1レコード型）の場合はreportNo必須、PageCode=1（複数レコード型）の場合は空文字列
+      const newReportNo = pageCode === 2 ? (reportNo || '') : '';
 
       const request: ApprovalRequest = {
+        pageCode,
         reportNo: newReportNo,
         year,
         month,
-        comment: comment.trim(),
+        comment: comment.trim() || '', // 空欄の場合は空文字列（バックエンドでnullに変換）
         approverNames: selectedApprovers.map((a) => a.name),
         submitterName: currentUser.name,
       };
 
-      // 再上程の判定：再上程フォームが表示されている場合は再上程
-      if (showResubmissionForm) {
-        // 再上程
-        await resubmit(request);
-        alert('再上程が完了しました。');
-      } else {
-        // 新規上程
-        await submitApproval(request);
-        alert('上程が完了しました。');
-      }
+      // 【最初の上程フェーズ】新規上程APIを呼び出し
+      await submitApproval(request);
+      alert('上程が完了しました。');
 
       // フォームをリセット
       setComment('');
       setSelectedApprovers([]);
       await refresh();
-      // 再上程の場合はDrawerを閉じない（フローを確認できるように）
-      if (!canResubmit() || resubmissionFlow.length > 0) {
-        onClose();
-      }
+      // 親コンポーネントの状態も更新
+      onApprovalChange?.();
+      onClose();
     } catch (error) {
       alert(error instanceof Error ? error.message : '上程に失敗しました。');
     }
   };
 
+  // ============================================================================
+  // 【差し戻しフェーズ】差し戻し関連の処理
+  // ============================================================================
+
   /**
-   * 現在の承認待ちレコードを取得
+   * 【差し戻しフェーズ】最新の差し戻しされた承認者を取得
    * 
-   * 履歴と再上程の両方をチェックし、再上程の承認待ちを優先して取得
-   * 承認待ち（Status=1）または承認スキップ（Status=6）のレコードを対象とする
+   * 複数の差し戻しがある場合、最新（最大flowOrder）の差し戻しを取得
+   * 再上程の判定や色付けロジックで使用される
    */
-  const getCurrentPendingApproval = (): ApprovalStatus | undefined => {
-    if (!currentUser || !existingFlow) return undefined;
-    // 再上程の承認待ちまたは承認スキップを優先
-    const resubmissionPending = resubmissionApprovers.find(
-      (a) => (a.status === 1 || a.status === 6) && a.userName === currentUser.name
+  const rejectedApprover = useMemo(() => {
+    const rejectedApprovals = approvalStatus.filter((a) => a.status === 3);
+    if (rejectedApprovals.length === 0) return undefined;
+    // 最大flowOrderの差し戻しを取得（最新の差し戻し）
+    return rejectedApprovals.reduce((latest, current) =>
+      current.flowOrder > latest.flowOrder ? current : latest
     );
-    if (resubmissionPending) return resubmissionPending;
-    // 履歴の承認待ちまたは承認スキップ
-    return approvalStatus.find(
-      (a) => (a.status === 1 || a.status === 6) && a.userName === currentUser.name
-    );
-  };
+  }, [approvalStatus]);
 
-  // 承認処理
-  const handleApprove = async () => {
-    const pendingApproval = getCurrentPendingApproval();
-    if (!pendingApproval) {
-      alert('承認対象が見つかりません。');
-      return;
-    }
-
-    try {
-      await approve(pendingApproval.id, approvalComment.trim());
-      alert('承認が完了しました。');
-      setApprovalComment('');
-      await refresh();
-    } catch (error) {
-      alert(error instanceof Error ? error.message : '承認に失敗しました。');
-    }
-  };
-
-  // 差し戻し処理
+  /**
+   * 【最初の上程フェーズ / 再上程フェーズ】差し戻し処理
+   * 
+   * 承認待ちまたは承認スキップのレコードに対して差し戻しを実行
+   * 差し戻し（Status=3）になると、その後の承認者は削除され、
+   * 再上程フェーズが開始可能になる
+   */
   const handleReject = async () => {
     const pendingApproval = getCurrentPendingApproval();
     if (!pendingApproval) {
@@ -388,10 +217,232 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
       alert('差し戻しが完了しました。');
       setApprovalComment('');
       await refresh();
+      // 親コンポーネントの状態も更新
+      onApprovalChange?.();
     } catch (error) {
       alert(error instanceof Error ? error.message : '差し戻しに失敗しました。');
     }
   };
+
+  // ============================================================================
+  // 【再上程フェーズ】再上程関連の処理
+  // ============================================================================
+
+  /**
+   * 【再上程フェーズ】差し戻し以降のフロー（再上程）を取得
+   * 
+   * 最新の差し戻しのFlowOrderより大きいFlowOrderのレコードを取得
+   * 再上程の上程者と承認者を判定するために使用
+   */
+  const resubmissionFlow = useMemo(() => {
+    // 差し戻し対象者レコード（Status=7）を取得
+    const rejectionTarget = approvalStatus.find((a) => a.status === 7);
+    if (!rejectionTarget) {
+      // 差し戻し対象者レコードがない場合、差し戻し以降のレコードを取得（後方互換性のため）
+      if (!rejectedApprover) return [];
+      return approvalStatus
+        .filter((a) => a.flowOrder > rejectedApprover.flowOrder)
+        .sort((a, b) => a.flowOrder - b.flowOrder);
+    }
+    // 差し戻し対象者レコード以降のレコードを取得
+    return approvalStatus
+      .filter((a) => a.flowOrder >= rejectionTarget.flowOrder)
+      .sort((a, b) => a.flowOrder - b.flowOrder);
+  }, [approvalStatus, rejectedApprover]);
+
+  /**
+   * 【再上程フェーズ】再上程の上程者レコード
+   * 
+   * 差し戻しされた承認者の次のFlowOrderでStatus=0のもの
+   * 再上程フォームの表示判定に使用
+   */
+  const resubmissionSubmitter = useMemo(() => {
+    // 差し戻し対象者レコード（Status=7）を取得
+    const rejectionTarget = approvalStatus.find((a) => a.status === 7);
+    if (!rejectionTarget) {
+      // 差し戻し対象者レコードがない場合、従来のロジックを使用（後方互換性のため）
+      if (!rejectedApprover) return null;
+      return resubmissionFlow.find((a) => a.flowOrder === rejectedApprover.flowOrder + 1 && a.status === 0) || null;
+    }
+    // 差し戻し対象者レコードが更新されてStatus=0になったレコードを取得
+    return resubmissionFlow.find((a) => a.flowOrder === rejectionTarget.flowOrder && a.status === 0) || null;
+  }, [resubmissionFlow, rejectedApprover, approvalStatus]);
+
+  /**
+   * 【再上程フェーズ】再上程の承認者レコード
+   * 
+   * 再上程の上程者より後のFlowOrderのレコード
+   * 承認待ちの判定に使用
+   */
+  const resubmissionApprovers = useMemo(() => {
+    return resubmissionFlow
+      .filter((a) => a.flowOrder > (resubmissionSubmitter?.flowOrder || 0))
+      .sort((a, b) => a.flowOrder - b.flowOrder);
+  }, [resubmissionFlow, resubmissionSubmitter]);
+
+  /**
+   * 【再上程フェーズ】再上程フォームが表示されているかどうかを判定
+   * 
+   * 条件：
+   * - 最新の差し戻しが存在する（差し戻しフェーズがある）
+   * - 差し戻し以降に再上程がまだない（再上程フェーズがない）
+   * 
+   * 再上程フォームが表示されている場合、新規上程ではなく再上程として処理される
+   */
+  const showResubmissionForm = useMemo(() => {
+    // 差し戻し対象者レコード（Status=7）を取得
+    const rejectionTarget = approvalStatus.find((a) => a.status === 7);
+    if (!rejectionTarget) return false;
+
+    if (!rejectedApprover) return false;
+
+    // 差し戻しした承認者本人は再上程フォームを表示しない
+    if (rejectedApprover.userName === currentUser?.name) {
+      return false;
+    }
+
+    // 差し戻し対象者レコード以降に再上程があるかチェック（Status=0のレコードが存在するか）
+    const hasResubmission = approvalStatus.some(
+      (a) => a.flowOrder > rejectionTarget.flowOrder && a.status === 0
+    );
+    return !hasResubmission;
+  }, [rejectedApprover, approvalStatus, currentUser]);
+
+  // 再上程フォームが表示されたら、選択済み承認者をリセット（初回のみ）
+  const [hasResetResubmissionForm, setHasResetResubmissionForm] = useState(false);
+  useEffect(() => {
+    if (showResubmissionForm && !hasResetResubmissionForm) {
+      setSelectedApprovers([]);
+      setComment('');
+      setHasResetResubmissionForm(true);
+    } else if (!showResubmissionForm) {
+      setHasResetResubmissionForm(false);
+    }
+  }, [showResubmissionForm, hasResetResubmissionForm]);
+
+  /**
+   * 【再上程フェーズ】再上程の送信処理
+   * 
+   * 処理フロー：
+   * 1. 報告書Noの決定（既存のreportNoを使用）
+   * 2. 再上程APIを呼び出し
+   * 3. フォームをリセットし、状態を更新
+   * 
+   * 注意：バリデーションはボタンのdisabled属性で制御しているため、
+   * この関数が呼ばれる時点では既にバリデーションは通過している
+   */
+  const handleResubmit = async () => {
+    // ボタンがdisabledになっているため、通常は呼ばれないが、型安全性のためチェック
+    if (!currentUser) {
+      return;
+    }
+
+    try {
+      // 既存のフローがある場合は、既存のreportNoを使用（すべてのレコードは同じreportNoを持つ）
+      if (!existingFlow || approvalStatus.length === 0) {
+        alert('再上程に失敗しました。既存のフローが見つかりません。');
+        return;
+      }
+
+      // 既存のレコードからreportNoを取得（どのレコードでも同じ値）
+      // PageCode=1（複数レコード型）の場合は空文字列、PageCode=2（1レコード型）の場合は既存のreportNoを使用
+      const existingReportNo = pageCode === 1 ? '' : (approvalStatus[0].reportNo || '');
+
+      const request: ApprovalRequest = {
+        pageCode,
+        reportNo: existingReportNo,
+        year,
+        month,
+        comment: comment.trim() || '', // 空欄の場合は空文字列（バックエンドでnullに変換）
+        approverNames: selectedApprovers.map((a) => a.name),
+        submitterName: currentUser.name,
+      };
+
+      // 【再上程フェーズ】再上程APIを呼び出し
+      await resubmit(request);
+      alert('再上程が完了しました。');
+
+      // フォームをリセット
+      setComment('');
+      setSelectedApprovers([]);
+      await refresh();
+      // 親コンポーネントの状態も更新
+      onApprovalChange?.();
+      // 再上程の場合はDrawerを閉じない（フローを確認できるように）
+      if (!canResubmit() || resubmissionFlow.length > 0) {
+        onClose();
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '再上程に失敗しました。');
+    }
+  };
+
+  // ============================================================================
+  // 共通処理（最初の上程フェーズ / 再上程フェーズの両方で使用）
+  // ============================================================================
+
+  /**
+   * フロー全体を表示用に整理（すべてのレコードをflowOrder順に並べる）
+   * 
+   * DBの状態をそのままFlowOrder順に表示する
+   * フェーズの構成：
+   * - 【最初の上程フェーズ】FlowOrder=0（上程者）から最初の差し戻しまでのレコード
+   * - 【差し戻しフェーズ】Status=3のレコード（最新の差し戻し）
+   * - 【再上程フェーズ】差し戻し以降のレコード（FlowOrder > rejectedApprover.flowOrder）
+   */
+  const allFlowRecords = useMemo(() => {
+    return approvalStatus.sort((a, b) => a.flowOrder - b.flowOrder);
+  }, [approvalStatus]);
+
+  /**
+   * 【最初の上程フェーズ / 再上程フェーズ】現在の承認待ちレコードを取得
+   * 
+   * 承認待ち（Status=1）または承認スキップ（Status=6）のレコードを対象とする
+   * 優先順位：
+   * 1. 【再上程フェーズ】再上程の承認待ちまたは承認スキップを優先
+   * 2. 【最初の上程フェーズ】最初の上程フェーズの承認待ちまたは承認スキップ
+   */
+  const getCurrentPendingApproval = (): ApprovalStatus | undefined => {
+    if (!currentUser || !existingFlow) return undefined;
+    // 【再上程フェーズ】再上程の承認待ちまたは承認スキップを優先
+    const resubmissionPending = resubmissionApprovers.find(
+      (a) => (a.status === 1 || a.status === 6) && a.userName === currentUser.name
+    );
+    if (resubmissionPending) return resubmissionPending;
+    // 【最初の上程フェーズ】最初の上程フェーズの承認待ちまたは承認スキップ
+    return approvalStatus.find(
+      (a) => (a.status === 1 || a.status === 6) && a.userName === currentUser.name
+    );
+  };
+
+  /**
+   * 【最初の上程フェーズ / 再上程フェーズ】承認処理
+   * 
+   * 承認待ちまたは承認スキップのレコードに対して承認を実行
+   * 最後の承認者の場合は完了（Status=5）、それ以外は承認済み（Status=2）になる
+   */
+  const handleApprove = async () => {
+    const pendingApproval = getCurrentPendingApproval();
+    if (!pendingApproval) {
+      alert('承認対象が見つかりません。');
+      return;
+    }
+
+    try {
+      await approve(pendingApproval.id, approvalComment.trim());
+      alert('承認が完了しました。');
+      setApprovalComment('');
+      await refresh();
+      // 親コンポーネントの状態も更新
+      onApprovalChange?.();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '承認に失敗しました。');
+    }
+  };
+
+  // ============================================================================
+  // ヘルパー関数
+  // ============================================================================
 
   // 状態ラベルを取得
   const getStatusLabel = (status: number) => {
@@ -410,6 +461,8 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
         return '完了';
       case 6:
         return '承認スキップ';
+      case 7:
+        return '差し戻し対象';
       default:
         return '不明';
     }
@@ -424,7 +477,9 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
     onClose();
   };
 
-  if (!isOpen) return null;
+  // ============================================================================
+  // UI レンダリング
+  // ============================================================================
 
   return (
     <>
@@ -435,8 +490,7 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
       />
       {/* Drawer */}
       <div
-        className={`fixed right-0 top-0 z-50 h-full w-96 bg-white shadow-xl transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'
-          }`}
+        className="fixed right-0 top-0 z-50 h-full w-[600px] bg-white shadow-xl transition-transform duration-300 ease-in-out translate-x-0"
       >
         <div className="flex h-full flex-col">
           {/* ヘッダー */}
@@ -450,13 +504,13 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
             </button>
           </div>
 
-          {/* 上程ボタン（ヘッダー下、新規上程時のみ表示） */}
+          {/* 【最初の上程フェーズ】上程ボタン（ヘッダー下、新規上程時のみ表示） */}
           {!existingFlow && (
             <div className="border-b p-4">
               <button
-                onClick={handleSubmit}
-                disabled={loading || approvalLoading}
-                className="w-full rounded bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:bg-gray-400"
+                onClick={handleNewSubmission}
+                disabled={loading || approvalLoading || !currentUser || selectedApprovers.length === 0}
+                className="w-full rounded bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 上程
               </button>
@@ -480,13 +534,23 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
                         承認フロー
                       </label>
                       <div className="space-y-3">
-                        {/* フロー全体を表示（差し戻しごとに再上程を表示） */}
+                        {/* 
+                          DBの状態をFlowOrder順にそのまま表示
+                          フェーズの構成：
+                          1. 【最初の上程フェーズ】FlowOrder=0（上程者）から最初の差し戻しまでのレコード
+                          2. 【差し戻しフェーズ】Status=3のレコード（最新の差し戻し）
+                          3. 【再上程フェーズ】差し戻し以降のレコード（FlowOrder > rejectedApprover.flowOrder）
+                        */}
                         {allFlowRecords.map((record, index) => {
                           const isSubmitter = record.flowOrder === 0;
                           const isRejected = record.status === 3;
 
-                          // 再上程者かどうかを判定（差し戻しの次のFlowOrderでStatus=0のもの）
-                          const isResubmissionSubmitter = rejectedApprover !== undefined &&
+                          // 【再上程フェーズ】再上程者かどうかを判定（差し戻しの次のFlowOrderでStatus=0のもの）
+                          // 差し戻し対象者レコード（Status=7）を取得
+                          const rejectionTarget = approvalStatus.find((a) => a.status === 7);
+                          const isResubmissionSubmitter = rejectionTarget
+                            ? record.flowOrder === rejectionTarget.flowOrder && record.status === 0
+                            : rejectedApprover !== undefined &&
                             record.flowOrder === rejectedApprover.flowOrder + 1 &&
                             record.status === 0;
 
@@ -494,11 +558,14 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
                           // 差し戻しの場合は常に表示、それ以外は次のレコードがある場合のみ表示
                           const showArrow = isRejected || index < allFlowRecords.length - 1;
 
+                          // 現在の承認待ちレコードかどうかを判定
+                          const currentPendingApproval = getCurrentPendingApproval();
+                          const isCurrentPendingRecord = currentPendingApproval?.id === record.id;
+
                           return (
                             <ApprovalFlowCard
                               key={`flow-${record.id}-${index}`}
                               record={record}
-                              currentUser={currentUser}
                               isSubmitter={isSubmitter}
                               isResubmissionSubmitter={isResubmissionSubmitter}
                               rejectedApprover={rejectedApprover}
@@ -506,16 +573,26 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
                               approvalStatus={approvalStatus}
                               showArrow={showArrow}
                               getStatusLabel={getStatusLabel}
+                              isCurrentPendingRecord={isCurrentPendingRecord}
+                              approvalComment={approvalComment}
+                              onApprovalCommentChange={setApprovalComment}
+                              onApprove={handleApprove}
+                              onReject={handleReject}
                             />
                           );
                         })}
                       </div>
                     </div>
 
-                    {/* 最新の差し戻しがある場合、その下に新規上程フォームを表示 */}
+                    {/* 
+                      【再上程フェーズ】最新の差し戻しがある場合、その下に再上程フォームを表示
+                      条件：
+                      - 差し戻しフェーズが存在する（rejectedApprover !== undefined）
+                      - 再上程フェーズがまだ存在しない（showResubmissionForm === true）
+                    */}
                     {showResubmissionForm && rejectedApprover && (
                       <>
-                        {/* 新規上程フォーム */}
+                        {/* 再上程フォーム */}
                         <div className="mb-6 rounded-lg border-2 border-blue-500 bg-blue-50 p-4">
                           <div className="mb-3 text-sm font-bold text-blue-800">
                             再上程
@@ -581,21 +658,13 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
                                     key={`new-${approver.id}-${index}`}
                                     className="flex flex-col items-center"
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <div className="rounded-lg border-2 border-green-500 bg-green-50 px-3 py-1.5">
-                                        <div className="text-xs font-medium text-green-700">
-                                          承認者 {index + 1}
-                                        </div>
-                                        <div className="text-xs text-gray-800">
-                                          {approver.name}
-                                        </div>
+                                    <div className="rounded-lg border-2 border-green-500 bg-green-50 px-3 py-1.5">
+                                      <div className="text-xs font-medium text-green-700">
+                                        承認者 {index + 1}
                                       </div>
-                                      <button
-                                        onClick={() => handleRemoveApprover(index)}
-                                        className="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
-                                      >
-                                        削除
-                                      </button>
+                                      <div className="text-xs text-gray-800">
+                                        {approver.name}
+                                      </div>
                                     </div>
                                     {index < selectedApprovers.length - 1 && (
                                       <div className="my-1 text-xl text-gray-400">↓</div>
@@ -606,38 +675,34 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
                             </div>
                           )}
 
-                          {/* 承認者選択 */}
+                          {/* 承認者選択（チェックボックス） */}
                           <div className="mb-4">
                             <label className="mb-2 block text-xs font-medium text-gray-700">
-                              承認者 {selectedApprovers.length + 1} を選択
+                              承認者を選択
                             </label>
-                            <select
-                              value=""
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  handleAddApprover(
-                                    selectedApprovers.length,
-                                    Number(e.target.value)
-                                  );
-                                  e.target.value = '';
-                                }
-                              }}
-                              className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                            >
-                              <option value="">選択してください</option>
-                              {getAvailableUsers(selectedApprovers.length).map((user) => (
-                                <option key={user.id} value={user.id}>
-                                  {user.name}
-                                </option>
+                            <div className="max-h-48 overflow-y-auto rounded border border-gray-300 p-2">
+                              {getAvailableUsers().map((user) => (
+                                <label
+                                  key={user.id}
+                                  className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isApproverSelected(user.id)}
+                                    onChange={() => handleToggleApprover(user.id)}
+                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span className="text-xs text-gray-800">{user.name}</span>
+                                </label>
                               ))}
-                            </select>
+                            </div>
                           </div>
 
                           {/* 再上程ボタン */}
                           <button
-                            onClick={handleSubmit}
-                            disabled={loading || approvalLoading || selectedApprovers.length === 0 || !comment.trim()}
-                            className="w-full rounded bg-blue-500 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600 disabled:bg-gray-400"
+                            onClick={handleResubmit}
+                            disabled={loading || approvalLoading || !currentUser || selectedApprovers.length === 0}
+                            className="w-full rounded bg-blue-500 px-3 py-2 text-xs font-medium text-white hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
                           >
                             再上程
                           </button>
@@ -645,42 +710,6 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
                       </>
                     )}
 
-                    {/* 承認対象ユーザーの場合、承認・差し戻しフォーム */}
-                    {/* 再上程の承認者も対象に含める（承認待ちまたは承認スキップ） */}
-                    {(isApprovalTarget() ||
-                      resubmissionApprovers.some((a) => (a.status === 1 || a.status === 6) && a.userName === currentUser?.name)) && (
-                        <div className="mb-6 rounded-lg border-2 border-yellow-500 bg-yellow-50 p-4">
-                          <div className="mb-2 text-sm font-bold text-yellow-800">
-                            あなたの承認待ちです
-                          </div>
-                          <div className="mb-3">
-                            <label className="mb-1 block text-xs font-medium text-gray-700">
-                              コメント（承認・差し戻し理由）
-                            </label>
-                            <textarea
-                              value={approvalComment}
-                              onChange={(e) => setApprovalComment(e.target.value)}
-                              rows={3}
-                              className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
-                              placeholder="コメントを入力してください"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={handleApprove}
-                              className="flex-1 rounded bg-green-500 px-3 py-2 text-sm font-medium text-white hover:bg-green-600"
-                            >
-                              承認
-                            </button>
-                            <button
-                              onClick={handleReject}
-                              className="flex-1 rounded bg-red-500 px-3 py-2 text-sm font-medium text-white hover:bg-red-600"
-                            >
-                              差し戻し
-                            </button>
-                          </div>
-                        </div>
-                      )}
 
 
                     {/* 完了状態の表示 */}
@@ -693,7 +722,7 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
                     )}
                   </>
                 ) : (
-                  // 新規上程フォームまたは再上程フォーム
+                  // 【最初の上程フェーズ】新規上程フォーム
                   <>
                     {/* 上程者表示（ログインユーザー固定） */}
                     <div className="mb-6">
@@ -756,21 +785,13 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
                               key={`${approver.id}-${index}`}
                               className="flex flex-col items-center"
                             >
-                              <div className="flex items-center gap-2">
-                                <div className="rounded-lg border-2 border-green-500 bg-green-50 px-4 py-2">
-                                  <div className="text-sm font-medium text-green-700">
-                                    承認者 {index + 1}
-                                  </div>
-                                  <div className="text-sm text-gray-800">
-                                    {approver.name}
-                                  </div>
+                              <div className="rounded-lg border-2 border-green-500 bg-green-50 px-4 py-2">
+                                <div className="text-sm font-medium text-green-700">
+                                  承認者 {index + 1}
                                 </div>
-                                <button
-                                  onClick={() => handleRemoveApprover(index)}
-                                  className="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
-                                >
-                                  削除
-                                </button>
+                                <div className="text-sm text-gray-800">
+                                  {approver.name}
+                                </div>
                               </div>
                               {index < selectedApprovers.length - 1 && (
                                 <div className="my-1 text-2xl text-gray-400">↓</div>
@@ -781,31 +802,27 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
                       </div>
                     )}
 
-                    {/* 承認者選択 */}
+                    {/* 承認者選択（チェックボックス） */}
                     <div className="mb-6">
                       <label className="mb-2 block text-sm font-medium text-gray-700">
-                        承認者 {selectedApprovers.length + 1} を選択
+                        承認者を選択
                       </label>
-                      <select
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAddApprover(
-                              selectedApprovers.length,
-                              Number(e.target.value)
-                            );
-                            e.target.value = '';
-                          }
-                        }}
-                        className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
-                      >
-                        <option value="">選択してください</option>
-                        {getAvailableUsers(selectedApprovers.length).map((user) => (
-                          <option key={user.id} value={user.id}>
-                            {user.name}
-                          </option>
+                      <div className="max-h-64 overflow-y-auto rounded border border-gray-300 p-3">
+                        {getAvailableUsers().map((user) => (
+                          <label
+                            key={user.id}
+                            className="flex items-center gap-2 px-2 py-2 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isApproverSelected(user.id)}
+                              onChange={() => handleToggleApprover(user.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-800">{user.name}</span>
+                          </label>
                         ))}
-                      </select>
+                      </div>
                     </div>
                   </>
                 )}
@@ -829,4 +846,3 @@ const ApprovalDrawer = ({ isOpen, onClose, year, month, reportNo }: ApprovalDraw
 };
 
 export default ApprovalDrawer;
-

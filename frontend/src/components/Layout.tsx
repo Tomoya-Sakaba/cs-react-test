@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Link, Outlet, useNavigate } from "react-router-dom";
 import { useAtom } from "jotai";
 import { currentUserAtom } from "../atoms/authAtom";
 import Sidebar from "./Sidebar";
@@ -18,7 +18,9 @@ const Layout = () => {
     <div className="h-screen overflow-hidden">
       {/* ヘッダー - 完全固定 */}
       <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b bg-white px-4 py-2 shadow-sm">
-        <div className="text-lg font-semibold">アプリケーション</div>
+        <div className="text-lg font-semibold">
+          <Link to="/">アプリケーション</Link>
+        </div>
         <div className="flex items-center gap-4">
           {currentUser && (
             <>

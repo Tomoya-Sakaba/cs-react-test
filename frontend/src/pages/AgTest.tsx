@@ -161,8 +161,6 @@ const AgTest = () => {
   >([]);
   // ヘッダー設定モーダルの表示状態
   const [isHeaderConfigOpen, setIsHeaderConfigOpen] = useState(false);
-  // 上程Drawerの表示状態
-  const [isApprovalDrawerOpen, setIsApprovalDrawerOpen] = useState(false);
   const gridRef = useRef<AgGridReactType<MapdePlan>>(null);
 
   //---------------------------------------------------------------------------
@@ -415,7 +413,11 @@ const AgTest = () => {
     approvalStatus,
     canEdit,
     isCompleted,
+    isDrawerOpen,
+    setIsDrawerOpen,
+    refresh: refreshApprovalStatus,
   } = useApproval({
+    pageCode: 1, // 複数レコード型ページ（計画書ページ）
     year: currentYear,
     month: currentIndexMonth + 1,
     autoFetch: true,
@@ -437,15 +439,15 @@ const AgTest = () => {
     <>
       <div className="mx-5 flex h-full flex-col">
         <div className="flex w-full justify-between">
-          <div className="">
+          <div className="flex items-center gap-4">
             <button
-              className="mr-5 h-full w-24 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+              className="h-full w-24 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
               onClick={handleClick}
             >
               pdf
             </button>
             <button
-              className="mr-5 h-full w-24 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+              className="h-full w-24 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
               onClick={handleSave}
             >
               保存
@@ -458,18 +460,39 @@ const AgTest = () => {
               バージョンを切る
             </button>
             <button
-              className="ml-5 h-full w-32 rounded-lg bg-purple-500 px-4 py-2 text-sm text-white hover:bg-purple-600"
+              className="h-full w-32 rounded-lg bg-purple-500 px-4 py-2 text-sm text-white hover:bg-purple-600"
               onClick={() => setIsHeaderConfigOpen(true)}
             >
               ヘッダー設定
             </button>
             <button
-              className="ml-5 h-full w-32 rounded-lg bg-orange-500 px-4 py-2 text-sm text-white hover:bg-orange-600"
-              onClick={() => setIsApprovalDrawerOpen(true)}
+              className="h-full w-32 rounded-lg bg-orange-500 px-4 py-2 text-sm text-white hover:bg-orange-600"
+              onClick={() => setIsDrawerOpen(true)}
             >
               上程
             </button>
+
+            {/* 上程状態表示（上程ボタンの右側） */}
+            {approvalStatus.length > 0 && (
+              <div className="flex items-center rounded-lg border-2 border-orange-500 bg-orange-50 px-3 py-2">
+                {isCompleted() ? (
+                  <div className="text-sm font-bold text-green-700">
+                    承認済み
+                  </div>
+                ) : (
+                  <div className="text-sm font-bold text-orange-700">
+                    上程中 -{' '}
+                    {approvalStatus
+                      .filter((a) => a.status === 1 || a.status === 6)
+                      .map((a) => a.userName)
+                      .join(', ')}{' '}
+                    が承認待ち
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
           <div>
             <p className="mb-2 text-xl">編集モード</p>
             <Toggle value={isEditing} onChange={toggleEditMode} />
@@ -579,32 +602,18 @@ const AgTest = () => {
           </div>
         )}
 
-        {/* 上程状態表示（簡易表示） */}
-        {approvalStatus.length > 0 && (
-          <div className="mb-4 rounded-lg border-2 border-orange-500 bg-orange-50 p-3">
-            <div className="text-sm font-bold text-orange-700">
-              上程中 -{' '}
-              {approvalStatus
-                .filter((a) => a.status === 1)
-                .map((a) => a.userName)
-                .join(', ')}{' '}
-              が承認待ち
-            </div>
-            {isCompleted() && (
-              <div className="mt-1 text-sm font-bold text-green-700">
-                上程が完了しました
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* 上程Drawer */}
-        <ApprovalDrawer
-          isOpen={isApprovalDrawerOpen}
-          onClose={() => setIsApprovalDrawerOpen(false)}
-          year={currentYear}
-          month={currentIndexMonth + 1}
-        />
+
+        {/* 上程Drawer（開いている時のみレンダリング） */}
+        {isDrawerOpen && (
+          <ApprovalDrawer
+            onClose={() => setIsDrawerOpen(false)}
+            pageCode={1} // 複数レコード型ページ（計画書ページ）
+            year={currentYear}
+            month={currentIndexMonth + 1}
+            onApprovalChange={refreshApprovalStatus}
+          />
+        )}
       </div>
     </>
   );

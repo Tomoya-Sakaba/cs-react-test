@@ -21,12 +21,13 @@ ADD [Position] nvarchar(100) NULL;     -- 役職
 ```sql
 CREATE TABLE [dbo].[Approvals] (
   [Id] int identity not null,
-  [ReportNo] nvarchar(50) not null,  -- 報告書No
+  [PageCode] int not null,            -- ページタイプコード（1: 複数レコード型, 2: 1レコード型）
+  [ReportNo] nvarchar(50) null,       -- 報告書No（PageCode=2の場合は必須、PageCode=1の場合はnull可）
   [Year] int not null,                 -- 年
   [Month] int not null,               -- 月
   [UserName] nvarchar(100) not null,  -- 対象のユーザー名
   [FlowOrder] int not null,            -- フロー順序番号（0: 上程者, 1: 承認者1, 2: 承認者2, ...）
-  [Status] int not null,               -- 状態番号（0: 上程済み, 1: 承認待ち, 2: 承認済み, 3: 差し戻し, 4: 取り戻し）
+  [Status] int not null,               -- 状態番号（0: 上程済み, 1: 承認待ち, 2: 承認済み, 3: 差し戻し, 4: 取り戻し, 5: 完了, 6: 承認スキップ）
   [Comment] nvarchar(1000) null,        -- コメント
   [ActionDate] datetime null,          -- 上程or承認をした日付
   [Created_At] datetime default getdate() not null,
@@ -35,7 +36,7 @@ CREATE TABLE [dbo].[Approvals] (
 );
 ```
 
-### 既存テーブルの修正（UserName カラムのサイズを変更）
+### 既存テーブルの修正
 
 既にテーブルが作成されている場合は、以下の SQL で修正してください：
 
@@ -43,22 +44,58 @@ CREATE TABLE [dbo].[Approvals] (
 -- UserNameカラムのサイズを変更
 ALTER TABLE [dbo].[Approvals]
 ALTER COLUMN [UserName] nvarchar(100) not null;
+
+-- PageCodeカラムを追加（既存データはデフォルトで2を設定：1レコード型として扱う）
+ALTER TABLE [dbo].[Approvals]
+ADD [PageCode] int NOT NULL DEFAULT 2;
+
+-- ReportNoカラムをNULL許可に変更（PageCode=1の場合はnull可）
+ALTER TABLE [dbo].[Approvals]
+ALTER COLUMN [ReportNo] nvarchar(50) NULL;
 ```
 
 -- インデックス
-CREATE INDEX [IX_Approvals_ReportNo] ON [dbo].[Approvals]([ReportNo]);
-CREATE INDEX [IX_Approvals_YearMonth] ON [dbo].[Approvals]([Year], [Month]);
+CREATE INDEX [IX_Approvals_PageCode_Year_Month] ON [dbo].[Approvals]([PageCode], [Year], [Month]);
+CREATE INDEX [IX_Approvals_PageCode_ReportNo_Year_Month] ON [dbo].[Approvals]([PageCode], [ReportNo], [Year], [Month]);
 CREATE INDEX [IX_Approvals_UserName] ON [dbo].[Approvals]([UserName]);
 CREATE INDEX [IX_Approvals_Status] ON [dbo].[Approvals]([Status]);
 
-```
+````
 
-## 3. テーブル設計の説明
+## 3. 報告書テーブル（Reports）
+
+1レコードで完結する報告書データを管理するテーブル：
+
+```sql
+CREATE TABLE [dbo].[Reports] (
+  [Id] int identity not null,
+  [ReportNo] nvarchar(50) not null unique,  -- 報告書No（ユニーク制約）
+  [Title] nvarchar(200) not null,           -- タイトル
+  [Content] nvarchar(max) null,              -- 内容
+  [Created_At] datetime default getdate() not null,
+  [Created_User] nvarchar(100) null,        -- 作成者
+  [Updated_At] datetime default getdate() not null,
+  [Updated_User] nvarchar(100) null,        -- 更新者
+  primary key (Id)
+);
+
+-- インデックス
+CREATE INDEX [IX_Reports_ReportNo] ON [dbo].[Reports]([ReportNo]);
+CREATE INDEX [IX_Reports_Created_At] ON [dbo].[Reports]([Created_At]);
+````
+
+### 状態管理について
+
+報告書の状態は上程管理テーブル（Approvals）から取得します。
+Reports テーブルには状態を保持しません。
+
+## 4. テーブル設計の説明
 
 ### ReportNo（報告書 No）について
 
 - 報告書を識別するための番号
 - 同じ報告書に対する上程フローは同じ ReportNo を使用
+- Reports テーブルでユニーク制約
 
 ### FlowOrder（フロー順序）について
 
@@ -67,6 +104,15 @@ CREATE INDEX [IX_Approvals_Status] ON [dbo].[Approvals]([Status]);
 - 2: 承認者 2
 - 3: 承認者 3
 - ... の順序
+
+### PageCode（ページタイプコード）について
+
+- **1**: 複数レコード型ページ（例：計画書ページ）
+  - `ReportNo`は`null`または空文字列で登録可能
+  - 上程状態の取得は`PageCode`、`Year`、`Month`のみで行う
+- **2**: 1 レコード型ページ（例：報告書ページ）
+  - `ReportNo`は必須（そのページのテーブルの`ReportNo`を使用）
+  - 上程状態の取得は`PageCode`、`ReportNo`、`Year`、`Month`で行う
 
 ### Status（状態番号）について
 
@@ -77,6 +123,7 @@ CREATE INDEX [IX_Approvals_Status] ON [dbo].[Approvals]([Status]);
 - 4: 取り戻し（上程者が取り戻した状態）
 - 5: 完了（すべての承認が完了した状態）
 - 6: 承認スキップ（後続の承認者が承認または差し戻ししたため、スキップされた状態）
+- 7: 差し戻し対象（差し戻しされた上程者が再上程待ちの状態）
 
 ### データ例
 
@@ -122,11 +169,10 @@ CREATE INDEX [IX_Approvals_Status] ON [dbo].[Approvals]([Status]);
 
 ```
 
-## 4. 承認者追加時の処理
+## 5. 承認者追加時の処理
 
 上程者が承認者を追加する場合:
 
 - 同じ ReportNo で、新しい FlowOrder のレコードを追加
 - 既存の承認フローが完了していない場合は、新しい承認者を最後に追加
 - 既存の承認フローが完了している場合は、新しい承認フローとして追加
-```

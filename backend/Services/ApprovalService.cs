@@ -3,13 +3,22 @@ using backend.Models.Entity;
 using backend.Models.Repository;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace backend.Services
 {
     public class ApprovalService
     {
         private readonly ApprovalRepository _repository = new ApprovalRepository();
+        
+        // メールログファイルのパス（backend/Mail/approval_mail_log.txt）
+        private readonly string _mailLogPath = Path.Combine(
+            Path.GetDirectoryName(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory)), 
+            "Mail", 
+            "approval_mail_log.txt"
+        );
 
         //---------------------------------------------------------------------
         // 上程データを作成
@@ -21,7 +30,13 @@ namespace backend.Services
         //---------------------------------------------------------------------
         public void CreateApproval(CreateApprovalRequest request)
         {
-            if (request == null || string.IsNullOrEmpty(request.ReportNo))
+            if (request == null)
+            {
+                throw new ArgumentException("リクエストが無効です。");
+            }
+
+            // PageCode=2（1レコード型）の場合はReportNo必須、PageCode=1（複数レコード型）の場合はReportNo不要
+            if (request.PageCode == 2 && string.IsNullOrEmpty(request.ReportNo))
             {
                 throw new ArgumentException("報告書Noが必要です。");
             }
@@ -31,16 +46,20 @@ namespace backend.Services
                 throw new ArgumentException("承認者を1人以上選択してください。");
             }
 
+            // PageCode=1（複数レコード型）の場合はReportNoをnullまたは空文字列に設定
+            string reportNo = request.PageCode == 1 ? null : request.ReportNo;
+
             // 上程者のレコードを作成（FlowOrder=0, Status=0）
             var submitterApproval = new ApprovalEntity
             {
-                ReportNo = request.ReportNo,
+                PageCode = request.PageCode,
+                ReportNo = reportNo,
                 Year = request.Year,
                 Month = request.Month,
                 UserName = request.SubmitterName,
                 FlowOrder = 0,
                 Status = 0, // 上程済み
-                Comment = request.Comment,
+                Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment,
                 ActionDate = DateTime.Now
             };
             _repository.AddApproval(submitterApproval);
@@ -50,7 +69,8 @@ namespace backend.Services
             {
                 var approverApproval = new ApprovalEntity
                 {
-                    ReportNo = request.ReportNo,
+                    PageCode = request.PageCode,
+                    ReportNo = reportNo,
                     Year = request.Year,
                     Month = request.Month,
                     UserName = request.ApproverNames[i],
@@ -61,17 +81,21 @@ namespace backend.Services
                 };
                 _repository.AddApproval(approverApproval);
             }
+
+            // メールログを記録
+            WriteMailLog(request.SubmitterName, request.ApproverNames, request.Comment, "新規上程");
         }
 
         //---------------------------------------------------------------------
-        // 報告書No、年、月で上程データを取得
+        // PageCode、報告書No、年、月で上程データを取得
         //---------------------------------------------------------------------
-        public List<ApprovalDto> GetApprovalsByReport(string reportNo, int year, int month)
+        public List<ApprovalDto> GetApprovalsByReport(int pageCode, string reportNo, int year, int month)
         {
-            var entities = _repository.GetApprovalsByReport(reportNo, year, month);
+            var entities = _repository.GetApprovalsByReport(pageCode, reportNo, year, month);
             return entities.Select(e => new ApprovalDto
             {
                 Id = e.Id,
+                PageCode = e.PageCode,
                 ReportNo = e.ReportNo,
                 Year = e.Year,
                 Month = e.Month,
@@ -94,6 +118,7 @@ namespace backend.Services
             return entities.Select(e => new ApprovalDto
             {
                 Id = e.Id,
+                PageCode = e.PageCode,
                 ReportNo = e.ReportNo,
                 Year = e.Year,
                 Month = e.Month,
@@ -129,8 +154,18 @@ namespace backend.Services
                 throw new ArgumentException("リクエストが無効です。");
             }
 
-            // 現在の承認レコードを取得
-            var allApprovals = _repository.GetApprovalsByReport(request.ReportNo, request.Year, request.Month);
+            // 現在の承認レコードを取得（PageCodeは既存レコードから取得）
+            // まず既存のレコードを取得してPageCodeを特定
+            var tempApprovals = _repository.GetApprovalsByReport(1, null, request.Year, request.Month)
+                .Concat(_repository.GetApprovalsByReport(2, request.ReportNo ?? string.Empty, request.Year, request.Month))
+                .ToList();
+            var targetApproval = tempApprovals.FirstOrDefault(a => a.Id == request.Id);
+            if (targetApproval == null)
+            {
+                throw new ArgumentException("承認レコードが見つかりません。");
+            }
+            int pageCode = targetApproval.PageCode;
+            var allApprovals = _repository.GetApprovalsByReport(pageCode, request.ReportNo, request.Year, request.Month);
             var currentApproval = allApprovals.FirstOrDefault(a => a.Id == request.Id);
 
             if (currentApproval == null)
@@ -166,7 +201,7 @@ namespace backend.Services
                     currentApproval.Status = 2; // 承認済み
                 }
 
-                currentApproval.Comment = request.Comment;
+                currentApproval.Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment;
                 currentApproval.ActionDate = DateTime.Now;
                 _repository.UpdateApproval(currentApproval);
 
@@ -188,7 +223,7 @@ namespace backend.Services
             {
                 // 差し戻し処理
                 currentApproval.Status = 3; // 差し戻し
-                currentApproval.Comment = request.Comment;
+                currentApproval.Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment;
                 currentApproval.ActionDate = DateTime.Now;
                 _repository.UpdateApproval(currentApproval);
 
@@ -216,6 +251,34 @@ namespace backend.Services
                     pendingApproval.Status = 6; // 承認スキップ
                     _repository.UpdateApproval(pendingApproval);
                 }
+
+                // 差し戻し対象者（上程者、FlowOrder=0）のレコードを取得
+                var submitterApproval = allApprovals.FirstOrDefault(a => a.FlowOrder == 0);
+                if (submitterApproval != null)
+                {
+                    // 差し戻し対象者のレコードを作成（FlowOrder = 差し戻しした承認者のFlowOrder + 1）
+                    var rejectionTargetApproval = new ApprovalEntity
+                    {
+                        PageCode = submitterApproval.PageCode,
+                        ReportNo = submitterApproval.ReportNo,
+                        Year = submitterApproval.Year,
+                        Month = submitterApproval.Month,
+                        UserName = submitterApproval.UserName, // 元の上程者
+                        FlowOrder = currentApproval.FlowOrder + 1,
+                        Status = 7, // 差し戻し対象
+                        Comment = null, // 差し戻し理由は差し戻しした人のコメントにあるため不要
+                        ActionDate = DateTime.Now
+                    };
+                    _repository.AddApproval(rejectionTargetApproval);
+
+                    // メールログを記録（差し戻しした承認者から上程者へ）
+                    WriteMailLog(
+                        request.UserName, // 送信者：差し戻しした承認者
+                        new[] { submitterApproval.UserName }, // 宛先：上程者
+                        request.Comment, // 差し戻し理由
+                        "差し戻し"
+                    );
+                }
             }
             else
             {
@@ -238,36 +301,39 @@ namespace backend.Services
         //---------------------------------------------------------------------
         public void ResubmitApproval(CreateApprovalRequest request)
         {
-            if (request == null || string.IsNullOrEmpty(request.ReportNo))
+            if (request == null)
+            {
+                throw new ArgumentException("リクエストが無効です。");
+            }
+
+            // PageCode=2（1レコード型）の場合はReportNo必須、PageCode=1（複数レコード型）の場合はReportNo不要
+            if (request.PageCode == 2 && string.IsNullOrEmpty(request.ReportNo))
             {
                 throw new ArgumentException("報告書Noが必要です。");
             }
 
+            // PageCode=1（複数レコード型）の場合はReportNoをnullまたは空文字列に設定
+            string reportNo = request.PageCode == 1 ? null : request.ReportNo;
+
             // 既存の上程データを取得
-            var existingApprovals = _repository.GetApprovalsByReport(request.ReportNo, request.Year, request.Month);
+            var existingApprovals = _repository.GetApprovalsByReport(request.PageCode, reportNo, request.Year, request.Month);
             
             if (existingApprovals.Count == 0)
             {
                 throw new ArgumentException("既存の上程データが見つかりません。");
             }
 
-            // 差し戻しが発生しているかチェック（最新の差し戻しを取得：最大FlowOrder）
-            var rejectedApprovals = existingApprovals.Where(a => a.Status == 3).ToList();
-            if (rejectedApprovals.Count == 0)
+            // 差し戻し対象者レコード（Status=7）を取得
+            var rejectionTargetApproval = existingApprovals.FirstOrDefault(a => a.Status == 7);
+            if (rejectionTargetApproval == null)
             {
-                throw new InvalidOperationException("差し戻しが発生していないため、再上程できません。");
+                throw new InvalidOperationException("差し戻し対象者レコードが見つかりません。再上程できません。");
             }
 
-            // 最新の差し戻し（最大FlowOrder）を取得
-            var rejectedApproval = rejectedApprovals.OrderByDescending(a => a.FlowOrder).First();
-            
-            // 差し戻しされた承認者のFlowOrderを取得（これが現在の最大FlowOrder）
-            int rejectedFlowOrder = rejectedApproval.FlowOrder;
-
-            // 差し戻しされた承認者以降に既に再上程があるかチェック
+            // 差し戻し対象者レコード以降に既に再上程があるかチェック
             // 既に再上程がある場合は、そのレコードを削除してから新しい再上程を作成
             var existingResubmissions = existingApprovals
-                .Where(a => a.FlowOrder > rejectedFlowOrder)
+                .Where(a => a.FlowOrder > rejectionTargetApproval.FlowOrder)
                 .ToList();
 
             if (existingResubmissions.Any())
@@ -279,28 +345,21 @@ namespace backend.Services
                 }
             }
 
-            // 新しい上程者を追加（最新の差し戻しの次のFlowOrder）
-            int newSubmitterFlowOrder = rejectedFlowOrder + 1;
-            var newSubmitterApproval = new ApprovalEntity
-            {
-                ReportNo = request.ReportNo,
-                Year = request.Year,
-                Month = request.Month,
-                UserName = request.SubmitterName,
-                FlowOrder = newSubmitterFlowOrder,
-                Status = 0, // 上程済み
-                Comment = request.Comment,
-                ActionDate = DateTime.Now
-            };
-            _repository.AddApproval(newSubmitterApproval);
+            // 差し戻し対象者レコードを更新（再上程者に変更）
+            rejectionTargetApproval.UserName = request.SubmitterName; // 再上程者
+            rejectionTargetApproval.Status = 0; // 上程済み
+            rejectionTargetApproval.Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment;
+            rejectionTargetApproval.ActionDate = DateTime.Now;
+            _repository.UpdateApproval(rejectionTargetApproval);
 
             // 新しい承認者を追加
-            int startApproverFlowOrder = newSubmitterFlowOrder + 1;
+            int startApproverFlowOrder = rejectionTargetApproval.FlowOrder + 1;
             for (int i = 0; i < request.ApproverNames.Length; i++)
             {
                 var approverApproval = new ApprovalEntity
                 {
-                    ReportNo = request.ReportNo,
+                    PageCode = request.PageCode,
+                    ReportNo = reportNo,
                     Year = request.Year,
                     Month = request.Month,
                     UserName = request.ApproverNames[i],
@@ -312,7 +371,50 @@ namespace backend.Services
                 _repository.AddApproval(approverApproval);
             }
 
+            // メールログを記録
+            WriteMailLog(request.SubmitterName, request.ApproverNames, request.Comment, "再上程");
+
             // 差し戻しまでのフローは履歴としてそのまま保持（変更なし）
+        }
+
+        //---------------------------------------------------------------------
+        // メールログをファイルに書き込む
+        // 
+        // 処理内容：
+        // 1. logsフォルダが存在しない場合は作成
+        // 2. メールログファイルに追記（日時、送信者、宛先、コメントを記録）
+        //---------------------------------------------------------------------
+        private void WriteMailLog(string fromUser, string[] toUsers, string comment, string actionType)
+        {
+            try
+            {
+                // logsフォルダが存在しない場合は作成
+                string logDirectory = Path.GetDirectoryName(_mailLogPath);
+                if (!Directory.Exists(logDirectory))
+                {
+                    Directory.CreateDirectory(logDirectory);
+                }
+
+                // メールログの内容を構築
+                var logContent = new StringBuilder();
+                logContent.AppendLine("========================================");
+                logContent.AppendLine($"日時: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                logContent.AppendLine($"アクション: {actionType}");
+                logContent.AppendLine($"送信者: {fromUser}");
+                logContent.AppendLine($"宛先: {string.Join(", ", toUsers)}");
+                logContent.AppendLine($"コメント: {comment ?? "(コメントなし)"}");
+                logContent.AppendLine("========================================");
+                logContent.AppendLine();
+
+                // ファイルに追記
+                File.AppendAllText(_mailLogPath, logContent.ToString(), Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                // ログの書き込みに失敗しても処理は続行（エラーログに記録することを推奨）
+                // 本番環境では適切なログライブラリ（NLog、Serilogなど）を使用することを推奨
+                System.Diagnostics.Debug.WriteLine($"メールログの書き込みに失敗しました: {ex.Message}");
+            }
         }
     }
 }

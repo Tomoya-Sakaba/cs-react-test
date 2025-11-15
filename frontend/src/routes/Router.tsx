@@ -15,6 +15,8 @@ import TimeStamping from "../pages/attendance/TimeStamping";
 import AttendanceList from "../pages/attendance/AttendanceList";
 import AttendanceRecord from "../pages/attendance/AttendanceRecord";
 import Login from "../pages/Login";
+import ReportList from "../pages/ReportList";
+import ReportForm from "../pages/ReportForm";
 
 const Router = createBrowserRouter(
   createRoutesFromElements(
@@ -35,6 +37,10 @@ const Router = createBrowserRouter(
           path="/attendance/record/:userId"
           element={<AttendanceRecord />}
         />
+
+        <Route path="/reports" element={<ReportList />} />
+        <Route path="/reports/new" element={<ReportForm />} />
+        <Route path="/reports/edit/:reportNo" element={<ReportForm />} />
       </Route>
     </>
   )
