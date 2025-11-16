@@ -170,6 +170,7 @@
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
     <Compile Include="Models\DTOs\ApprovalDto.cs" />
+    <Compile Include="Models\DTOs\AvailableYearMonthDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeListDto.cs" />
     <Compile Include="Models\DTOs\PlanHistoryDto.cs" />
@@ -197,6 +198,7 @@
     <Compile Include="Services\PlanService.cs" />
     <Compile Include="Services\ReportService.cs" />
     <Compile Include="Services\TestService.cs" />
+    <Compile Include="Utils\ReportNoGenerator.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Areas\HelpPage\HelpPage.css" />

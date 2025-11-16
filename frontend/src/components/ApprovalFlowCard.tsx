@@ -15,6 +15,8 @@ type ApprovalFlowCardProps = {
   onReject?: () => void; // 差し戻しハンドラ
   onRecall?: () => void; // 取り戻しハンドラ
   canRecall?: boolean; // 取り戻し可能かどうか
+  onResubmit?: () => void; // 再上程ハンドラ
+  canResubmit?: boolean; // 再上程可能かどうか
   userEmail?: string; // ユーザーのメールアドレス
 };
 
@@ -32,6 +34,8 @@ const ApprovalFlowCard = ({
   onReject,
   onRecall,
   canRecall = false,
+  onResubmit,
+  canResubmit = false,
   userEmail,
 }: ApprovalFlowCardProps) => {
   const isRejected = record.status === 3;
@@ -193,6 +197,18 @@ const ApprovalFlowCard = ({
                 差し戻し
               </button>
             </div>
+          </div>
+        )}
+
+        {/* 再上程可能なレコードの場合、再上程ボタンを表示 */}
+        {canResubmit && onResubmit && (
+          <div className="mt-3">
+            <button
+              onClick={onResubmit}
+              className="w-full rounded bg-blue-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue-600"
+            >
+              再上程
+            </button>
           </div>
         )}
 

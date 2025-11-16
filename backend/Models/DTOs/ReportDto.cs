@@ -37,6 +37,12 @@ namespace backend.Models.DTOs
 
         [JsonProperty("content")]
         public string Content { get; set; }
+
+        [JsonProperty("fiscalYearStartMonth")]
+        public int? FiscalYearStartMonth { get; set; }
+
+        [JsonProperty("reportNoPrefix")]
+        public string ReportNoPrefix { get; set; }
     }
 
     public class UpdateReportRequest

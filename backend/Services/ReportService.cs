@@ -1,6 +1,7 @@
 ﻿using backend.Models.DTOs;
 using backend.Models.Entity;
 using backend.Models.Repository;
+using backend.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,8 +27,15 @@ namespace backend.Services
                 throw new ArgumentException("タイトルは必須です。");
             }
 
-            // ReportNoを生成（RPT-YYYYMMDD-XXXX形式）
-            string reportNo = GenerateReportNo();
+            // ReportNoを生成（プレフィックス年度月配番形式）
+            // 年度開始月が指定されていない場合は4月をデフォルトとする
+            // プレフィックスが指定されていない場合は"RPT"をデフォルトとする
+            int fiscalYearStartMonth = request.FiscalYearStartMonth ?? 4;
+            string prefix = string.IsNullOrWhiteSpace(request.ReportNoPrefix) ? "RPT" : request.ReportNoPrefix;
+            
+            // 既存レポートを取得してReportNoを生成
+            var existingReports = _repository.GetAllReports();
+            string reportNo = ReportNoGenerator.GenerateReportNo(fiscalYearStartMonth, prefix, existingReports);
 
             var report = new ReportEntity
             {
@@ -123,21 +131,6 @@ namespace backend.Services
             }
 
             _repository.DeleteReport(reportNo);
-        }
-
-        //---------------------------------------------------------------------
-        // ReportNoを生成（RPT-YYYYMMDD-XXXX形式）
-        //---------------------------------------------------------------------
-        private string GenerateReportNo()
-        {
-            // すべての報告書数を取得して連番を生成
-            var existingReports = _repository.GetAllReports();
-            int sequence = existingReports.Count + 1;
-
-            // 現在の日付を取得（YYYYMMDD形式）
-            string dateStr = DateTime.Now.ToString("yyyyMMdd");
-
-            return $"RPT-{dateStr}-{sequence:D4}";
         }
 
         //---------------------------------------------------------------------

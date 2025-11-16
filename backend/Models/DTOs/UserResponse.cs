@@ -25,6 +25,9 @@ namespace backend.Models.DTOs
 
         [JsonProperty("position")]
         public string Position { get; set; }
+        
+        [JsonProperty("color")]
+        public string Color { get; set; }
 
         // Password は返さない
     }

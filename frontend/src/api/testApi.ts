@@ -137,4 +137,16 @@ export const testApi = {
 
     return res.data;
   },
+
+  async fetchAvailableYearMonths(): Promise<{ year: number; month: number }[]> {
+    const res = await axios.get<{ year: number; month: number }[]>(
+      '/api/plan/available-year-months',
+      {
+        headers: {
+          Accept: 'application/json',
+        },
+      }
+    );
+    return res.data;
+  },
 };

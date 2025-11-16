@@ -699,5 +699,31 @@ namespace backend.Models.Repository
                 UserName = userName
             }, tran);
         }
+
+        //------------------------------------------------------------------------------------------
+        // データが存在する年月のリストを取得
+        // t_planとnoteテーブルの両方から、データが存在する年月を取得
+        //------------------------------------------------------------------------------------------
+        public List<AvailableYearMonthDto> GetAvailableYearMonths()
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT DISTINCT
+                        YEAR(date) AS Year,
+                        MONTH(date) AS Month
+                    FROM t_plan
+                    WHERE is_active = 1
+                    UNION
+                    SELECT DISTINCT
+                        YEAR(note_date) AS Year,
+                        MONTH(note_date) AS Month
+                    FROM note
+                    ORDER BY Year DESC, Month DESC;
+                ";
+
+                return db.Query<AvailableYearMonthDto>(sql).ToList();
+            }
+        }
     }
 }

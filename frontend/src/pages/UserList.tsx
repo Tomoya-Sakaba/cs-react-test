@@ -1,6 +1,7 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { getTextColor } from "../utils/colorUtils";
 
 const UserList = () => {
 
@@ -9,6 +10,7 @@ const UserList = () => {
     name: string,
     createdAt: string,
     updatedAt: string,
+    color: string,
   }
   const [users, setUsers] = useState<Users[]>([]);
 
@@ -35,26 +37,34 @@ const UserList = () => {
 
         <Link to={"new"} >
           <div className="mb-5 w-32 cursor-pointer rounded-xl bg-blue-500 p-2 text-center text-white">
-          ユーザー新規作成
+            ユーザー新規作成
           </div>
         </Link>
 
         <div className="w-1/2">
-          {Array.isArray(users) && users.map((item, index) => (
-            <Link to={`/user/list/${item.id}`} key={index} >
-              <div
-                className="mb-2 rounded border bg-white p-2 shadow-sm"
-              >
-                <p className="text-lg font-bold">{item.name}</p>
-                <p className="text-sm text-gray-500">
-                  登録日: {new Date(item.createdAt).toLocaleDateString().replaceAll('/', '-').toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-500">
-                  登録日: {item.createdAt}
-                </p>
-              </div>
-            </Link>
-          ))}
+          {Array.isArray(users) && users.map((item, index) => {
+            const backgroundColor = item.color ?? "#ffffff";
+            const textColor = getTextColor(backgroundColor);
+            return (
+              <Link to={`/user/list/${item.id}`} key={index} >
+                <div
+                  className="mb-2 rounded border p-2 shadow-sm"
+                  style={{
+                    backgroundColor: backgroundColor,
+                    color: textColor
+                  }}
+                >
+                  <p className="text-lg font-bold">{item.name}</p>
+                  <p className="text-sm" style={{ color: textColor, opacity: 0.8 }}>
+                    登録日: {new Date(item.createdAt).toLocaleDateString().replaceAll('/', '-').toLocaleString()}
+                  </p>
+                  <p className="text-sm" style={{ color: textColor, opacity: 0.8 }}>
+                    登録日: {item.createdAt}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </>

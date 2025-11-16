@@ -11,6 +11,7 @@ import {
 import TestPdf from '../components/TestPdf';
 import PdfPreview from '../components/PdfPreview';
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { testApi } from '../api/testApi';
 import YearMonthFilter from '../components/YearMonthFilter';
 import { useYearMonthParams } from '../hooks/useYearMonthParams';
@@ -147,7 +148,19 @@ const getColumnDefs = (
 
 
 const AgTest = () => {
-  const { currentYear, currentIndexMonth } = useYearMonthParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isNewMode = searchParams.get('mode') === 'new';
+
+  // 利用可能な年月のリスト
+  const [availableYearMonths, setAvailableYearMonths] = useState<
+    { year: number; month: number }[]
+  >([]);
+  const [loadingYearMonths, setLoadingYearMonths] = useState(true);
+
+  const { currentYear, currentIndexMonth } = useYearMonthParams(
+    isNewMode ? undefined : availableYearMonths // 新規作成モードの場合は利用可能な年月のチェックをスキップ
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [rowData, setRowData] = useState<MapdePlan[]>([]);
   const [agRowData, setAgRowData] = useState<MapdePlan[]>([]);
@@ -164,19 +177,86 @@ const AgTest = () => {
   const gridRef = useRef<AgGridReactType<MapdePlan>>(null);
 
   //---------------------------------------------------------------------------
+  // 利用可能な年月を取得
+  //---------------------------------------------------------------------------
+  useEffect(() => {
+    const fetchAvailableYearMonths = async () => {
+      try {
+        const data = await testApi.fetchAvailableYearMonths();
+        setAvailableYearMonths(data);
+      } catch (error) {
+        console.error("利用可能な年月の取得に失敗しました:", error);
+      } finally {
+        setLoadingYearMonths(false);
+      }
+    };
+    fetchAvailableYearMonths();
+  }, []);
+
+  //---------------------------------------------------------------------------
+  // 新規作成モードで年月変更時に既存データをチェック
+  //---------------------------------------------------------------------------
+  const [showExistingDataDialog, setShowExistingDataDialog] = useState(false);
+
+  useEffect(() => {
+    // 新規作成モードで年月が変更された時、既存データがあるかチェック
+    // ダイアログ表示中、利用可能な年月がまだ取得されていない場合はスキップ
+    if (isNewMode && availableYearMonths.length > 0) {
+      // URLパラメータから直接年月を取得（currentYear/currentIndexMonthの更新を待たない）
+      const yearParam = searchParams.get('year');
+      const monthParam = searchParams.get('month');
+
+      if (yearParam && monthParam) {
+        const urlYearMonth = `${yearParam}-${monthParam}`;
+
+        // 利用可能な年月のセットを作成
+        const availableSet = new Set(
+          availableYearMonths.map((ym) => `${ym.year}-${ym.month}`)
+        );
+
+        // 既存データがあるかチェック（利用可能な年月に含まれているか）
+        if (availableSet.has(urlYearMonth)) {
+          setShowExistingDataDialog(true);
+        } else {
+          // 既存データがない場合は、モーダルを閉じる（戻った場合など）
+          setShowExistingDataDialog(false);
+        }
+      }
+    }
+  }, [searchParams, isNewMode, availableYearMonths]);
+
+  // 既存データを読み込む
+  const handleLoadExistingData = () => {
+    setShowExistingDataDialog(false);
+    // URLからmode=newを削除し、年月を設定して通常モードに切り替え
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+      newParams.delete('mode');
+      newParams.set('year', currentYear.toString());
+      newParams.set('month', (currentIndexMonth + 1).toString()); // 1-12の形式に変換
+      return newParams;
+    });
+  };
+
+  // 戻る（ブラウザの履歴を一つ前に戻す）
+  const handleGoBack = () => {
+    setShowExistingDataDialog(false);
+    // ブラウザの履歴を一つ前に戻す
+    navigate(-1);
+  };
+
+  //---------------------------------------------------------------------------
   // 初回レンダリング処理
   //---------------------------------------------------------------------------
   const [isNew, setIsNew] = useState(false);
   useEffect(() => {
-    const fetchData = async () => {
-      // fetch
-      const res = await testApi.fetchPlanData(
-        currentYear,
-        currentIndexMonth + 1
-      );
-      console.log('res', res);
+    // ダイアログ表示中は処理をスキップ
+    if (showExistingDataDialog) {
+      return;
+    }
 
-      // fetch
+    const fetchData = async () => {
+      // fetch ContentTypeList（常に必要）
       const resContent = await testApi.fetchContentTypeList();
       console.log('resContent', resContent);
 
@@ -188,8 +268,28 @@ const AgTest = () => {
       const contentTypeIdList = getContentTypeIdList(resContent);
       console.log('contentTypeIdList', contentTypeIdList);
 
-      //const defaultData = getDefaultRecord(contentTypeIdList);
-      //console.log("defaultData", defaultData);
+      // 新規作成モードの場合は、データ取得をスキップして空のデータで初期化
+      if (isNewMode) {
+        setIsNew(true);
+        const mapData = mapMonthlyTestData(
+          [],
+          currentYear,
+          currentIndexMonth,
+          getDefaultRecord,
+          contentTypeIdList
+        );
+        console.log('mapData(新規作成モード)', mapData);
+        setRowData(mapData);
+        setAgRowData(JSON.parse(JSON.stringify(mapData)));
+        return;
+      }
+
+      // 通常モードの場合はデータを取得
+      const res = await testApi.fetchPlanData(
+        currentYear,
+        currentIndexMonth + 1
+      );
+      console.log('res', res);
 
       if (res.length === 0 || !res) {
         setIsNew(true);
@@ -221,7 +321,7 @@ const AgTest = () => {
       }
     };
     fetchData();
-  }, [currentYear, currentIndexMonth, isNew]);
+  }, [currentYear, currentIndexMonth, isNew, isNewMode, showExistingDataDialog]);
 
   const getContentTypeIdList = (list: ContentTypeList[]): number[] => {
     return list.map((item) => item.contentTypeId);
@@ -237,16 +337,19 @@ const AgTest = () => {
   // 編集
   //---------------------------------------------------------------------------
   const toggleEditMode = () => {
-    // 上程完了済みの場合は編集不可
-    if (approvalStatus.some((a) => a.status === 5)) {
-      alert('上程が完了しているため、編集できません。');
-      return;
-    }
+    // 新規作成モードの場合は上程チェックをスキップ
+    if (!isNewMode) {
+      // 上程完了済みの場合は編集不可
+      if (approvalStatus.some((a) => a.status === 5)) {
+        alert('上程が完了しているため、編集できません。');
+        return;
+      }
 
-    // 上程中は承認者のみが編集可能
-    if (!canEdit()) {
-      alert('上程中です。承認者のみが編集できます。');
-      return;
+      // 上程中は承認者のみが編集可能
+      if (!canEdit()) {
+        alert('上程中です。承認者のみが編集できます。');
+        return;
+      }
     }
 
     if (isEditing) {
@@ -425,6 +528,10 @@ const AgTest = () => {
 
   // 上程状態をチェック（承認者のみが操作可能かどうか）
   const checkCanEdit = (): boolean => {
+    // 新規作成モードの場合は常に編集可能
+    if (isNewMode) {
+      return true;
+    }
     // 完了済みの場合は編集不可
     if (isCompleted()) {
       return false;
@@ -500,7 +607,11 @@ const AgTest = () => {
         </div>
 
         <div className="my-5 flex gap-4">
-          <YearMonthFilter />
+          <YearMonthFilter
+            availableYearMonths={availableYearMonths}
+            loading={loadingYearMonths}
+            allowAllMonths={isNewMode}
+          />
         </div>
 
         <div className="flex flex-1">
@@ -613,6 +724,39 @@ const AgTest = () => {
             month={currentIndexMonth + 1}
             onApprovalChange={refreshApprovalStatus}
           />
+        )}
+
+        {/* 既存データがある場合の確認ダイアログ */}
+        {showExistingDataDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="w-96 rounded-lg bg-white p-6 shadow-xl">
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-800">
+                  既存データが見つかりました
+                </h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  {currentYear}年{currentIndexMonth + 1}月には既にデータが存在します。
+                </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  既存データを読み込むか、前の年月に戻りますか？
+                </p>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={handleGoBack}
+                  className="rounded bg-gray-500 px-4 py-2 text-sm text-white hover:bg-gray-600"
+                >
+                  戻る
+                </button>
+                <button
+                  onClick={handleLoadExistingData}
+                  className="rounded bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+                >
+                  既存データを読み込む
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </>

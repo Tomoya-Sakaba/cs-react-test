@@ -51,6 +51,7 @@ namespace backend.Controllers
                 Email = e.Email,
                 Department = e.Department,
                 Position = e.Position,
+                Color = e.Color,
                 CreatedAt = e.CreatedAt,
                 UpdatedAt = e.UpdatedAt
             }).ToList();

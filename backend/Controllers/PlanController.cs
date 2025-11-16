@@ -76,6 +76,17 @@ namespace backend.Controllers
             _service.CreateVersionSnapshot(request.Year, request.Month, userName);
             return Ok();
         }
+
+        //------------------------------------------------------------------------------
+        // データが存在する年月のリストを取得
+        //------------------------------------------------------------------------------
+        [HttpGet]
+        [Route("api/plan/available-year-months")]
+        public IHttpActionResult GetAvailableYearMonths()
+        {
+            var data = _service.GetAvailableYearMonths();
+            return Ok(data);
+        }
     }
 
     public class VersionRequest

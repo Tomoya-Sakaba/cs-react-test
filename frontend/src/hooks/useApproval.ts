@@ -77,7 +77,8 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
   const { pageCode, year, month, reportNo, autoFetch = true } = options;
   const [currentUser] = useAtom(currentUserAtom);
   const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus[]>([]);
-  const [loading, setLoading] = useState(false);
+  // 初期状態でloadingをtrueに設定（autoFetchがtrueの場合、すぐに読み込みが始まるため）
+  const [loading, setLoading] = useState(autoFetch);
   const [error, setError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 

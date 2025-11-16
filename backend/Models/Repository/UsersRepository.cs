@@ -40,7 +40,7 @@ namespace backend.Models.Repository
             using (SqlConnection conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "SELECT Id, Name, Password, Email, Department, Position, Created_At, Updated_At FROM dbo.Users";
+                string sql = "SELECT Id, Name, Password, Email, Department, Position, Color, Created_At, Updated_At FROM dbo.Users";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 using (SqlDataReader reader = cmd.ExecuteReader())
                 {
@@ -54,6 +54,7 @@ namespace backend.Models.Repository
                             Email = reader["Email"] as string,
                             Department = reader["Department"] as string,
                             Position = reader["Position"] as string,
+                            Color = reader["Color"] as string,
                             CreatedAt = (DateTime)reader["Created_At"],
                             UpdatedAt = (DateTime)reader["Updated_At"]
                         });

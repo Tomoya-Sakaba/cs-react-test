@@ -13,6 +13,7 @@ namespace backend.Models.Entity
         public string Email { get; set; }
         public string Department { get; set; }
         public string Position { get; set; }
+        public string Color { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
     }
