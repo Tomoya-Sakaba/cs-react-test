@@ -89,5 +89,14 @@ namespace backend.Models.DTOs
         [JsonProperty("comment")]
         public string Comment { get; set; }
     }
+
+    public class RecallApprovalRequest
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        [JsonProperty("userName")]
+        public string UserName { get; set; }
+    }
 }
 

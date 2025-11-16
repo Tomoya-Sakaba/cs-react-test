@@ -2,8 +2,6 @@ import { type ApprovalStatus } from '../hooks/useApproval';
 
 type ApprovalFlowCardProps = {
   record: ApprovalStatus;
-  isSubmitter: boolean;
-  isResubmissionSubmitter: boolean;
   rejectedApprover: ApprovalStatus | undefined;
   resubmissionFlow: ApprovalStatus[];
   approvalStatus: ApprovalStatus[]; // 承認待ちの判定に使用
@@ -15,12 +13,13 @@ type ApprovalFlowCardProps = {
   onApprovalCommentChange?: (comment: string) => void; // コメント変更ハンドラ
   onApprove?: () => void; // 承認ハンドラ
   onReject?: () => void; // 差し戻しハンドラ
+  onRecall?: () => void; // 取り戻しハンドラ
+  canRecall?: boolean; // 取り戻し可能かどうか
+  userEmail?: string; // ユーザーのメールアドレス
 };
 
 const ApprovalFlowCard = ({
   record,
-  isSubmitter,
-  isResubmissionSubmitter,
   rejectedApprover,
   resubmissionFlow,
   approvalStatus,
@@ -31,6 +30,9 @@ const ApprovalFlowCard = ({
   onApprovalCommentChange,
   onApprove,
   onReject,
+  onRecall,
+  canRecall = false,
+  userEmail,
 }: ApprovalFlowCardProps) => {
   const isRejected = record.status === 3;
   const isRejectionTarget = record.status === 7; // 差し戻し対象
@@ -123,32 +125,38 @@ const ApprovalFlowCard = ({
 
   return (
     <div className="flex flex-col items-center">
-      <div className={`rounded-lg border-2 px-4 py-2 ${cardColor} w-full`}>
-        <div className="text-sm font-medium">
-          {isSubmitter ? '上程者' : isResubmissionSubmitter ? '上程者（再上程）' : `承認者 ${record.flowOrder}`} -{' '}
-          {getStatusLabel(record.status)}
+      <div className={`rounded-lg border-2 px-4 py-3 ${cardColor} w-full relative`}>
+        {/* ユーザー名と状態を同じ行に配置 */}
+        <div className="flex items-center justify-between">
+          {/* ユーザー名 */}
+          <div className="text-lg font-semibold">
+            {record.userName}
+          </div>
+          {/* 状態を右上に表示 */}
+          <div className="text-lg font-semibold">
+            {getStatusLabel(record.status)}
+          </div>
         </div>
-        <div className="text-sm font-semibold">
-          {record.userName}
-        </div>
-        {record.comment && (
-          <div className="mt-1 text-xs text-gray-600">
-            {isRejected ? (
-              <div>
-                <div className="font-semibold text-red-700">
-                  差し戻し理由:
-                </div>
-                <div className="mt-1 whitespace-pre-wrap text-red-800">
-                  {record.comment}
-                </div>
-              </div>
-            ) : (
-              <div>コメント: {record.comment}</div>
-            )}
+
+        {/* メールアドレス */}
+        {userEmail && (
+          <div className="mt-1 text-sm text-gray-600">
+            {userEmail}
           </div>
         )}
+
+        {/* コメント（枠内に表示） */}
+        {record.comment && (
+          <div className="mt-3 rounded border border-gray-300 bg-white p-3">
+            <div className="text-sm text-black whitespace-pre-wrap">
+              {record.comment}
+            </div>
+          </div>
+        )}
+
+        {/* アクション日時 */}
         {record.actionDate && (
-          <div className="mt-1 text-xs text-gray-500">
+          <div className="mt-2 text-xs text-gray-500">
             {new Date(record.actionDate).toLocaleString('ja-JP')}
           </div>
         )}
@@ -160,14 +168,14 @@ const ApprovalFlowCard = ({
               あなたの承認待ちです
             </div>
             <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 コメント（承認・差し戻し理由）
               </label>
               <textarea
                 value={approvalComment}
                 onChange={(e) => onApprovalCommentChange?.(e.target.value)}
                 rows={3}
-                className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-black focus:border-blue-500 focus:outline-none"
                 placeholder="コメントを入力してください"
               />
             </div>
@@ -185,6 +193,18 @@ const ApprovalFlowCard = ({
                 差し戻し
               </button>
             </div>
+          </div>
+        )}
+
+        {/* 取り戻し可能なレコードの場合、取り戻しボタンを表示 */}
+        {canRecall && onRecall && (
+          <div className="mt-3">
+            <button
+              onClick={onRecall}
+              className="w-full rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600"
+            >
+              取り戻し
+            </button>
           </div>
         )}
       </div>

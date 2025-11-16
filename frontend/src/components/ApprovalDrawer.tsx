@@ -48,7 +48,9 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
     approve,
     reject,
     resubmit,
+    recall,
     refresh,
+    canRecall,
   } = useApproval({
     pageCode,
     year,
@@ -448,13 +450,13 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
   const getStatusLabel = (status: number) => {
     switch (status) {
       case 0:
-        return '上程済み';
+        return '上程';
       case 1:
         return '承認待ち';
       case 2:
         return '承認済み';
       case 3:
-        return '差し戻し';
+        return '差戻';
       case 4:
         return '取り戻し';
       case 5:
@@ -542,17 +544,7 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
                           3. 【再上程フェーズ】差し戻し以降のレコード（FlowOrder > rejectedApprover.flowOrder）
                         */}
                         {allFlowRecords.map((record, index) => {
-                          const isSubmitter = record.flowOrder === 0;
                           const isRejected = record.status === 3;
-
-                          // 【再上程フェーズ】再上程者かどうかを判定（差し戻しの次のFlowOrderでStatus=0のもの）
-                          // 差し戻し対象者レコード（Status=7）を取得
-                          const rejectionTarget = approvalStatus.find((a) => a.status === 7);
-                          const isResubmissionSubmitter = rejectionTarget
-                            ? record.flowOrder === rejectionTarget.flowOrder && record.status === 0
-                            : rejectedApprover !== undefined &&
-                            record.flowOrder === rejectedApprover.flowOrder + 1 &&
-                            record.status === 0;
 
                           // 下矢印を表示するかどうか
                           // 差し戻しの場合は常に表示、それ以外は次のレコードがある場合のみ表示
@@ -562,12 +554,33 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
                           const currentPendingApproval = getCurrentPendingApproval();
                           const isCurrentPendingRecord = currentPendingApproval?.id === record.id;
 
+                          // ユーザー名からメールアドレスを取得
+                          const user = users.find((u) => u.name === record.userName);
+                          const userEmail = user?.email;
+
+                          // 取り戻し可能かどうかを判定
+                          const recordCanRecall = canRecall(record);
+
+                          // 取り戻しハンドラ
+                          const handleRecall = async () => {
+                            if (!window.confirm('取り戻しを実行しますか？')) {
+                              return;
+                            }
+
+                            try {
+                              await recall(record.id);
+                              alert('取り戻しが完了しました。');
+                              await refresh();
+                              onApprovalChange?.();
+                            } catch (error) {
+                              alert(error instanceof Error ? error.message : '取り戻しに失敗しました。');
+                            }
+                          };
+
                           return (
                             <ApprovalFlowCard
                               key={`flow-${record.id}-${index}`}
                               record={record}
-                              isSubmitter={isSubmitter}
-                              isResubmissionSubmitter={isResubmissionSubmitter}
                               rejectedApprover={rejectedApprover}
                               resubmissionFlow={resubmissionFlow}
                               approvalStatus={approvalStatus}
@@ -578,6 +591,9 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
                               onApprovalCommentChange={setApprovalComment}
                               onApprove={handleApprove}
                               onReject={handleReject}
+                              onRecall={handleRecall}
+                              canRecall={recordCanRecall}
+                              userEmail={userEmail}
                             />
                           );
                         })}
@@ -638,13 +654,15 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
                                 {/* 上程者 */}
                                 {currentUser && (
                                   <div className="flex flex-col items-center">
-                                    <div className="rounded-lg border-2 border-blue-500 bg-blue-50 px-3 py-1.5">
-                                      <div className="text-xs font-medium text-blue-700">
-                                        上程者
-                                      </div>
-                                      <div className="text-xs text-gray-800">
+                                    <div className="rounded-lg border-2 border-blue-500 bg-blue-50 px-4 py-3 w-full">
+                                      <div className="text-lg font-semibold text-gray-800">
                                         {currentUser.name}
                                       </div>
+                                      {currentUser.email && (
+                                        <div className="mt-1 text-base text-gray-600">
+                                          {currentUser.email}
+                                        </div>
+                                      )}
                                     </div>
                                     {selectedApprovers.length > 0 && (
                                       <div className="my-1 text-xl text-gray-400">↓</div>
@@ -658,13 +676,15 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
                                     key={`new-${approver.id}-${index}`}
                                     className="flex flex-col items-center"
                                   >
-                                    <div className="rounded-lg border-2 border-green-500 bg-green-50 px-3 py-1.5">
-                                      <div className="text-xs font-medium text-green-700">
-                                        承認者 {index + 1}
-                                      </div>
-                                      <div className="text-xs text-gray-800">
+                                    <div className="rounded-lg border-2 border-green-500 bg-green-50 px-4 py-3 w-full">
+                                      <div className="text-lg font-semibold text-gray-800">
                                         {approver.name}
                                       </div>
+                                      {approver.email && (
+                                        <div className="mt-1 text-base text-gray-600">
+                                          {approver.email}
+                                        </div>
+                                      )}
                                     </div>
                                     {index < selectedApprovers.length - 1 && (
                                       <div className="my-1 text-xl text-gray-400">↓</div>
@@ -765,13 +785,15 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
                           {/* 上程者 */}
                           {currentUser && (
                             <div className="flex flex-col items-center">
-                              <div className="rounded-lg border-2 border-blue-500 bg-blue-50 px-4 py-2">
-                                <div className="text-sm font-medium text-blue-700">
-                                  上程者
-                                </div>
-                                <div className="text-sm text-gray-800">
+                              <div className="rounded-lg border-2 border-blue-500 bg-blue-50 px-4 py-3 w-full">
+                                <div className="text-lg font-semibold text-gray-800">
                                   {currentUser.name}
                                 </div>
+                                {currentUser.email && (
+                                  <div className="mt-1 text-base text-gray-600">
+                                    {currentUser.email}
+                                  </div>
+                                )}
                               </div>
                               {selectedApprovers.length > 0 && (
                                 <div className="my-1 text-2xl text-gray-400">↓</div>
@@ -785,13 +807,15 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
                               key={`${approver.id}-${index}`}
                               className="flex flex-col items-center"
                             >
-                              <div className="rounded-lg border-2 border-green-500 bg-green-50 px-4 py-2">
-                                <div className="text-sm font-medium text-green-700">
-                                  承認者 {index + 1}
-                                </div>
-                                <div className="text-sm text-gray-800">
+                              <div className="rounded-lg border-2 border-green-500 bg-green-50 px-4 py-3 w-full">
+                                <div className="text-lg font-semibold text-gray-800">
                                   {approver.name}
                                 </div>
+                                {approver.email && (
+                                  <div className="mt-1 text-base text-gray-600">
+                                    {approver.email}
+                                  </div>
+                                )}
                               </div>
                               {index < selectedApprovers.length - 1 && (
                                 <div className="my-1 text-2xl text-gray-400">↓</div>
@@ -846,3 +870,5 @@ const ApprovalDrawer = ({ onClose, pageCode, year, month, reportNo, onApprovalCh
 };
 
 export default ApprovalDrawer;
+
+

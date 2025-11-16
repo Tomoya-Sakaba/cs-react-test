@@ -287,6 +287,105 @@ namespace backend.Services
         }
 
         //---------------------------------------------------------------------
+        // 取り戻し処理
+        // 
+        // 処理内容：
+        // 1. 上程者（FlowOrder=0, Status=0）：全レコードを削除（上程を取り消し）
+        // 2. 再上程者（FlowOrder=rejectionTarget.flowOrder, Status=0）：Status=7（差し戻し対象）に戻す、その後のレコードを削除
+        // 3. 承認者（Status=2または3）：Status=1（承認待ち）に戻す、その後の承認者をStatus=6（承認スキップ）に戻す
+        //---------------------------------------------------------------------
+        public void RecallApproval(int approvalId, string userName)
+        {
+            // 対象のレコードを取得
+            var targetApproval = _repository.GetApprovalById(approvalId);
+            if (targetApproval == null)
+            {
+                throw new ArgumentException("対象のレコードが見つかりません。");
+            }
+
+            var allApprovals = _repository.GetApprovalsByReport(
+                targetApproval.PageCode,
+                targetApproval.ReportNo,
+                targetApproval.Year,
+                targetApproval.Month
+            );
+
+            // 操作権限チェック（本人のみ取り戻し可能）
+            if (targetApproval.UserName != userName)
+            {
+                throw new UnauthorizedAccessException("取り戻し権限がありません。");
+            }
+
+            // 上程者（FlowOrder=0, Status=0）の場合：全レコードを削除
+            if (targetApproval.FlowOrder == 0 && targetApproval.Status == 0)
+            {
+                _repository.DeleteApprovalsByReport(
+                    targetApproval.PageCode,
+                    targetApproval.ReportNo,
+                    targetApproval.Year,
+                    targetApproval.Month
+                );
+                return;
+            }
+
+            // 再上程者（Status=0で、差し戻し対象レコードのFlowOrderと一致）の場合
+            var rejectionTarget = allApprovals.FirstOrDefault(a => a.Status == 7);
+            if (rejectionTarget != null && targetApproval.FlowOrder == rejectionTarget.FlowOrder && targetApproval.Status == 0)
+            {
+                // Status=7（差し戻し対象）に戻す
+                targetApproval.Status = 7;
+                targetApproval.Comment = null;
+                targetApproval.ActionDate = null;
+                _repository.UpdateApproval(targetApproval);
+
+                // その後のレコード（再上程以降）を削除
+                var subsequentApprovals = allApprovals
+                    .Where(a => a.FlowOrder > targetApproval.FlowOrder)
+                    .ToList();
+
+                foreach (var subsequentApproval in subsequentApprovals)
+                {
+                    _repository.DeleteApproval(subsequentApproval.Id);
+                }
+                return;
+            }
+
+            // 差し戻し（Status=3）は取り戻し不可
+            if (targetApproval.Status == 3)
+            {
+                throw new InvalidOperationException("差し戻しは取り戻しできません。");
+            }
+
+            // 承認者（Status=2）の場合
+            if (targetApproval.FlowOrder > 0 && targetApproval.Status == 2)
+            {
+                // Status=1（承認待ち）に戻す
+                targetApproval.Status = 1;
+                targetApproval.Comment = null;
+                targetApproval.ActionDate = null;
+                _repository.UpdateApproval(targetApproval);
+
+                // その後の承認者をStatus=6（承認スキップ）に戻す
+                var subsequentApprovals = allApprovals
+                    .Where(a => a.FlowOrder > targetApproval.FlowOrder && a.FlowOrder > 0)
+                    .ToList();
+
+                foreach (var subsequentApproval in subsequentApprovals)
+                {
+                    if (subsequentApproval.Status == 2)
+                    {
+                        subsequentApproval.Status = 6; // 承認スキップ
+                        _repository.UpdateApproval(subsequentApproval);
+                    }
+                }
+                return;
+            }
+
+            throw new InvalidOperationException("取り戻しできない状態です。");
+        }
+
+
+        //---------------------------------------------------------------------
         // 再上程処理（差し戻し後の再提出）
         // 
         // 処理内容：

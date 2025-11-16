@@ -127,6 +127,20 @@ namespace backend.Models.Repository
                 db.Execute(sql, new { Id = id });
             }
         }
+
+        // IDで上程データを取得
+        public ApprovalEntity GetApprovalById(int id)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT Id, PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate,
+                           Created_At AS CreatedAt, Updated_At AS UpdatedAt
+                    FROM dbo.Approvals
+                    WHERE Id = @Id";
+                return db.Query<ApprovalEntity>(sql, new { Id = id }).FirstOrDefault();
+            }
+        }
     }
 }
 

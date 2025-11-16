@@ -116,6 +116,34 @@ namespace backend.Controllers
                 return InternalServerError(ex);
             }
         }
+
+        // 取り戻し
+        [HttpPost]
+        [Route("api/approval/recall")]
+        public IHttpActionResult RecallApproval([FromBody] RecallApprovalRequest request)
+        {
+            try
+            {
+                _service.RecallApproval(request.Id, request.UserName);
+                return Ok(new { message = "取り戻しが完了しました。" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return InternalServerError(ex);
+            }
+        }
     }
 }
 

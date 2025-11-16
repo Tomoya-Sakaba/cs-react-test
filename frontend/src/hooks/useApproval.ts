@@ -68,7 +68,9 @@ type UseApprovalReturn = {
   approve: (id: number, comment?: string) => Promise<void>;
   reject: (id: number, comment: string) => Promise<void>;
   resubmit: (request: ApprovalRequest) => Promise<void>; // 再上程
+  recall: (id: number) => Promise<void>; // 取り戻し
   refresh: () => Promise<void>; // 状態を再取得
+  canRecall: (record: ApprovalStatus) => boolean; // 取り戻し可能かどうか
 };
 
 export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
@@ -347,6 +349,78 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
     [currentUser, canResubmit, fetchApprovalStatus]
   );
 
+  // 取り戻し可能かどうかを判定
+  const canRecall = useCallback(
+    (record: ApprovalStatus): boolean => {
+      if (!currentUser) return false;
+      if (record.userName !== currentUser.name) return false; // 本人のみ
+
+      // 上程者（FlowOrder=0, Status=0）の場合
+      if (record.flowOrder === 0 && record.status === 0) {
+        return true;
+      }
+
+      // 再上程者（Status=0で、差し戻し対象レコードのFlowOrderと一致）の場合
+      const rejectionTarget = approvalStatus.find((a) => a.status === 7);
+      if (
+        rejectionTarget &&
+        record.flowOrder === rejectionTarget.flowOrder &&
+        record.status === 0
+      ) {
+        return true;
+      }
+
+      // 差し戻し（Status=3）は取り戻し不可
+      if (record.status === 3) {
+        return false;
+      }
+
+      // 承認者（Status=2）の場合（差し戻しは除外）
+      if (record.flowOrder > 0 && record.status === 2) {
+        return true;
+      }
+
+      return false;
+    },
+    [currentUser, approvalStatus]
+  );
+
+  // 取り戻し
+  const recall = useCallback(
+    async (id: number) => {
+      if (!currentUser) {
+        throw new Error('ログインが必要です');
+      }
+
+      const targetRecord = approvalStatus.find((a) => a.id === id);
+      if (!targetRecord) {
+        throw new Error('対象のレコードが見つかりません');
+      }
+
+      if (!canRecall(targetRecord)) {
+        throw new Error('取り戻しできない状態です');
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        await axios.post('/api/approval/recall', {
+          id,
+          userName: currentUser.name,
+        });
+        await fetchApprovalStatus();
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : '取り戻しに失敗しました';
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentUser, approvalStatus, canRecall, fetchApprovalStatus]
+  );
+
   /**
    * 状態を再取得
    */
@@ -383,6 +457,8 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
     approve,
     reject,
     resubmit,
+    recall,
     refresh,
+    canRecall,
   };
 };
