@@ -15,7 +15,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { testApi } from '../api/testApi';
 import YearMonthFilter from '../components/YearMonthFilter';
 import { useYearMonthParams } from '../hooks/useYearMonthParams';
-import { mapMonthlyTestData } from '../utils/mappingData';
+import {
+  mapMonthlyTestData,
+  mapMonthlyTestDataWithDefaults,
+} from '../utils/mappingData';
 import Toggle from '../components/Toggle';
 import CustomInputEditor from '../components/CustomInputEditor';
 import type { AgGridReact as AgGridReactType } from 'ag-grid-react'; // 型補完用
@@ -249,77 +252,92 @@ const AgTest = () => {
   // 初回レンダリング処理
   //---------------------------------------------------------------------------
   const [isNew, setIsNew] = useState(false);
-  useEffect(() => {
+
+  // データ取得関数を抽出（再利用可能にする）
+  const fetchData = async (skipNewModeCheck = false) => {
     // ダイアログ表示中は処理をスキップ
-    if (showExistingDataDialog) {
+    if (showExistingDataDialog && !skipNewModeCheck) {
       return;
     }
 
-    const fetchData = async () => {
-      // fetch ContentTypeList（常に必要）
-      const resContent = await testApi.fetchContentTypeList();
-      console.log('resContent', resContent);
+    // fetch ContentTypeList（常に必要）
+    const resContent = await testApi.fetchContentTypeList();
+    console.log('resContent', resContent);
 
-      // オリジナルの順序を保持
-      setOriginalContentType(resContent);
-      // 初期状態では全て選択
-      const allIds = resContent.map((item) => item.contentTypeId);
-      setSelectedContentTypeIds(allIds);
-      const contentTypeIdList = getContentTypeIdList(resContent);
-      console.log('contentTypeIdList', contentTypeIdList);
+    // オリジナルの順序を保持
+    setOriginalContentType(resContent);
+    // 初期状態では全て選択
+    const allIds = resContent.map((item) => item.contentTypeId);
+    setSelectedContentTypeIds(allIds);
+    const contentTypeIdList = getContentTypeIdList(resContent);
+    console.log('contentTypeIdList', contentTypeIdList);
 
-      // 新規作成モードの場合は、データ取得をスキップして空のデータで初期化
-      if (isNewMode) {
-        setIsNew(true);
-        const mapData = mapMonthlyTestData(
-          [],
-          currentYear,
-          currentIndexMonth,
-          getDefaultRecord,
-          contentTypeIdList
-        );
-        console.log('mapData(新規作成モード)', mapData);
-        setRowData(mapData);
-        setAgRowData(JSON.parse(JSON.stringify(mapData)));
-        return;
-      }
+    // 新規作成モードの場合は、データ取得をスキップして空のデータで初期化
+    // skipNewModeCheckがtrueの場合は、強制的に通常モードとしてデータを取得
+    if (isNewMode && !skipNewModeCheck) {
+      setIsNew(true);
 
-      // 通常モードの場合はデータを取得
-      const res = await testApi.fetchPlanData(
+      // マスターデータを取得
+      const [defaultTimeData, defaultVolData] = await Promise.all([
+        testApi.fetchContentTypeDefaultTime(),
+        testApi.fetchContentTypeDefaultVol(),
+      ]);
+
+      // マスターデータから初期値を設定した月次データを生成
+      const mapDataWithDefaults = mapMonthlyTestDataWithDefaults(
         currentYear,
-        currentIndexMonth + 1
+        currentIndexMonth,
+        contentTypeIdList,
+        defaultTimeData,
+        defaultVolData,
+        getDefaultRecord
       );
-      console.log('res', res);
 
-      if (res.length === 0 || !res) {
-        setIsNew(true);
-        console.log('isNew:', isNew);
+      console.log('mapData(新規作成モード)', mapDataWithDefaults);
+      setRowData(mapDataWithDefaults);
+      setAgRowData(JSON.parse(JSON.stringify(mapDataWithDefaults)));
+      return;
+    }
 
-        // 全日マッピング処理
-        const mapData = mapMonthlyTestData(
-          [],
-          currentYear,
-          currentIndexMonth,
-          getDefaultRecord,
-          contentTypeIdList
-        );
-        console.log('mapData(新規)', mapData);
-        setRowData(mapData);
-        setAgRowData(JSON.parse(JSON.stringify(mapData)));
-      } else {
-        // 全日マッピング処理
-        const mapData = mapMonthlyTestData(
-          res,
-          currentYear,
-          currentIndexMonth,
-          getDefaultRecord,
-          contentTypeIdList
-        );
-        console.log('mapData(既存)', mapData);
-        setRowData(mapData);
-        setAgRowData(JSON.parse(JSON.stringify(mapData)));
-      }
-    };
+    // 通常モードの場合はデータを取得
+    const res = await testApi.fetchPlanData(
+      currentYear,
+      currentIndexMonth + 1
+    );
+    console.log('res', res);
+
+    if (res.length === 0 || !res) {
+      setIsNew(true);
+      console.log('isNew:', isNew);
+
+      // 全日マッピング処理
+      const mapData = mapMonthlyTestData(
+        [],
+        currentYear,
+        currentIndexMonth,
+        getDefaultRecord,
+        contentTypeIdList
+      );
+      console.log('mapData(新規)', mapData);
+      setRowData(mapData);
+      setAgRowData(JSON.parse(JSON.stringify(mapData)));
+    } else {
+      setIsNew(false);
+      // 全日マッピング処理
+      const mapData = mapMonthlyTestData(
+        res,
+        currentYear,
+        currentIndexMonth,
+        getDefaultRecord,
+        contentTypeIdList
+      );
+      console.log('mapData(既存)', mapData);
+      setRowData(mapData);
+      setAgRowData(JSON.parse(JSON.stringify(mapData)));
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, [currentYear, currentIndexMonth, isNew, isNewMode, showExistingDataDialog]);
 
@@ -403,19 +421,35 @@ const AgTest = () => {
         alert('新規登録が完了しました。');
 
         setIsNew(false);
+
+        // 新規モードを解除（URLパラメータからmodeを削除）
+        if (isNewMode) {
+          setSearchParams((prev) => {
+            const newParams = new URLSearchParams(prev);
+            newParams.delete('mode');
+            return newParams;
+          });
+        }
+
+        // 新規登録後、現在の年月でデータを再取得（強制的に通常モードとして取得）
+        // skipNewModeCheck=trueで、isNewModeのチェックをスキップし、現在の年月のデータを取得
+        await fetchData(true);
+
+        // 編集モード解除
+        setIsEditing(false);
       } else {
         // --- API呼び出し（あなたのtestApi経由）---
         const res = await testApi.savePlan(reqData);
         console.log('保存成功:', res);
         alert('保存が完了しました。');
+
+        // 編集モード解除
+        setIsEditing(false);
+
+        // Grid内の現在の状態をagRowDataとrowDataにセット
+        setAgRowData(updatedRows);
+        setRowData(updatedRows);
       }
-
-      // 編集モード解除
-      setIsEditing(false);
-
-      // Grid内の現在の状態をagRowDataとrowDataにセット
-      setAgRowData(updatedRows);
-      setRowData(updatedRows);
     } catch (error) {
       console.error('登録エラー:', error);
       alert('登録に失敗しました。サーバーを確認してください。');

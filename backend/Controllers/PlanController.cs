@@ -32,6 +32,22 @@ namespace backend.Controllers
             return Ok(data);
         }
 
+        [HttpGet]
+        [Route("api/content/default-time")]
+        public IHttpActionResult GetContentTypeDefaultTime()
+        {
+            var data = _service.GetContentTypeDefaultTime();
+            return Ok(data);
+        }
+
+        [HttpGet]
+        [Route("api/content/default-vol")]
+        public IHttpActionResult GetContentTypeDefaultVol()
+        {
+            var data = _service.GetContentTypeDefaultVol();
+            return Ok(data);
+        }
+
         //------------------------------------------------------------------------------
         // 新規Plan、note登録
         //------------------------------------------------------------------------------

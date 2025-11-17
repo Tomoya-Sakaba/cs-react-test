@@ -171,6 +171,8 @@
     </Compile>
     <Compile Include="Models\DTOs\ApprovalDto.cs" />
     <Compile Include="Models\DTOs\AvailableYearMonthDto.cs" />
+    <Compile Include="Models\DTOs\ContentTypeDefaultTimeDto.cs" />
+    <Compile Include="Models\DTOs\ContentTypeDefaultVolDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeListDto.cs" />
     <Compile Include="Models\DTOs\PlanHistoryDto.cs" />

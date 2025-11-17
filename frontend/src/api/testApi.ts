@@ -149,4 +149,48 @@ export const testApi = {
     );
     return res.data;
   },
+
+  async fetchContentTypeDefaultTime(): Promise<
+    {
+      id: number;
+      contentTypeId: number;
+      dayType: string;
+      defTime: string | null;
+    }[]
+  > {
+    const res = await axios.get<
+      {
+        id: number;
+        contentTypeId: number;
+        dayType: string;
+        defTime: string | null;
+      }[]
+    >('/api/content/default-time', {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+    return res.data;
+  },
+
+  async fetchContentTypeDefaultVol(): Promise<
+    {
+      id: number;
+      contentTypeId: number;
+      defVol: number | null;
+    }[]
+  > {
+    const res = await axios.get<
+      {
+        id: number;
+        contentTypeId: number;
+        defVol: number | null;
+      }[]
+    >('/api/content/default-vol', {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+    return res.data;
+  },
 };

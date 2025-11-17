@@ -725,5 +725,46 @@ namespace backend.Models.Repository
                 return db.Query<AvailableYearMonthDto>(sql).ToList();
             }
         }
+
+        //------------------------------------------------------------------------------------------
+        // ContentTypeDefaultTimeマスターデータを取得
+        //------------------------------------------------------------------------------------------
+        public List<ContentTypeDefaultTimeDto> GetAllContentTypeDefaultTime()
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT 
+                        Id,
+                        ContentTypeId,
+                        DayType,
+                        DefTime
+                    FROM ContentTypeDefaultTime
+                    ORDER BY ContentTypeId, DayType;
+                ";
+
+                return db.Query<ContentTypeDefaultTimeDto>(sql).ToList();
+            }
+        }
+
+        //------------------------------------------------------------------------------------------
+        // ContentTypeDefaultVolマスターデータを取得
+        //------------------------------------------------------------------------------------------
+        public List<ContentTypeDefaultVolDto> GetAllContentTypeDefaultVol()
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                string sql = @"
+                    SELECT 
+                        Id,
+                        ContentTypeId,
+                        DefVol
+                    FROM ContentTypeDefaultVol
+                    ORDER BY ContentTypeId;
+                ";
+
+                return db.Query<ContentTypeDefaultVolDto>(sql).ToList();
+            }
+        }
     }
 }

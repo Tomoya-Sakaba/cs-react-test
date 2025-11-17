@@ -148,6 +148,22 @@ namespace backend.Services
         {
             return _repository.GetAvailableYearMonths();
         }
+
+        //---------------------------------------------------------------------
+        // ContentTypeDefaultTimeマスターデータを取得
+        //---------------------------------------------------------------------
+        public List<ContentTypeDefaultTimeDto> GetContentTypeDefaultTime()
+        {
+            return _repository.GetAllContentTypeDefaultTime();
+        }
+
+        //---------------------------------------------------------------------
+        // ContentTypeDefaultVolマスターデータを取得
+        //---------------------------------------------------------------------
+        public List<ContentTypeDefaultVolDto> GetContentTypeDefaultVol()
+        {
+            return _repository.GetAllContentTypeDefaultVol();
+        }
         //---------------------------------------------------------------------
         // 新規登録処理
         //---------------------------------------------------------------------
