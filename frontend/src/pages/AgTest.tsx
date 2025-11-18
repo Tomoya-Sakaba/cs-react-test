@@ -76,31 +76,45 @@ export type MapedTestType = {
   note: string;
 };
 
-// contentTypeIdに値があるかどうかをチェックする関数
-const hasContentTypeData = (
-  data: MapdePlan[],
-  contentTypeId: number
-): boolean => {
-  return data.some((row) => {
-    const contentType = row.contentType[contentTypeId];
-    if (!contentType) return false;
-    return (
-      contentType.company !== null ||
-      contentType.vol !== null ||
-      contentType.time !== null
-    );
-  });
-};
-
 // 初期表示するcontentTypeIdのリストを決定する関数
 const getInitialContentTypeIds = (data: MapdePlan[]): number[] => {
   const initialIds: number[] = [2, 4]; // デフォルトは2, 4のみ
+  let hasContentType1 = false;
+  let hasContentType3 = false;
 
-  // 1と3はデータがある場合のみ追加
-  if (hasContentTypeData(data, 1)) {
+  // contentTypeIdをチェック
+  data.some((row) => {
+    // contentTypeId 1のチェック
+    if (!hasContentType1) {
+      const contentType1 = row.contentType[1];
+      if (contentType1) {
+        hasContentType1 =
+          contentType1.company !== null ||
+          contentType1.vol !== null ||
+          contentType1.time !== null;
+      }
+    }
+
+    // contentTypeId 3のチェック
+    if (!hasContentType3) {
+      const contentType3 = row.contentType[3];
+      if (contentType3) {
+        hasContentType3 =
+          contentType3.company !== null ||
+          contentType3.vol !== null ||
+          contentType3.time !== null;
+      }
+    }
+
+    // 両方見つかったら早期終了
+    return hasContentType1 && hasContentType3;
+  });
+
+  // データがある場合のみ追加
+  if (hasContentType1) {
     initialIds.push(1);
   }
-  if (hasContentTypeData(data, 3)) {
+  if (hasContentType3) {
     initialIds.push(3);
   }
 
@@ -180,7 +194,6 @@ const getColumnDefs = (
   ];
 };
 
-
 const AgTest = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -219,7 +232,7 @@ const AgTest = () => {
         const data = await testApi.fetchAvailableYearMonths();
         setAvailableYearMonths(data);
       } catch (error) {
-        console.error("利用可能な年月の取得に失敗しました:", error);
+        console.error('利用可能な年月の取得に失敗しました:', error);
       } finally {
         setLoadingYearMonths(false);
       }
@@ -333,10 +346,7 @@ const AgTest = () => {
     }
 
     // 通常モードの場合はデータを取得
-    const res = await testApi.fetchPlanData(
-      currentYear,
-      currentIndexMonth + 1
-    );
+    const res = await testApi.fetchPlanData(currentYear, currentIndexMonth + 1);
     console.log('res', res);
 
     // 全日マッピング処理
@@ -770,8 +780,6 @@ const AgTest = () => {
           </div>
         )}
 
-
-
         {/* 上程Drawer（開いている時のみレンダリング） */}
         {isDrawerOpen && (
           <ApprovalDrawer
@@ -792,7 +800,8 @@ const AgTest = () => {
                   既存データが見つかりました
                 </h2>
                 <p className="mt-2 text-sm text-gray-600">
-                  {currentYear}年{currentIndexMonth + 1}月には既にデータが存在します。
+                  {currentYear}年{currentIndexMonth + 1}
+                  月には既にデータが存在します。
                 </p>
                 <p className="mt-2 text-sm text-gray-600">
                   既存データを読み込むか、前の年月に戻りますか？
