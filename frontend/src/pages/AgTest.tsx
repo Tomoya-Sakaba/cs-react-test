@@ -76,6 +76,37 @@ export type MapedTestType = {
   note: string;
 };
 
+// contentTypeIdに値があるかどうかをチェックする関数
+const hasContentTypeData = (
+  data: MapdePlan[],
+  contentTypeId: number
+): boolean => {
+  return data.some((row) => {
+    const contentType = row.contentType[contentTypeId];
+    if (!contentType) return false;
+    return (
+      contentType.company !== null ||
+      contentType.vol !== null ||
+      contentType.time !== null
+    );
+  });
+};
+
+// 初期表示するcontentTypeIdのリストを決定する関数
+const getInitialContentTypeIds = (data: MapdePlan[]): number[] => {
+  const initialIds: number[] = [2, 4]; // デフォルトは2, 4のみ
+
+  // 1と3はデータがある場合のみ追加
+  if (hasContentTypeData(data, 1)) {
+    initialIds.push(1);
+  }
+  if (hasContentTypeData(data, 3)) {
+    initialIds.push(3);
+  }
+
+  return initialIds;
+};
+
 const getColumnDefs = (
   isEditing: boolean,
   selectedIds: number[],
@@ -266,9 +297,7 @@ const AgTest = () => {
 
     // オリジナルの順序を保持
     setOriginalContentType(resContent);
-    // 初期状態では全て選択
-    const allIds = resContent.map((item) => item.contentTypeId);
-    setSelectedContentTypeIds(allIds);
+
     const contentTypeIdList = getContentTypeIdList(resContent);
     console.log('contentTypeIdList', contentTypeIdList);
 
@@ -296,6 +325,10 @@ const AgTest = () => {
       console.log('mapData(新規作成モード)', mapDataWithDefaults);
       setRowData(mapDataWithDefaults);
       setAgRowData(JSON.parse(JSON.stringify(mapDataWithDefaults)));
+
+      // 初期表示するcontentTypeIdのリストを決定
+      const initialIds = getInitialContentTypeIds(mapDataWithDefaults);
+      setSelectedContentTypeIds(initialIds);
       return;
     }
 
@@ -306,40 +339,28 @@ const AgTest = () => {
     );
     console.log('res', res);
 
-    if (res.length === 0 || !res) {
-      setIsNew(true);
-      console.log('isNew:', isNew);
+    // 全日マッピング処理
+    const mapData = mapMonthlyTestData(
+      res,
+      currentYear,
+      currentIndexMonth,
+      getDefaultRecord,
+      contentTypeIdList
+    );
 
-      // 全日マッピング処理
-      const mapData = mapMonthlyTestData(
-        [],
-        currentYear,
-        currentIndexMonth,
-        getDefaultRecord,
-        contentTypeIdList
-      );
-      console.log('mapData(新規)', mapData);
-      setRowData(mapData);
-      setAgRowData(JSON.parse(JSON.stringify(mapData)));
-    } else {
-      setIsNew(false);
-      // 全日マッピング処理
-      const mapData = mapMonthlyTestData(
-        res,
-        currentYear,
-        currentIndexMonth,
-        getDefaultRecord,
-        contentTypeIdList
-      );
-      console.log('mapData(既存)', mapData);
-      setRowData(mapData);
-      setAgRowData(JSON.parse(JSON.stringify(mapData)));
-    }
+    console.log('mapData(既存)', mapData);
+
+    setRowData(mapData);
+    setAgRowData(JSON.parse(JSON.stringify(mapData)));
+
+    // 初期表示するcontentTypeIdのリストを決定
+    const initialIds = getInitialContentTypeIds(mapData);
+    setSelectedContentTypeIds(initialIds);
   };
 
   useEffect(() => {
     fetchData();
-  }, [currentYear, currentIndexMonth, isNew, isNewMode, showExistingDataDialog]);
+  }, [currentYear, currentIndexMonth, isNewMode, showExistingDataDialog]);
 
   const getContentTypeIdList = (list: ContentTypeList[]): number[] => {
     return list.map((item) => item.contentTypeId);
@@ -484,8 +505,6 @@ const AgTest = () => {
         );
         const resContent = await testApi.fetchContentTypeList();
         setOriginalContentType(resContent);
-        const allIds = resContent.map((item) => item.contentTypeId);
-        setSelectedContentTypeIds(allIds);
         const contentTypeIdList = getContentTypeIdList(resContent);
 
         const mapData = mapMonthlyTestData(
@@ -497,6 +516,10 @@ const AgTest = () => {
         );
         setRowData(mapData);
         setAgRowData(JSON.parse(JSON.stringify(mapData)));
+
+        // 初期表示するcontentTypeIdのリストを決定
+        const initialIds = getInitialContentTypeIds(mapData);
+        setSelectedContentTypeIds(initialIds);
       };
       await fetchData();
     } catch (error) {
