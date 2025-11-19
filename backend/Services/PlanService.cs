@@ -79,7 +79,7 @@ namespace backend.Services
 
             // 日付ごとにグループ化
             var grouped = rawData
-                .GroupBy(r => r.Date)
+                .GroupBy(r => r.date)
                 .Select(g =>
                 {
                     // すべての contentType をまず初期化（変更フラグも追加）
@@ -90,9 +90,9 @@ namespace backend.Services
                             ct => ct.content_type_id,
                             ct => new TestItemHistory
                             {
-                                Company = 0,
-                                Vol = 0,
-                                Time = "",
+                                Company = null,
+                                Vol = null,
+                                Time = null,
                                 IsChanged = false
                             }
                         );
@@ -100,12 +100,12 @@ namespace backend.Services
                     // 実際のデータで上書き
                     foreach (var record in g)
                     {
-                        contentTypeDict[record.ContentTypeId] = new TestItemHistory
+                        contentTypeDict[record.content_type_id] = new TestItemHistory
                         {
-                            Company = record.Company,
-                            Vol = record.Vol,
-                            Time = record.Time,
-                            IsChanged = record.IsChanged
+                            Company = record.company,
+                            Vol = record.vol,
+                            Time = record.Time.HasValue ? record.Time.Value.ToString(@"hh\:mm") : null,
+                            IsChanged = record.is_changed
                         };
                     }
 
@@ -113,7 +113,7 @@ namespace backend.Services
                     {
                         Date = g.Key.ToString("yyyy-MM-dd"),
                         ContentType = contentTypeDict,
-                        Note = g.FirstOrDefault()?.NoteText ?? "",
+                        Note = g.FirstOrDefault()?.note_text ?? "",
                     };
                 })
                 .ToList();
@@ -163,6 +163,31 @@ namespace backend.Services
         public List<ContentTypeDefaultVolDto> GetContentTypeDefaultVol()
         {
             return _repository.GetAllContentTypeDefaultVol();
+        }
+
+        //---------------------------------------------------------------------
+        // 指定年月の利用可能なバージョンリストを取得
+        // plan_version_snapshotテーブルのcurrent_versionから0までの連続したバージョンリストを返す
+        //---------------------------------------------------------------------
+        public List<int> GetAvailableVersions(int year, int month)
+        {
+            // plan_version_snapshotからcurrent_versionを取得
+            int? currentVersion = _repository.GetCurrentVersion(year, month);
+
+            // current_versionが存在しない場合は空のリストを返す
+            if (currentVersion == null)
+            {
+                return new List<int>();
+            }
+
+            // current_versionから0までの連続したバージョンリストを生成（降順）
+            List<int> versions = new List<int>();
+            for (int v = currentVersion.Value; v >= 0; v--)
+            {
+                versions.Add(v);
+            }
+
+            return versions;
         }
         //---------------------------------------------------------------------
         // 新規登録処理

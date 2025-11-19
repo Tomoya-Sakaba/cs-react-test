@@ -150,6 +150,65 @@ export const testApi = {
     return res.data;
   },
 
+  async fetchAvailableVersions(year: number, month: number): Promise<number[]> {
+    const res = await axios.get<number[]>('/api/plan/available-versions', {
+      params: {
+        year,
+        month,
+      },
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+    return res.data;
+  },
+
+  async fetchPlanHistory(
+    year: number,
+    month: number,
+    version: number
+  ): Promise<
+    Array<{
+      date: string;
+      contentType: Record<
+        number,
+        {
+          company: number | null;
+          vol: number | null;
+          time: string | null;
+          isChanged?: boolean;
+        }
+      >;
+      note: string;
+    }>
+  > {
+    const res = await axios.get<
+      Array<{
+        date: string;
+        contentType: Record<
+          number,
+          {
+            company: number | null;
+            vol: number | null;
+            time: string | null;
+            isChanged?: boolean;
+          }
+        >;
+        note: string;
+      }>
+    >('/api/plan/history', {
+      params: {
+        year,
+        month,
+        version,
+      },
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+    return res.data;
+  },
+
   async fetchContentTypeDefaultTime(): Promise<
     {
       id: number;

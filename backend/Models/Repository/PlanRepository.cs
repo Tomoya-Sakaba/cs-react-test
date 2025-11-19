@@ -766,5 +766,6 @@ namespace backend.Models.Repository
                 return db.Query<ContentTypeDefaultVolDto>(sql).ToList();
             }
         }
+
     }
 }

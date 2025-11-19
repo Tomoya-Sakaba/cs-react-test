@@ -1,6 +1,6 @@
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
-import type { ColDef, ColGroupDef } from 'ag-grid-community';
+import type { ColDef, ColGroupDef, CellClassParams } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import {
   fetchTestData,
@@ -42,6 +42,7 @@ export type testItem = {
   company: number | null;
   vol: number | null;
   time: string | null;
+  isChanged?: boolean;
 };
 
 export type FetchPlanType = {
@@ -162,6 +163,10 @@ const getColumnDefs = (
           editable: isEditing,
           cellEditor: CustomInputEditor,
           cellEditorParams: { type: 'number' },
+          cellClass: (params: CellClassParams<MapdePlan>) => {
+            const item = params.data?.contentType?.[type.contentTypeId];
+            return item?.isChanged ? 'bg-red-100' : '';
+          },
         },
         {
           headerName: '数量',
@@ -171,6 +176,10 @@ const getColumnDefs = (
           editable: isEditing,
           cellEditor: CustomInputEditor,
           cellEditorParams: { type: 'number' },
+          cellClass: (params: CellClassParams<MapdePlan>) => {
+            const item = params.data?.contentType?.[type.contentTypeId];
+            return item?.isChanged ? 'bg-red-100' : '';
+          },
         },
         {
           headerName: '時間',
@@ -180,6 +189,10 @@ const getColumnDefs = (
           editable: isEditing,
           cellEditor: CustomInputEditor,
           cellEditorParams: { type: 'time' },
+          cellClass: (params: CellClassParams<MapdePlan>) => {
+            const item = params.data?.contentType?.[type.contentTypeId];
+            return item?.isChanged ? 'bg-red-100' : '';
+          },
         },
       ],
     })),
@@ -221,6 +234,10 @@ const AgTest = () => {
   >([]);
   // ヘッダー設定モーダルの表示状態
   const [isHeaderConfigOpen, setIsHeaderConfigOpen] = useState(false);
+  // バージョン選択関連
+  const [availableVersions, setAvailableVersions] = useState<number[]>([]);
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const gridRef = useRef<AgGridReactType<MapdePlan>>(null);
 
   //---------------------------------------------------------------------------
@@ -239,6 +256,44 @@ const AgTest = () => {
     };
     fetchAvailableYearMonths();
   }, []);
+
+  //---------------------------------------------------------------------------
+  // 利用可能なバージョンを取得
+  //---------------------------------------------------------------------------
+  useEffect(() => {
+    // 新規作成モードの場合はスキップ
+    if (isNewMode) {
+      setAvailableVersions([]);
+      setSelectedVersion(null);
+      return;
+    }
+
+    const fetchVersions = async () => {
+      setIsLoadingVersions(true);
+      try {
+        const versions = await testApi.fetchAvailableVersions(
+          currentYear,
+          currentIndexMonth + 1
+        );
+        setAvailableVersions(versions);
+        // 最新バージョン（最大値）をデフォルト選択
+        if (versions.length > 0) {
+          const latestVersion = Math.max(...versions);
+          setSelectedVersion(latestVersion);
+        } else {
+          setSelectedVersion(null);
+        }
+      } catch (error) {
+        console.error('利用可能なバージョンの取得に失敗しました:', error);
+        setAvailableVersions([]);
+        setSelectedVersion(null);
+      } finally {
+        setIsLoadingVersions(false);
+      }
+    };
+
+    fetchVersions();
+  }, [currentYear, currentIndexMonth, isNewMode]);
 
   //---------------------------------------------------------------------------
   // 新規作成モードで年月変更時に既存データをチェック
@@ -346,7 +401,19 @@ const AgTest = () => {
     }
 
     // 通常モードの場合はデータを取得
-    const res = await testApi.fetchPlanData(currentYear, currentIndexMonth + 1);
+    // バージョンが選択されている場合はバージョン指定で取得、そうでない場合は最新を取得
+    let res: FetchPlanType[];
+    if (selectedVersion !== null && !skipNewModeCheck) {
+      // バージョン指定で取得（historyDataはFetchPlanTypeと互換性があるためそのまま使用）
+      res = (await testApi.fetchPlanHistory(
+        currentYear,
+        currentIndexMonth + 1,
+        selectedVersion
+      )) as FetchPlanType[];
+    } else {
+      // 最新バージョンを取得
+      res = await testApi.fetchPlanData(currentYear, currentIndexMonth + 1);
+    }
     console.log('res', res);
 
     // 全日マッピング処理
@@ -370,7 +437,7 @@ const AgTest = () => {
 
   useEffect(() => {
     fetchData();
-  }, [currentYear, currentIndexMonth, isNewMode, showExistingDataDialog]);
+  }, [currentYear, currentIndexMonth, isNewMode, showExistingDataDialog, selectedVersion]);
 
   const getContentTypeIdList = (list: ContentTypeList[]): number[] => {
     return list.map((item) => item.contentTypeId);
@@ -679,6 +746,37 @@ const AgTest = () => {
             loading={loadingYearMonths}
             allowAllMonths={isNewMode}
           />
+          {/* バージョン選択ドロップダウン（新規作成モード以外で表示） */}
+          {!isNewMode && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">
+                バージョン:
+              </label>
+              <select
+                value={selectedVersion ?? ''}
+                onChange={(e) => {
+                  const version = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                  setSelectedVersion(version);
+                }}
+                disabled={isLoadingVersions || availableVersions.length === 0}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100 disabled:text-gray-500"
+              >
+                {isLoadingVersions ? (
+                  <option>読み込み中...</option>
+                ) : availableVersions.length === 0 ? (
+                  <option>バージョンなし</option>
+                ) : (
+                  availableVersions.map((version) => (
+                    <option key={version} value={version}>
+                      {version === Math.max(...availableVersions)
+                        ? `v${version} (最新)`
+                        : `v${version}`}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-1">

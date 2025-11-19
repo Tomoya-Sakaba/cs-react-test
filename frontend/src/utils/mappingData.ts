@@ -31,8 +31,25 @@ export const mapMonthlyTestData = (
     const isSturday = current.getDay() === 6;
 
     const defaultContentType = getDefaultRecord(contentTypeIdList);
+    // record.contentTypeのisChangedプロパティも保持する
     const mergedContentType = record
-      ? { ...defaultContentType, ...record.contentType }
+      ? Object.keys({ ...defaultContentType, ...record.contentType }).reduce(
+          (acc, key) => {
+            const contentTypeId = Number(key);
+            const recordItem = record.contentType[contentTypeId];
+            acc[contentTypeId] = {
+              ...defaultContentType[contentTypeId],
+              ...(recordItem && {
+                company: recordItem.company,
+                vol: recordItem.vol,
+                time: recordItem.time,
+                isChanged: recordItem.isChanged,
+              }),
+            };
+            return acc;
+          },
+          {} as Record<number, testItem>
+        )
       : defaultContentType;
 
     mapped.push({

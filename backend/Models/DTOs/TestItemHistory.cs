@@ -9,10 +9,10 @@ namespace backend.Models.DTOs
     public class TestItemHistory
     {
         [JsonProperty("company")]
-        public int Company { get; set; }
+        public int? Company { get; set; }
 
         [JsonProperty("vol")]
-        public decimal Vol { get; set; }
+        public decimal? Vol { get; set; }
 
         [JsonProperty("time")]
         public string Time { get; set; }

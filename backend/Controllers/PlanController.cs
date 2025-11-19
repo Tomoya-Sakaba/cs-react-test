@@ -103,6 +103,28 @@ namespace backend.Controllers
             var data = _service.GetAvailableYearMonths();
             return Ok(data);
         }
+
+        //------------------------------------------------------------------------------
+        // 指定年月の利用可能なバージョンリストを取得
+        //------------------------------------------------------------------------------
+        [HttpGet]
+        [Route("api/plan/available-versions")]
+        public IHttpActionResult GetAvailableVersions(int year, int month)
+        {
+            var data = _service.GetAvailableVersions(year, month);
+            return Ok(data);
+        }
+
+        //------------------------------------------------------------------------------
+        // バージョン指定でPlanデータを取得
+        //------------------------------------------------------------------------------
+        [HttpGet]
+        [Route("api/plan/history")]
+        public IHttpActionResult GetPlanHistory(int year, int month, int version)
+        {
+            var data = _service.GetPlanHistoryData(version, year, month);
+            return Ok(data);
+        }
     }
 
     public class VersionRequest
