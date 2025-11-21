@@ -9,9 +9,9 @@ namespace backend.Models.DTOs
     public class ContentTypeDto
     {
         [JsonProperty("ContentTypeId")]
-        public int content_type_id { get; set; }
+        public int ContentTypeId { get; set; }
 
         [JsonProperty("ContentName")]
-        public string content_name { get; set; }
+        public string ContentName { get; set; }
     }
 }

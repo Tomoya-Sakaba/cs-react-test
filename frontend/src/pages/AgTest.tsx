@@ -261,10 +261,10 @@ const AgTest = () => {
   // 利用可能なバージョンを取得
   //---------------------------------------------------------------------------
   useEffect(() => {
-    // 新規作成モードの場合はスキップ
+    // 新規作成モードの場合はバージョン0を設定
     if (isNewMode) {
-      setAvailableVersions([]);
-      setSelectedVersion(null);
+      setAvailableVersions([0]);
+      setSelectedVersion(0);
       return;
     }
 
@@ -276,13 +276,9 @@ const AgTest = () => {
           currentIndexMonth + 1
         );
         setAvailableVersions(versions);
-        // 最新バージョン（最大値）をデフォルト選択
-        if (versions.length > 0) {
-          const latestVersion = Math.max(...versions);
-          setSelectedVersion(latestVersion);
-        } else {
-          setSelectedVersion(null);
-        }
+        // 最新バージョン（最大値）をデフォルト選択（データがない場合も[0]が返ってくる）
+        const latestVersion = Math.max(...versions);
+        setSelectedVersion(latestVersion);
       } catch (error) {
         console.error('利用可能なバージョンの取得に失敗しました:', error);
         setAvailableVersions([]);
@@ -359,61 +355,35 @@ const AgTest = () => {
       return;
     }
 
-    // fetch ContentTypeList（常に必要）
+    // ヘッダーに設定可能なコンテントタイプを取得
     const resContent = await testApi.fetchContentTypeList();
     console.log('resContent', resContent);
 
     // オリジナルの順序を保持
     setOriginalContentType(resContent);
 
+    // コンテントタイプIDの数字リストを取得
     const contentTypeIdList = getContentTypeIdList(resContent);
     console.log('contentTypeIdList', contentTypeIdList);
 
-    // 新規作成モードの場合は、データ取得をスキップして空のデータで初期化
+    // 新規作成モードの場合は、isNewをtrueにしてselectedContentTypeIdsを設定
     // skipNewModeCheckがtrueの場合は、強制的に通常モードとしてデータを取得
     if (isNewMode && !skipNewModeCheck) {
       setIsNew(true);
-
-      // マスターデータを取得
-      const [defaultTimeData, defaultVolData] = await Promise.all([
-        testApi.fetchContentTypeDefaultTime(),
-        testApi.fetchContentTypeDefaultVol(),
-      ]);
-
-      // マスターデータから初期値を設定した月次データを生成
-      const mapDataWithDefaults = mapMonthlyTestDataWithDefaults(
-        currentYear,
-        currentIndexMonth,
-        contentTypeIdList,
-        defaultTimeData,
-        defaultVolData,
-        getDefaultRecord
-      );
-
-      console.log('mapData(新規作成モード)', mapDataWithDefaults);
-      setRowData(mapDataWithDefaults);
-      setAgRowData(JSON.parse(JSON.stringify(mapDataWithDefaults)));
-
-      // 初期表示するcontentTypeIdのリストを決定
-      const initialIds = getInitialContentTypeIds(mapDataWithDefaults);
-      setSelectedContentTypeIds(initialIds);
-      return;
+      setSelectedContentTypeIds([2, 4]);
     }
 
-    // 通常モードの場合はデータを取得
-    // バージョンが選択されている場合はバージョン指定で取得、そうでない場合は最新を取得
-    let res: FetchPlanType[];
-    if (selectedVersion !== null && !skipNewModeCheck) {
-      // バージョン指定で取得（historyDataはFetchPlanTypeと互換性があるためそのまま使用）
-      res = (await testApi.fetchPlanHistory(
-        currentYear,
-        currentIndexMonth + 1,
-        selectedVersion
-      )) as FetchPlanType[];
-    } else {
-      // 最新バージョンを取得
-      res = await testApi.fetchPlanData(currentYear, currentIndexMonth + 1);
-    }
+    // バージョンを決定（新規モードの場合は0、通常モードの場合は選択されたバージョン、nullの場合は0）
+    const versionToFetch = isNewMode && !skipNewModeCheck
+      ? 0
+      : (selectedVersion !== null ? selectedVersion : 0);
+
+    // バージョン指定でデータを取得（常にfetchPlanHistoryを使用）
+    const res = await testApi.fetchPlanHistory(
+      currentYear,
+      currentIndexMonth + 1,
+      versionToFetch
+    );
     console.log('res', res);
 
     // 全日マッピング処理
@@ -425,28 +395,80 @@ const AgTest = () => {
       contentTypeIdList
     );
 
-    console.log('mapData(既存)', mapData);
+    console.log('mapData', mapData);
 
     setRowData(mapData);
     setAgRowData(JSON.parse(JSON.stringify(mapData)));
 
-    // 初期表示するcontentTypeIdのリストを決定
-    const initialIds = getInitialContentTypeIds(mapData);
-    setSelectedContentTypeIds(initialIds);
+    // 初期表示するcontentTypeIdのリストを決定（新規モードの場合は既に設定済みなのでスキップ）
+    if (!isNewMode || skipNewModeCheck) {
+      const initialIds = getInitialContentTypeIds(mapData);
+      setSelectedContentTypeIds(initialIds);
+    }
   };
 
+
+  //---------------------------------------------------------------------------
+  // 初回レンダリング処理
+  //---------------------------------------------------------------------------
   useEffect(() => {
     fetchData();
   }, [currentYear, currentIndexMonth, isNewMode, showExistingDataDialog, selectedVersion]);
 
+  //---------------------------------------------------------------------------
+  // コンテントタイプIDを数字のリストに変換する関数
+  //---------------------------------------------------------------------------
   const getContentTypeIdList = (list: ContentTypeList[]): number[] => {
     return list.map((item) => item.contentTypeId);
   };
+
+  //---------------------------------------------------------------------------
+  // コンテントタイプIDごとにデフォルト値を設定する関数（マッピングで使用）
+  //---------------------------------------------------------------------------
   const getDefaultRecord = (IdList: number[]): Record<number, testItem> => {
     return IdList.reduce((acc, id) => {
       acc[id] = { company: null, vol: null, time: null };
       return acc;
     }, {} as Record<number, testItem>);
+  };
+
+  //---------------------------------------------------------------------------
+  // デフォルト値を設定する処理（新規モード用）
+  //---------------------------------------------------------------------------
+  const handleSetDefaultValues = async () => {
+    if (!isNewMode) return;
+
+    try {
+      // マスターデータを取得
+      const [defaultTimeData, defaultVolData] = await Promise.all([
+        testApi.fetchContentTypeDefaultTime(),
+        testApi.fetchContentTypeDefaultVol(),
+      ]);
+
+      // 現在のcontentTypeIdListを取得
+      const contentTypeIdList = getContentTypeIdList(originalContentType);
+
+      // マスターデータから初期値を設定した月次データを生成
+      const mapDataWithDefaults = mapMonthlyTestDataWithDefaults(
+        currentYear,
+        currentIndexMonth,
+        contentTypeIdList,
+        defaultTimeData,
+        defaultVolData,
+        getDefaultRecord
+      );
+
+      console.log('mapData(デフォルト値設定)', mapDataWithDefaults);
+      setRowData(mapDataWithDefaults);
+      setAgRowData(JSON.parse(JSON.stringify(mapDataWithDefaults)));
+
+      // 初期表示するcontentTypeIdのリストを決定
+      const initialIds = getInitialContentTypeIds(mapDataWithDefaults);
+      setSelectedContentTypeIds(initialIds);
+    } catch (error) {
+      console.error('デフォルト値の設定に失敗しました:', error);
+      alert('デフォルト値の設定に失敗しました。');
+    }
   };
 
   //---------------------------------------------------------------------------
@@ -574,12 +596,22 @@ const AgTest = () => {
       console.log('バージョン作成成功:', res);
       alert('バージョンの作成が完了しました。');
 
-      // データを再取得
+      // データを再取得（最新バージョンを指定）
       const fetchData = async () => {
-        const res = await testApi.fetchPlanData(
+        // 最新バージョンを取得
+        const versions = await testApi.fetchAvailableVersions(
           currentYear,
           currentIndexMonth + 1
         );
+        const latestVersion = Math.max(...versions);
+
+        // バージョン指定でデータを取得
+        const res = await testApi.fetchPlanHistory(
+          currentYear,
+          currentIndexMonth + 1,
+          latestVersion
+        );
+
         const resContent = await testApi.fetchContentTypeList();
         setOriginalContentType(resContent);
         const contentTypeIdList = getContentTypeIdList(resContent);
@@ -597,6 +629,10 @@ const AgTest = () => {
         // 初期表示するcontentTypeIdのリストを決定
         const initialIds = getInitialContentTypeIds(mapData);
         setSelectedContentTypeIds(initialIds);
+
+        // 最新バージョンを選択状態に設定
+        setSelectedVersion(latestVersion);
+        setAvailableVersions(versions);
       };
       await fetchData();
     } catch (error) {
@@ -687,6 +723,15 @@ const AgTest = () => {
             >
               pdf
             </button>
+            {/* 新規モードの時のみ表示される初期値設定ボタン */}
+            {isNewMode && (
+              <button
+                className="h-full w-32 rounded-lg bg-yellow-500 px-4 py-2 text-sm text-white hover:bg-yellow-600"
+                onClick={handleSetDefaultValues}
+              >
+                初期値を設定
+              </button>
+            )}
             <button
               className="h-full w-24 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
               onClick={handleSave}

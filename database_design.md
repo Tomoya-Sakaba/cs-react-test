@@ -1,5 +1,15 @@
 # 上程機能のテーブル設計
 
+## 命名規則について
+
+本データベースでは、以下の命名規則に統一されています：
+
+- **テーブル名**: PascalCase（複数形）
+- **カラム名**: PascalCase（アンダースコアなし）
+- **インデックス名**: `IX_` プレフィックス + テーブル名 + カラム名
+
+詳細は `database_naming_convention.md` を参照してください。
+
 ## 1. Users テーブルの拡張
 
 上程機能に必要な追加カラム：
@@ -30,8 +40,8 @@ CREATE TABLE [dbo].[Approvals] (
   [Status] int not null,               -- 状態番号（0: 上程済み, 1: 承認待ち, 2: 承認済み, 3: 差し戻し, 4: 取り戻し, 5: 完了, 6: 承認スキップ）
   [Comment] nvarchar(1000) null,        -- コメント
   [ActionDate] datetime null,          -- 上程or承認をした日付
-  [Created_At] datetime default getdate() not null,
-  [Updated_At] datetime default getdate() not null,
+  [CreatedAt] datetime default getdate() not null,
+  [UpdatedAt] datetime default getdate() not null,
   primary key (Id)
 );
 ```
@@ -72,16 +82,16 @@ CREATE TABLE [dbo].[Reports] (
   [ReportNo] nvarchar(50) not null unique,  -- 報告書No（ユニーク制約）
   [Title] nvarchar(200) not null,           -- タイトル
   [Content] nvarchar(max) null,              -- 内容
-  [Created_At] datetime default getdate() not null,
-  [Created_User] nvarchar(100) null,        -- 作成者
-  [Updated_At] datetime default getdate() not null,
-  [Updated_User] nvarchar(100) null,        -- 更新者
+  [CreatedAt] datetime default getdate() not null,
+  [CreatedUser] nvarchar(100) null,        -- 作成者
+  [UpdatedAt] datetime default getdate() not null,
+  [UpdatedUser] nvarchar(100) null,        -- 更新者
   primary key (Id)
 );
 
 -- インデックス
 CREATE INDEX [IX_Reports_ReportNo] ON [dbo].[Reports]([ReportNo]);
-CREATE INDEX [IX_Reports_Created_At] ON [dbo].[Reports]([Created_At]);
+CREATE INDEX [IX_Reports_CreatedAt] ON [dbo].[Reports]([CreatedAt]);
 ````
 
 ### 状態管理について
@@ -89,25 +99,25 @@ CREATE INDEX [IX_Reports_Created_At] ON [dbo].[Reports]([Created_At]);
 報告書の状態は上程管理テーブル（Approvals）から取得します。
 Reports テーブルには状態を保持しません。
 
-## 4. コンテンツタイプ時間デフォルト値マスターテーブル（ContentTypeDefaultTime）
+## 4. コンテンツタイプ時間デフォルト値マスターテーブル（ContentTypeDefaultTimes）
 
 新規作成モード時にカラムに初期値を設定するためのマスターテーブル：
 
 ```sql
-CREATE TABLE [dbo].[ContentTypeDefaultTime] (
+CREATE TABLE [dbo].[ContentTypeDefaultTimes] (
   [Id] int identity not null,
   [ContentTypeId] int not null,            -- コンテンツタイプID
   [DayType] nvarchar(20) not null,         -- 曜日タイプ（'月': 月曜, '平': 平日, '祭': 祝日, '土': 土曜, '日': 日曜）
   [DefTime] nvarchar(10) null,             -- デフォルト時間（例: '09:00', '14:30'）
-  [Created_At] datetime default getdate() not null,
-  [Updated_At] datetime default getdate() not null,
+  [CreatedAt] datetime default getdate() not null,
+  [UpdatedAt] datetime default getdate() not null,
   primary key (Id)
 );
 
 -- インデックス
-CREATE INDEX [IX_ContentTypeDefaultTime_ContentTypeId] ON [dbo].[ContentTypeDefaultTime]([ContentTypeId]);
-CREATE INDEX [IX_ContentTypeDefaultTime_DayType] ON [dbo].[ContentTypeDefaultTime]([DayType]);
-CREATE UNIQUE INDEX [IX_ContentTypeDefaultTime_ContentTypeId_DayType] ON [dbo].[ContentTypeDefaultTime]([ContentTypeId], [DayType]);
+CREATE INDEX [IX_ContentTypeDefaultTimes_ContentTypeId] ON [dbo].[ContentTypeDefaultTimes]([ContentTypeId]);
+CREATE INDEX [IX_ContentTypeDefaultTimes_DayType] ON [dbo].[ContentTypeDefaultTimes]([DayType]);
+CREATE UNIQUE INDEX [IX_ContentTypeDefaultTimes_ContentTypeId_DayType] ON [dbo].[ContentTypeDefaultTimes]([ContentTypeId], [DayType]);
 ```
 
 ### DayType（曜日タイプ）について
@@ -122,7 +132,7 @@ CREATE UNIQUE INDEX [IX_ContentTypeDefaultTime_ContentTypeId_DayType] ON [dbo].[
 
 ```sql
 -- コンテンツタイプ1のデフォルト時間設定例
-INSERT INTO [dbo].[ContentTypeDefaultTime] ([ContentTypeId], [DayType], [DefTime])
+INSERT INTO [dbo].[ContentTypeDefaultTimes] ([ContentTypeId], [DayType], [DefTime])
 VALUES
   (1, '月', '09:00'),
   (1, '平', '09:00'),
@@ -131,7 +141,7 @@ VALUES
   (1, '日', NULL);
 
 -- コンテンツタイプ2のデフォルト時間設定例
-INSERT INTO [dbo].[ContentTypeDefaultTime] ([ContentTypeId], [DayType], [DefTime])
+INSERT INTO [dbo].[ContentTypeDefaultTimes] ([ContentTypeId], [DayType], [DefTime])
 VALUES
   (2, '月', '10:00'),
   (2, '平', '10:00'),
@@ -140,7 +150,7 @@ VALUES
   (2, '日', NULL);
 
 -- コンテンツタイプ3のデフォルト時間設定例
-INSERT INTO [dbo].[ContentTypeDefaultTime] ([ContentTypeId], [DayType], [DefTime])
+INSERT INTO [dbo].[ContentTypeDefaultTimes] ([ContentTypeId], [DayType], [DefTime])
 VALUES
   (3, '月', '14:00'),
   (3, '平', '14:00'),
@@ -149,7 +159,7 @@ VALUES
   (3, '日', NULL);
 
 -- コンテンツタイプ4のデフォルト時間設定例
-INSERT INTO [dbo].[ContentTypeDefaultTime] ([ContentTypeId], [DayType], [DefTime])
+INSERT INTO [dbo].[ContentTypeDefaultTimes] ([ContentTypeId], [DayType], [DefTime])
 VALUES
   (4, '月', '16:00'),
   (4, '平', '16:00'),
@@ -158,47 +168,47 @@ VALUES
   (4, '日', NULL);
 ```
 
-注意: 上記の INSERT 文は例です。実際の`content_type`テーブルに存在する`content_type_id`に合わせて調整してください。
+注意: 上記の INSERT 文は例です。実際の`ContentTypes`テーブルに存在する`ContentTypeId`に合わせて調整してください。
 
-## 5. コンテンツタイプ数量デフォルト値マスターテーブル（ContentTypeDefaultVol）
+## 5. コンテンツタイプ数量デフォルト値マスターテーブル（ContentTypeDefaultVols）
 
 新規作成モード時にカラムに初期値を設定するためのマスターテーブル：
 
 ```sql
-CREATE TABLE [dbo].[ContentTypeDefaultVol] (
+CREATE TABLE [dbo].[ContentTypeDefaultVols] (
   [Id] int identity not null,
   [ContentTypeId] int not null,            -- コンテンツタイプID
   [DefVol] decimal(18, 2) null,            -- デフォルト数量
-  [Created_At] datetime default getdate() not null,
-  [Updated_At] datetime default getdate() not null,
+  [CreatedAt] datetime default getdate() not null,
+  [UpdatedAt] datetime default getdate() not null,
   primary key (Id)
 );
 
 -- インデックス（ContentTypeIdにユニーク制約）
-CREATE UNIQUE INDEX [IX_ContentTypeDefaultVol_ContentTypeId] ON [dbo].[ContentTypeDefaultVol]([ContentTypeId]);
+CREATE UNIQUE INDEX [IX_ContentTypeDefaultVols_ContentTypeId] ON [dbo].[ContentTypeDefaultVols]([ContentTypeId]);
 ```
 
 ### 初期データの INSERT 文
 
 ```sql
 -- コンテンツタイプ1のデフォルト数量設定例
-INSERT INTO [dbo].[ContentTypeDefaultVol] ([ContentTypeId], [DefVol])
+INSERT INTO [dbo].[ContentTypeDefaultVols] ([ContentTypeId], [DefVol])
 VALUES (1, 100.00);
 
 -- コンテンツタイプ2のデフォルト数量設定例
-INSERT INTO [dbo].[ContentTypeDefaultVol] ([ContentTypeId], [DefVol])
+INSERT INTO [dbo].[ContentTypeDefaultVols] ([ContentTypeId], [DefVol])
 VALUES (2, 200.00);
 
 -- コンテンツタイプ3のデフォルト数量設定例
-INSERT INTO [dbo].[ContentTypeDefaultVol] ([ContentTypeId], [DefVol])
+INSERT INTO [dbo].[ContentTypeDefaultVols] ([ContentTypeId], [DefVol])
 VALUES (3, 300.00);
 
 -- コンテンツタイプ4のデフォルト数量設定例
-INSERT INTO [dbo].[ContentTypeDefaultVol] ([ContentTypeId], [DefVol])
+INSERT INTO [dbo].[ContentTypeDefaultVols] ([ContentTypeId], [DefVol])
 VALUES (4, 400.00);
 ```
 
-注意: 上記の INSERT 文は例です。実際の`content_type`テーブルに存在する`content_type_id`に合わせて調整してください。
+注意: 上記の INSERT 文は例です。実際の`ContentTypes`テーブルに存在する`ContentTypeId`に合わせて調整してください。
 
 ## 6. テーブル設計の説明
 

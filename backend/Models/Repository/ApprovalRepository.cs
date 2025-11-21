@@ -19,8 +19,8 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    INSERT INTO dbo.Approvals (
-                        PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, Created_At, Updated_At
+                    INSERT INTO dbo.t_approvals (
+                        page_code, report_no, year, month, user_name, flow_order, status, comment, action_date, created_at, updated_at
                     )
                     VALUES (
                         @PageCode, @ReportNo, @Year, @Month, @UserName, @FlowOrder, @Status, @Comment, @ActionDate, GETDATE(), GETDATE()
@@ -40,22 +40,44 @@ namespace backend.Models.Repository
                 {
                     // 複数レコード型ページ：PageCode、Year、Monthのみで検索
                     sql = @"
-                        SELECT Id, PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, 
-                               Created_At AS CreatedAt, Updated_At AS UpdatedAt
-                        FROM dbo.Approvals
-                        WHERE PageCode = @PageCode AND Year = @Year AND Month = @Month
-                          AND (ReportNo IS NULL OR ReportNo = '')
-                        ORDER BY FlowOrder";
+                        SELECT 
+                            id AS Id,
+                            page_code AS PageCode,
+                            report_no AS ReportNo,
+                            year AS Year,
+                            month AS Month,
+                            user_name AS UserName,
+                            flow_order AS FlowOrder,
+                            status AS Status,
+                            comment AS Comment,
+                            action_date AS ActionDate,
+                            created_at AS CreatedAt,
+                            updated_at AS UpdatedAt
+                        FROM dbo.t_approvals
+                        WHERE page_code = @PageCode AND year = @Year AND month = @Month
+                          AND (report_no IS NULL OR report_no = '')
+                        ORDER BY flow_order";
                 }
                 else
                 {
                     // 1レコード型ページ：PageCode、ReportNo、Year、Monthで検索
                     sql = @"
-                        SELECT Id, PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, 
-                               Created_At AS CreatedAt, Updated_At AS UpdatedAt
-                        FROM dbo.Approvals
-                        WHERE PageCode = @PageCode AND ReportNo = @ReportNo AND Year = @Year AND Month = @Month
-                        ORDER BY FlowOrder";
+                        SELECT 
+                            id AS Id,
+                            page_code AS PageCode,
+                            report_no AS ReportNo,
+                            year AS Year,
+                            month AS Month,
+                            user_name AS UserName,
+                            flow_order AS FlowOrder,
+                            status AS Status,
+                            comment AS Comment,
+                            action_date AS ActionDate,
+                            created_at AS CreatedAt,
+                            updated_at AS UpdatedAt
+                        FROM dbo.t_approvals
+                        WHERE page_code = @PageCode AND report_no = @ReportNo AND year = @Year AND month = @Month
+                        ORDER BY flow_order";
                 }
                 
                 var parameters = new { PageCode = pageCode, ReportNo = reportNo ?? string.Empty, Year = year, Month = month };
@@ -69,11 +91,22 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    SELECT Id, PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate, 
-                           Created_At AS CreatedAt, Updated_At AS UpdatedAt
-                    FROM dbo.Approvals
-                    WHERE UserName = @UserName AND Status = 1
-                    ORDER BY Created_At DESC";
+                    SELECT 
+                        id AS Id,
+                        page_code AS PageCode,
+                        report_no AS ReportNo,
+                        year AS Year,
+                        month AS Month,
+                        user_name AS UserName,
+                        flow_order AS FlowOrder,
+                        status AS Status,
+                        comment AS Comment,
+                        action_date AS ActionDate,
+                        created_at AS CreatedAt,
+                        updated_at AS UpdatedAt
+                    FROM dbo.t_approvals
+                    WHERE user_name = @UserName AND status = 1
+                    ORDER BY created_at DESC";
                 return db.Query<ApprovalEntity>(sql, new { UserName = userName }).ToList();
             }
         }
@@ -84,9 +117,9 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    UPDATE dbo.Approvals
-                    SET Status = @Status, Comment = @Comment, ActionDate = @ActionDate, Updated_At = GETDATE()
-                    WHERE Id = @Id";
+                    UPDATE dbo.t_approvals
+                    SET status = @Status, comment = @Comment, action_date = @ActionDate, updated_at = GETDATE()
+                    WHERE id = @Id";
                 db.Execute(sql, approval);
             }
         }
@@ -101,16 +134,16 @@ namespace backend.Models.Repository
                 {
                     // 複数レコード型ページ：PageCode、Year、Monthのみで削除
                     sql = @"
-                        DELETE FROM dbo.Approvals
-                        WHERE PageCode = @PageCode AND Year = @Year AND Month = @Month
-                          AND (ReportNo IS NULL OR ReportNo = '')";
+                        DELETE FROM dbo.t_approvals
+                        WHERE page_code = @PageCode AND year = @Year AND month = @Month
+                          AND (report_no IS NULL OR report_no = '')";
                 }
                 else
                 {
                     // 1レコード型ページ：PageCode、ReportNo、Year、Monthで削除
                     sql = @"
-                        DELETE FROM dbo.Approvals
-                        WHERE PageCode = @PageCode AND ReportNo = @ReportNo AND Year = @Year AND Month = @Month";
+                        DELETE FROM dbo.t_approvals
+                        WHERE page_code = @PageCode AND report_no = @ReportNo AND year = @Year AND month = @Month";
                 }
                 db.Execute(sql, new { PageCode = pageCode, ReportNo = reportNo ?? string.Empty, Year = year, Month = month });
             }
@@ -122,8 +155,8 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    DELETE FROM dbo.Approvals
-                    WHERE Id = @Id";
+                    DELETE FROM dbo.t_approvals
+                    WHERE id = @Id";
                 db.Execute(sql, new { Id = id });
             }
         }
@@ -134,10 +167,21 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    SELECT Id, PageCode, ReportNo, Year, Month, UserName, FlowOrder, Status, Comment, ActionDate,
-                           Created_At AS CreatedAt, Updated_At AS UpdatedAt
-                    FROM dbo.Approvals
-                    WHERE Id = @Id";
+                    SELECT 
+                        id AS Id,
+                        page_code AS PageCode,
+                        report_no AS ReportNo,
+                        year AS Year,
+                        month AS Month,
+                        user_name AS UserName,
+                        flow_order AS FlowOrder,
+                        status AS Status,
+                        comment AS Comment,
+                        action_date AS ActionDate,
+                        created_at AS CreatedAt,
+                        updated_at AS UpdatedAt
+                    FROM dbo.t_approvals
+                    WHERE id = @Id";
                 return db.Query<ApprovalEntity>(sql, new { Id = id }).FirstOrDefault();
             }
         }

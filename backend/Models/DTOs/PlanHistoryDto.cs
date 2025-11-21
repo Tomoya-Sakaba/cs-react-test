@@ -7,14 +7,14 @@ namespace backend.Models.DTOs
 {
     public class PlanHistoryDto
     {
-        public DateTime date { get; set; }
-        public int content_type_id { get; set; }
-        public int? company { get; set; }
-        public decimal? vol { get; set; }
+        public DateTime Date { get; set; }
+        public int ContentTypeId { get; set; }
+        public int? Company { get; set; }
+        public decimal? Vol { get; set; }
         public TimeSpan? Time { get; set; }
-        public int version { get; set; }
-        public bool is_active { get; set; }
-        public bool is_changed { get; set; }
-        public string note_text { get; set; }
+        public int Version { get; set; }
+        public bool IsActive { get; set; }
+        public bool IsChanged { get; set; }
+        public string NoteText { get; set; }
     }
 }

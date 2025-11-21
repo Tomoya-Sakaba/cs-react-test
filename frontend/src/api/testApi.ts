@@ -71,11 +71,16 @@ export const testApi = {
     ];
   },
 
-  async fetchPlanData(year: number, month: number): Promise<FetchPlanType[]> {
+  async fetchPlanData(
+    year: number,
+    month: number,
+    version?: number
+  ): Promise<FetchPlanType[]> {
     const res = await axios.get<FetchPlanType[]>('/api/plan', {
       params: {
         year,
         month,
+        ...(version !== undefined && { version }),
       },
       headers: {
         Accept: 'application/json',
@@ -167,36 +172,8 @@ export const testApi = {
     year: number,
     month: number,
     version: number
-  ): Promise<
-    Array<{
-      date: string;
-      contentType: Record<
-        number,
-        {
-          company: number | null;
-          vol: number | null;
-          time: string | null;
-          isChanged?: boolean;
-        }
-      >;
-      note: string;
-    }>
-  > {
-    const res = await axios.get<
-      Array<{
-        date: string;
-        contentType: Record<
-          number,
-          {
-            company: number | null;
-            vol: number | null;
-            time: string | null;
-            isChanged?: boolean;
-          }
-        >;
-        note: string;
-      }>
-    >('/api/plan/history', {
+  ): Promise<FetchPlanType[]> {
+    const res = await axios.get<FetchPlanType[]>('/api/plan/history', {
       params: {
         year,
         month,

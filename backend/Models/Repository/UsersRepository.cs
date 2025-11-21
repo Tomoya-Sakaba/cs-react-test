@@ -19,7 +19,7 @@ namespace backend.Models.Repository
             {
                 conn.Open();
                 string sql = @"
-                    INSERT INTO dbo.Users (Name, Password)
+                    INSERT INTO dbo.t_users (name, password)
                     VALUES (@Name, @Password)
                     SELECT CAST(SCOPE_IDENTITY() AS int);
                 ";
@@ -40,7 +40,18 @@ namespace backend.Models.Repository
             using (SqlConnection conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "SELECT Id, Name, Password, Email, Department, Position, Color, Created_At, Updated_At FROM dbo.Users";
+                string sql = @"
+                    SELECT 
+                        id AS Id,
+                        name AS Name,
+                        password AS Password,
+                        email AS Email,
+                        department AS Department,
+                        position AS Position,
+                        color AS Color,
+                        created_at AS CreatedAt,
+                        updated_at AS UpdatedAt
+                    FROM dbo.t_users";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 using (SqlDataReader reader = cmd.ExecuteReader())
                 {
@@ -55,8 +66,8 @@ namespace backend.Models.Repository
                             Department = reader["Department"] as string,
                             Position = reader["Position"] as string,
                             Color = reader["Color"] as string,
-                            CreatedAt = (DateTime)reader["Created_At"],
-                            UpdatedAt = (DateTime)reader["Updated_At"]
+                            CreatedAt = (DateTime)reader["CreatedAt"],
+                            UpdatedAt = (DateTime)reader["UpdatedAt"]
                         });
                     }
                 }
@@ -70,7 +81,18 @@ namespace backend.Models.Repository
             using (SqlConnection conn = new SqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "SELECT Id, Name, Password, Email, Department, Position, Created_At, Updated_At FROM dbo.Users WHERE ID = @userId";
+                string sql = @"
+                    SELECT 
+                        id AS Id,
+                        name AS Name,
+                        password AS Password,
+                        email AS Email,
+                        department AS Department,
+                        position AS Position,
+                        created_at AS CreatedAt,
+                        updated_at AS UpdatedAt
+                    FROM dbo.t_users
+                    WHERE id = @userId";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@userId", userId);
@@ -86,8 +108,8 @@ namespace backend.Models.Repository
                                 Email = reader["Email"] as string,
                                 Department = reader["Department"] as string,
                                 Position = reader["Position"] as string,
-                                CreatedAt = (DateTime)reader["Created_At"],
-                                UpdatedAt = (DateTime)reader["Updated_At"]
+                                CreatedAt = (DateTime)reader["CreatedAt"],
+                                UpdatedAt = (DateTime)reader["UpdatedAt"]
                             });
                         }
                     }
@@ -102,8 +124,8 @@ namespace backend.Models.Repository
             {
                 conn.Open();
                 string sql = @"
-                    UPDATE dbo.Users
-                    SET Name = @Name, Updated_At = GETDATE()
+                    UPDATE dbo.t_users
+                    SET name = @Name, updated_at = GETDATE()
                     WHERE id = @Id
                 ";
                 using (SqlCommand cmd = new SqlCommand(sql, conn))

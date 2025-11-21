@@ -24,7 +24,7 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                 WITH latest_plan AS (
-                    -- 最新バージョンのt_planを先に取得
+                    -- 最新バージョンのt_plansを先に取得
                     SELECT 
                         p.date,
                         p.content_type_id,
@@ -32,41 +32,41 @@ namespace backend.Models.Repository
                         p.vol,
                         p.time,
                         p.version
-                    FROM t_plan p
+                    FROM dbo.t_plans p
                     INNER JOIN (
                         SELECT 
                             date,
                             content_type_id,
                             MAX(version) AS max_version
-                        FROM t_plan
+                        FROM dbo.t_plans
                         GROUP BY date, content_type_id
                     ) max_p ON p.date = max_p.date 
                            AND p.content_type_id = max_p.content_type_id 
                            AND p.version = max_p.max_version
                 ),
                 latest_note AS (
-                    -- 最新バージョンのnoteを先に取得
+                    -- 最新バージョンのt_notesを先に取得
                     SELECT 
                         n.note_date,
                         n.note_text
-                    FROM note n
+                    FROM dbo.t_notes n
                     INNER JOIN (
                         SELECT 
                             note_date,
                             MAX(version) AS max_version
-                        FROM note
+                        FROM dbo.t_notes
                         GROUP BY note_date
                     ) max_n ON n.note_date = max_n.note_date 
                           AND n.version = max_n.max_version
                 )
                 SELECT
-                    COALESCE(p.date, n.note_date) AS date,
-                    p.content_type_id,
-                    p.company,
-                    p.vol,
-                    p.time,
-                    p.version,
-                    n.note_text
+                    COALESCE(p.date, n.note_date) AS Date,
+                    p.content_type_id AS ContentTypeId,
+                    p.company AS Company,
+                    p.vol AS Vol,
+                    p.time AS Time,
+                    p.version AS Version,
+                    n.note_text AS NoteText
                 FROM latest_plan p
                 FULL OUTER JOIN latest_note n ON n.note_date = p.date
                 WHERE 
@@ -88,7 +88,7 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     WITH latest_plan AS (
-                            -- 最新バージョンのt_planを先に取得
+                            -- 最新バージョンのt_plansを先に取得
                             SELECT 
                                 p.date,
                                 p.content_type_id,
@@ -96,13 +96,13 @@ namespace backend.Models.Repository
                                 p.vol,
                                 p.time,
                                 p.version
-                            FROM t_plan p
+                            FROM dbo.t_plans p
                             INNER JOIN (
                                 SELECT 
                                     date,
                                     content_type_id,
                                     MAX(version) AS max_version
-                                FROM t_plan
+                                FROM dbo.t_plans
                                 WHERE version <= @TargetVersion
                                 GROUP BY date, content_type_id
                             ) max_p ON p.date = max_p.date 
@@ -110,29 +110,29 @@ namespace backend.Models.Repository
                                    AND p.version = max_p.max_version
                         ),
                         latest_note AS (
-                            -- 最新バージョンのnoteを先に取得
+                            -- 最新バージョンのt_notesを先に取得
                             SELECT 
                                 n.note_date,
                                 n.note_text
-                            FROM note n
+                            FROM dbo.t_notes n
                             INNER JOIN (
                                 SELECT 
                                     note_date,
                                     MAX(version) AS max_version
-                                FROM note
+                                FROM dbo.t_notes
                                 WHERE version <= @TargetVersion
                                 GROUP BY note_date
                             ) max_n ON n.note_date = max_n.note_date 
                                   AND n.version = max_n.max_version
                         )
                         SELECT
-                            COALESCE(p.date, n.note_date) AS date,
-                            p.content_type_id,
-                            p.company,
-                            p.vol,
-                            p.time,
-                            p.version,
-                            n.note_text
+                            COALESCE(p.date, n.note_date) AS Date,
+                            p.content_type_id AS ContentTypeId,
+                            p.company AS Company,
+                            p.vol AS Vol,
+                            p.time AS Time,
+                            p.version AS Version,
+                            n.note_text AS NoteText
                         FROM latest_plan p
                         FULL OUTER JOIN latest_note n ON n.note_date = p.date
                         WHERE 
@@ -156,9 +156,9 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                 SELECT 
-                    content_type_id,
-                    content_name
-                FROM content_type
+                    content_type_id AS ContentTypeId,
+                    content_name AS ContentName
+                FROM dbo.content_type
             ";
 
                 return db.Query<ContentTypeDto>(sql).ToList();
@@ -171,9 +171,9 @@ namespace backend.Models.Repository
             {
                 var sql = @"
                 SELECT
-                    date,
-                    content_type_id
-                FROM t_plan
+                    date AS Date,
+                    content_type_id AS ContentTypeId
+                FROM dbo.t_plans
                 WHERE date = @date
                 ";
 
@@ -189,14 +189,13 @@ namespace backend.Models.Repository
         public void InsertPlan(IDbConnection db, IDbTransaction tran, PlanEntity plan)
         {
             const string sql = @"
-                INSERT INTO t_plan (
+                INSERT INTO dbo.t_plans (
                     date,
                     content_type_id,
                     company,
                     vol,
                     time,
                     version,
-                    is_active,
                     created_at,
                     created_user,
                     updated_at,
@@ -209,7 +208,6 @@ namespace backend.Models.Repository
                     @Vol,
                     @Time,
                     @Version,
-                    @IsActive,
                     @CreatedAt,
                     @CreatedUser,
                     @UpdatedAt,
@@ -223,11 +221,10 @@ namespace backend.Models.Repository
         public void InsertNote(IDbConnection db, IDbTransaction tran, string date, string noteText, int version, string userName)
         {
             const string sql = @"
-                INSERT INTO note (
+                INSERT INTO dbo.t_notes (
                     note_date,
                     note_text,
                     version,
-                    is_active,
                     created_at,
                     created_user,
                     updated_at,
@@ -237,7 +234,6 @@ namespace backend.Models.Repository
                     @NoteDate,
                     @NoteText,
                     @Version,
-                    1,
                     GETDATE(),
                     @UserName,
                     GETDATE(),
@@ -260,7 +256,7 @@ namespace backend.Models.Repository
         public void UpdateNote(IDbConnection db, IDbTransaction tran, string date, string noteText, int version, string userName)
         {
             const string sql = @"
-                UPDATE note
+                UPDATE dbo.t_notes
                 SET 
                     note_text = @NoteText,
                     updated_at = GETDATE(),
@@ -288,7 +284,7 @@ namespace backend.Models.Repository
             {
                 const string sql = @"
                     SELECT COUNT(1)
-                    FROM note
+                    FROM dbo.t_notes
                     WHERE note_date = @NoteDate
                       AND version = @Version;
                 ";
@@ -304,7 +300,7 @@ namespace backend.Models.Repository
         public void DeleteNote(IDbConnection db, IDbTransaction tran, DateTime date, int version)
         {
             const string sql = @"
-                DELETE FROM note
+                DELETE FROM dbo.t_notes
                 WHERE 
                     note_date = @NoteDate
                     AND version = @Version;
@@ -326,12 +322,12 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     SELECT 
-                        ISNULL(MAX(v), 0) + 1 AS next_version
+                        ISNULL(MAX(v), 0) + 1 AS NextVersion
                     FROM (
-                        SELECT MAX(version) AS v FROM t_plan
+                        SELECT MAX(version) AS v FROM dbo.t_plans
                         WHERE YEAR(date) = @Year AND MONTH(date) = @Month
                         UNION ALL
-                        SELECT MAX(version) AS v FROM note
+                        SELECT MAX(version) AS v FROM dbo.t_notes
                         WHERE YEAR(note_date) = @Year AND MONTH(note_date) = @Month
                     ) AS all_versions;
                 ";
@@ -349,22 +345,22 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     SELECT
-                        COALESCE(p.date, n.note_date) AS date,
-                        p.content_type_id,
-                        p.company,
-                        p.vol,
-                        p.time,
-                        p.version,
-                        n.note_text
-                    FROM t_plan p
+                        COALESCE(p.date, n.note_date) AS Date,
+                        p.content_type_id AS ContentTypeId,
+                        p.company AS Company,
+                        p.vol AS Vol,
+                        p.time AS Time,
+                        p.version AS Version,
+                        n.note_text AS NoteText
+                    FROM dbo.t_plans p
                     FULL OUTER JOIN (
                         SELECT 
                             note_date,
                             note_text
-                        FROM note n2
+                        FROM dbo.t_notes n2
                         WHERE n2.version = (
                             SELECT MAX(n3.version)
-                            FROM note n3
+                            FROM dbo.t_notes n3
                             WHERE n3.note_date = n2.note_date
                         )
                     ) n ON n.note_date = p.date
@@ -373,7 +369,7 @@ namespace backend.Models.Repository
                             p.version IS NULL
                             OR p.version = (
                                 SELECT MAX(tp.version)
-                                FROM t_plan tp
+                                FROM dbo.t_plans tp
                                 WHERE tp.date = p.date
                                   AND tp.content_type_id = p.content_type_id
                             )
@@ -396,7 +392,7 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-            INSERT INTO t_plan (date, content_type_id, company, vol, time, version)
+            INSERT INTO dbo.t_plans (date, content_type_id, company, vol, time, version)
             VALUES (@Date, @ContentTypeId, @Company, @Vol, @Time, @Version);
         ";
 
@@ -420,7 +416,7 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-            INSERT INTO t_plan (date, content_type_id, company, vol, time, version)
+            INSERT INTO dbo.t_plans (date, content_type_id, company, vol, time, version)
             VALUES (@Date, @ContentTypeId, NULL, NULL, NULL, @Version);
         ";
 
@@ -442,7 +438,7 @@ namespace backend.Models.Repository
         public void UpdatePlan(IDbConnection db, IDbTransaction tran, DateTime date, int contentTypeId, TestItem item, int version)
         {
             string sql = @"
-                UPDATE t_plan
+                UPDATE dbo.t_plans
                 SET 
                     company = @Company,
                     vol = @Vol,
@@ -471,7 +467,7 @@ namespace backend.Models.Repository
         public void DeletePlan(IDbConnection db, IDbTransaction tran, DateTime date, int contentTypeId, int version)
         {
             string sql = @"
-                DELETE FROM t_plan
+                DELETE FROM dbo.t_plans
                 WHERE 
                     date = @Date
                     AND content_type_id = @ContentTypeId
@@ -495,7 +491,7 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     SELECT COUNT(1)
-                    FROM t_plan
+                    FROM dbo.t_plans
                     WHERE 
                         date = @Date
                         AND content_type_id = @ContentTypeId
@@ -522,8 +518,8 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    SELECT current_version
-                    FROM plan_version_snapshot
+                    SELECT current_version AS CurrentVersion
+                    FROM dbo.t_plan_version_snapshots
                     WHERE year = @Year AND month = @Month;
                 ";
 
@@ -538,9 +534,9 @@ namespace backend.Models.Repository
         public void UpsertVersionSnapshot(IDbConnection db, IDbTransaction tran, int year, int month, int version, string userName)
         {
             string sql = @"
-                IF EXISTS (SELECT 1 FROM plan_version_snapshot WHERE year = @Year AND month = @Month)
+                IF EXISTS (SELECT 1 FROM dbo.t_plan_version_snapshots WHERE year = @Year AND month = @Month)
                 BEGIN
-                    UPDATE plan_version_snapshot
+                    UPDATE dbo.t_plan_version_snapshots
                     SET current_version = @Version,
                         created_at = GETDATE(),
                         created_user = @UserName
@@ -548,7 +544,7 @@ namespace backend.Models.Repository
                 END
                 ELSE
                 BEGIN
-                    INSERT INTO plan_version_snapshot (year, month, current_version, created_at, created_user)
+                    INSERT INTO dbo.t_plan_version_snapshots (year, month, current_version, created_at, created_user)
                     VALUES (@Year, @Month, @Version, GETDATE(), @UserName);
                 END;
             ";
@@ -572,14 +568,14 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     SELECT TOP 1
-                        date,
-                        content_type_id,
-                        company,
-                        vol,
-                        time,
-                        version,
-                        '' AS note_text
-                    FROM t_plan
+                        date AS Date,
+                        content_type_id AS ContentTypeId,
+                        company AS Company,
+                        vol AS Vol,
+                        time AS Time,
+                        version AS Version,
+                        '' AS NoteText
+                    FROM dbo.t_plans
                     WHERE 
                         date = @Date
                         AND content_type_id = @ContentTypeId
@@ -602,7 +598,7 @@ namespace backend.Models.Repository
         public void CopyVersionZeroToVersionOne(IDbConnection db, IDbTransaction tran, int year, int month, string userName)
         {
             string sql = @"
-                INSERT INTO t_plan (date, content_type_id, company, vol, time, version, is_active, created_at, created_user, updated_at, updated_user)
+                INSERT INTO dbo.t_plans (date, content_type_id, company, vol, time, version, created_at, created_user, updated_at, updated_user)
                 SELECT 
                     date,
                     content_type_id,
@@ -610,17 +606,15 @@ namespace backend.Models.Repository
                     vol,
                     time,
                     1 AS version,
-                    is_active,
                     GETDATE() AS created_at,
                     @UserName AS created_user,
                     GETDATE() AS updated_at,
                     @UserName AS updated_user
-                FROM t_plan
+                FROM dbo.t_plans
                 WHERE 
                     YEAR(date) = @Year
                     AND MONTH(date) = @Month
-                    AND version = 0
-                    AND is_active = 1;
+                    AND version = 0;
             ";
 
             db.Execute(sql, new
@@ -632,33 +626,72 @@ namespace backend.Models.Repository
         }
 
         //------------------------------------------------------------------------------------------
-        // 指定バージョンの全レコードを取得
-        //（デバッグ・検証用の補助API）
+        // 指定バージョン以下の最大バージョンのレコードを取得
+        //（version=0で作成後、バージョンを切って更新すると、更新されたレコードのみ新しいバージョンが作成されるため、
+        //  指定バージョン以下の最大バージョンを取得する必要がある）
         //------------------------------------------------------------------------------------------
-        public List<PlanRecordDto> GetPlanRecordsByVersion(int year, int month, int version)
+        public List<PlanRecordDto> GetPlanRecordsByVersion(int year, int month, int targetVersion)
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
+                    WITH latest_plan AS (
+                        -- 指定バージョン以下の最大バージョンのt_plansを取得
+                        SELECT 
+                            p.date,
+                            p.content_type_id,
+                            p.company,
+                            p.vol,
+                            p.time,
+                            p.version
+                        FROM dbo.t_plans p
+                        INNER JOIN (
+                            SELECT 
+                                date,
+                                content_type_id,
+                                MAX(version) AS max_version
+                            FROM dbo.t_plans
+                            WHERE version <= @TargetVersion
+                            GROUP BY date, content_type_id
+                        ) max_p ON p.date = max_p.date 
+                               AND p.content_type_id = max_p.content_type_id 
+                               AND p.version = max_p.max_version
+                    ),
+                    latest_note AS (
+                        -- 指定バージョン以下の最大バージョンのt_notesを取得
+                        SELECT 
+                            n.note_date,
+                            n.note_text
+                        FROM dbo.t_notes n
+                        INNER JOIN (
+                            SELECT 
+                                note_date,
+                                MAX(version) AS max_version
+                            FROM dbo.t_notes
+                            WHERE version <= @TargetVersion
+                            GROUP BY note_date
+                        ) max_n ON n.note_date = max_n.note_date 
+                              AND n.version = max_n.max_version
+                    )
                     SELECT
-                        p.date,
-                        p.content_type_id,
-                        p.company,
-                        p.vol,
-                        p.time,
-                        p.version,
-                        COALESCE(n.note_text, '') AS note_text
-                    FROM t_plan p
-                    LEFT JOIN note n ON n.note_date = p.date
+                        COALESCE(p.date, n.note_date) AS Date,
+                        p.content_type_id AS ContentTypeId,
+                        p.company AS Company,
+                        p.vol AS Vol,
+                        p.time AS Time,
+                        p.version AS Version,
+                        COALESCE(n.note_text, '') AS NoteText
+                    FROM latest_plan p
+                    FULL OUTER JOIN latest_note n ON n.note_date = p.date
                     WHERE 
-                        YEAR(p.date) = @Year
-                        AND MONTH(p.date) = @Month
-                        AND p.version = @Version
-                        AND p.is_active = 1
-                    ORDER BY p.date, p.content_type_id;
+                        YEAR(COALESCE(p.date, n.note_date)) = @Year
+                        AND MONTH(COALESCE(p.date, n.note_date)) = @Month
+                    ORDER BY 
+                        COALESCE(p.date, n.note_date),
+                        p.content_type_id;
                 ";
 
-                return db.Query<PlanRecordDto>(sql, new { Year = year, Month = month, Version = version }).ToList();
+                return db.Query<PlanRecordDto>(sql, new { TargetVersion = targetVersion, Year = year, Month = month }).ToList();
             }
         }
 
@@ -669,7 +702,7 @@ namespace backend.Models.Repository
         public void CopyVersionToNextVersion(IDbConnection db, IDbTransaction tran, int year, int month, int currentVersion, int nextVersion, string userName)
         {
             string sql = @"
-                INSERT INTO t_plan (date, content_type_id, company, vol, time, version, is_active, created_at, created_user, updated_at, updated_user)
+                INSERT INTO dbo.t_plans (date, content_type_id, company, vol, time, version, created_at, created_user, updated_at, updated_user)
                 SELECT 
                     date,
                     content_type_id,
@@ -677,17 +710,15 @@ namespace backend.Models.Repository
                     vol,
                     time,
                     @NextVersion AS version,
-                    is_active,
                     GETDATE() AS created_at,
                     @UserName AS created_user,
                     GETDATE() AS updated_at,
                     @UserName AS updated_user
-                FROM t_plan
+                FROM dbo.t_plans
                 WHERE 
                     YEAR(date) = @Year
                     AND MONTH(date) = @Month
-                    AND version = @CurrentVersion
-                    AND is_active = 1;
+                    AND version = @CurrentVersion;
             ";
 
             db.Execute(sql, new
@@ -712,13 +743,12 @@ namespace backend.Models.Repository
                     SELECT DISTINCT
                         YEAR(date) AS Year,
                         MONTH(date) AS Month
-                    FROM t_plan
-                    WHERE is_active = 1
+                    FROM dbo.t_plans
                     UNION
                     SELECT DISTINCT
                         YEAR(note_date) AS Year,
                         MONTH(note_date) AS Month
-                    FROM note
+                    FROM dbo.t_notes
                     ORDER BY Year DESC, Month DESC;
                 ";
 
@@ -735,12 +765,12 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     SELECT 
-                        Id,
-                        ContentTypeId,
-                        DayType,
-                        DefTime
-                    FROM ContentTypeDefaultTime
-                    ORDER BY ContentTypeId, DayType;
+                        id AS Id,
+                        content_type_id AS ContentTypeId,
+                        day_type AS DayType,
+                        def_time AS DefTime
+                    FROM dbo.m_content_type_default_time
+                    ORDER BY content_type_id, day_type;
                 ";
 
                 return db.Query<ContentTypeDefaultTimeDto>(sql).ToList();
@@ -756,11 +786,11 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     SELECT 
-                        Id,
-                        ContentTypeId,
-                        DefVol
-                    FROM ContentTypeDefaultVol
-                    ORDER BY ContentTypeId;
+                        id AS Id,
+                        content_type_id AS ContentTypeId,
+                        def_vol AS DefVol
+                    FROM dbo.m_content_type_default_vol
+                    ORDER BY content_type_id;
                 ";
 
                 return db.Query<ContentTypeDefaultVolDto>(sql).ToList();

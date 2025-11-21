@@ -14,13 +14,19 @@ namespace backend.Controllers
         private readonly PlanService _service = new PlanService();
 
         //------------------------------------------------------------------------------
-        // 最新のPlanデータ取得API
+        // Planデータ取得API（バージョン指定、バージョンが指定されない場合は最新バージョンを取得）
         //------------------------------------------------------------------------------
         [HttpGet]
         [Route("api/plan")]
-        public IHttpActionResult GetPlan(int year, int month)
+        public IHttpActionResult GetPlan(int year, int month, int? version = null)
         {
-            var data = _service.GetPlanData(year, month);
+            // バージョンが指定されていない場合は最新バージョンを取得
+            if (version == null)
+            {
+                var versions = _service.GetAvailableVersions(year, month);
+                version = versions.Count > 0 ? versions.Max() : 0;
+            }
+            var data = _service.GetPlanData(year, month, version.Value);
             return Ok(data);
         }
 
@@ -122,7 +128,7 @@ namespace backend.Controllers
         [Route("api/plan/history")]
         public IHttpActionResult GetPlanHistory(int year, int month, int version)
         {
-            var data = _service.GetPlanHistoryData(version, year, month);
+            var data = _service.GetPlanData(year, month, version);
             return Ok(data);
         }
     }

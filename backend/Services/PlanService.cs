@@ -17,39 +17,39 @@ namespace backend.Services
         private readonly PlanRepository _repository = new PlanRepository();
 
         //---------------------------------------------------------------------
-        // Planデータの取得（最新のバージョン）
+        // Planデータの取得（バージョン指定）
         //---------------------------------------------------------------------
-        public List<TestPlanDto> GetPlanData(int year, int month)
+        public List<TestPlanDto> GetPlanData(int year, int month, int version)
         {
-            // 生データ取得
-            var rawData = _repository.GetAllPlanRecords(year, month);
+            // バージョン指定で生データ取得
+            var rawData = _repository.GetPlanRecordsByVersion(year, month, version);
 
             // content_type テーブルから全タイプを取得
             var allContentTypes = _repository.GetAllContentTypes(); // List<ContentTypeDto> の想定
 
             // 日付ごとにグループ化
             var grouped = rawData
-                .GroupBy(r => r.date)
+                .GroupBy(r => r.Date)
                 .Select(g =>
                 {
                     // すべての contentType をまず 0 初期化で作る
                     var contentTypeDict = allContentTypes
-                        .GroupBy(ct => ct.content_type_id)
+                        .GroupBy(ct => ct.ContentTypeId)
                         .Select(grp => grp.First())
                         .ToDictionary(
-                            ct => ct.content_type_id,
+                            ct => ct.ContentTypeId,
                             ct => new TestItem { Company = null, Vol = null, Time = null, Version = 0 }
                         );
 
                     // 実際のデータで上書き
                     foreach (var record in g)
                     {
-                        contentTypeDict[record.content_type_id] = new TestItem
+                        contentTypeDict[record.ContentTypeId] = new TestItem
                         {
-                            Company = record.company,
-                            Vol = record.vol,
-                            Time = record.time.HasValue ? record.time.Value.ToString(@"hh\:mm") : null,
-                            Version = record.version
+                            Company = record.Company,
+                            Vol = record.Vol,
+                            Time = record.Time.HasValue ? record.Time.Value.ToString(@"hh\:mm") : null,
+                            Version = record.Version
                         };
                     }
 
@@ -57,7 +57,7 @@ namespace backend.Services
                     {
                         Date = g.Key.ToString("yyyy-MM-dd"),
                         ContentType = contentTypeDict,
-                        Note = g.FirstOrDefault()?.note_text ?? "",
+                        Note = g.FirstOrDefault()?.NoteText ?? "",
                     };
                 })
                 .ToList();
@@ -66,60 +66,6 @@ namespace backend.Services
         }
 
 
-        //---------------------------------------------------------------------
-        // バージョニングされたPlanデータの取得
-        //---------------------------------------------------------------------
-        public List<TestPlanHistoryDto> GetPlanHistoryData(int targetVersion, int year, int month)
-        {
-            // バージョン指定で履歴付きデータを取得
-            var rawData = _repository.GetPlanHistory(targetVersion, year, month);
-
-            // content_type テーブルから全タイプを取得
-            var allContentTypes = _repository.GetAllContentTypes();
-
-            // 日付ごとにグループ化
-            var grouped = rawData
-                .GroupBy(r => r.date)
-                .Select(g =>
-                {
-                    // すべての contentType をまず初期化（変更フラグも追加）
-                    var contentTypeDict = allContentTypes
-                        .GroupBy(ct => ct.content_type_id)
-                        .Select(grp => grp.First())
-                        .ToDictionary(
-                            ct => ct.content_type_id,
-                            ct => new TestItemHistory
-                            {
-                                Company = null,
-                                Vol = null,
-                                Time = null,
-                                IsChanged = false
-                            }
-                        );
-
-                    // 実際のデータで上書き
-                    foreach (var record in g)
-                    {
-                        contentTypeDict[record.content_type_id] = new TestItemHistory
-                        {
-                            Company = record.company,
-                            Vol = record.vol,
-                            Time = record.Time.HasValue ? record.Time.Value.ToString(@"hh\:mm") : null,
-                            IsChanged = record.is_changed
-                        };
-                    }
-
-                    return new TestPlanHistoryDto
-                    {
-                        Date = g.Key.ToString("yyyy-MM-dd"),
-                        ContentType = contentTypeDict,
-                        Note = g.FirstOrDefault()?.note_text ?? "",
-                    };
-                })
-                .ToList();
-
-            return grouped;
-        }
 
         //---------------------------------------------------------------------
         // ContentTypeをすべて取得
@@ -133,8 +79,8 @@ namespace backend.Services
                 {
                     return new ContentTypeListDto
                     {
-                        ContentTypeId = a.content_type_id,
-                        ContentName = a.content_name
+                        ContentTypeId = a.ContentTypeId,
+                        ContentName = a.ContentName
                     };
                 }).
                 ToList();
@@ -174,10 +120,10 @@ namespace backend.Services
             // plan_version_snapshotからcurrent_versionを取得
             int? currentVersion = _repository.GetCurrentVersion(year, month);
 
-            // current_versionが存在しない場合は空のリストを返す
+            // current_versionが存在しない場合は0のみを返す
             if (currentVersion == null)
             {
-                return new List<int>();
+                return new List<int> { 0 };
             }
 
             // current_versionから0までの連続したバージョンリストを生成（降順）
@@ -246,21 +192,21 @@ namespace backend.Services
 
         bool IsSame(PlanRecordDto existing, TestItem newItem)
         {
-            string existingTimeStr = existing.time.HasValue
-                ? existing.time.Value.ToString(@"hh\:mm")
+            string existingTimeStr = existing.Time.HasValue
+                ? existing.Time.Value.ToString(@"hh\:mm")
                 : null;
 
-            return existing.company == newItem.Company
-                && existing.vol == newItem.Vol
+            return existing.Company == newItem.Company
+                && existing.Vol == newItem.Vol
                 && existingTimeStr == newItem.Time;
         }
 
         private bool IsEmptyPlan(PlanRecordDto plan)
         {
             // すべての主要カラムが NULL または空の場合に「空データ」と判定
-            return plan?.company == null
-                && plan?.vol == null
-                && plan?.time == null;
+            return plan?.Company == null
+                && plan?.Vol == null
+                && plan?.Time == null;
         }
 
         //---------------------------------------------------------------------
@@ -315,10 +261,9 @@ namespace backend.Services
                         int targetVersion = currentVersion ?? 0;
 
                         //---------------------------------------------------------------
-                        // この月に存在する既存データ（最新version）を取得
-                        // 注意: latest を基準に existingIds を推定する（ver>=1 で version=0 のみ存在してもOK）
+                        // この月に存在する既存データ（指定バージョン）を取得
                         //---------------------------------------------------------------
-                        var existingAll = _repository.GetAllPlanRecords(year, month);
+                        var existingAll = _repository.GetPlanRecordsByVersion(year, month, targetVersion);
 
                         // リクエストに含まれる日付の一覧を取得
                         var requestedDates = plans
@@ -328,7 +273,7 @@ namespace backend.Services
 
                         // 既存データに存在する日付の一覧を取得
                         var existingDates = existingAll
-                            .Select(x => x.date.Date)
+                            .Select(x => x.Date.Date)
                             .Distinct()
                             .ToList();
 
@@ -342,11 +287,11 @@ namespace backend.Services
                         {
                             DateTime date = DateTime.Parse(plan.Date);
                             var existingPlans = existingAll
-                                .Where(x => x.date.Date == date)
+                                .Where(x => x.Date.Date == date)
                                 .ToList();
 
                             var newIds = plan.ContentType.Keys.ToList();
-                            var existingIds = existingPlans.Select(x => x.content_type_id).ToList();
+                            var existingIds = existingPlans.Select(x => x.ContentTypeId).ToList();
 
                             // 新規または更新処理
                             foreach (var id in newIds)
@@ -354,11 +299,11 @@ namespace backend.Services
                                 var newItem = plan.ContentType[id];
                                 
                                 // 既存の最新versionのデータを取得（比較用）
-                                var existingLatest = existingPlans.FirstOrDefault(e => e.content_type_id == id);
+                                var existingLatest = existingPlans.FirstOrDefault(e => e.ContentTypeId == id);
                                 
                                 // 指定バージョンのレコードが存在するかチェック
                                 // existingLatest が null でない かつ version が targetVersion と一致する場合に存在
-                                bool existsAtTarget = existingLatest != null && existingLatest.version == targetVersion;
+                                bool existsAtTarget = existingLatest != null && existingLatest.Version == targetVersion;
 
                                 if (targetVersion == 0)
                                 {
@@ -437,7 +382,7 @@ namespace backend.Services
                             // 削除処理（既存にあって新にない）
                             foreach (var id in existingIds.Except(newIds))
                             {
-                                var existing = existingPlans.FirstOrDefault(e => e.content_type_id == id);
+                                var existing = existingPlans.FirstOrDefault(e => e.ContentTypeId == id);
 
                                 // すでに空データならスキップ
                                 if (IsEmptyPlan(existing))
@@ -445,7 +390,7 @@ namespace backend.Services
 
                                 // 指定バージョンのレコードが存在するかチェック
                                 // existing が null でない かつ version が targetVersion と一致する場合に存在
-                                bool existsAtTarget = existing != null && existing.version == targetVersion;
+                                bool existsAtTarget = existing != null && existing.Version == targetVersion;
 
                                 if (targetVersion == 0)
                                 {
@@ -494,7 +439,7 @@ namespace backend.Services
                             }
 
                             // Noteの更新処理（バージョン管理対応）
-                            string existingNote = existingPlans.FirstOrDefault()?.note_text ?? "";
+                            string existingNote = existingPlans.FirstOrDefault()?.NoteText ?? "";
                             string newNote = plan.Note ?? "";
                             
                             // Noteが変更されている場合のみ処理
@@ -556,11 +501,11 @@ namespace backend.Services
                         foreach (var dateToDelete in datesToDelete)
                         {
                             var existingPlansForDate = existingAll
-                                .Where(x => x.date.Date == dateToDelete)
+                                .Where(x => x.Date.Date == dateToDelete)
                                 .ToList();
 
                             // その日付のNoteを取得
-                            string existingNoteForDate = existingPlansForDate.FirstOrDefault()?.note_text ?? "";
+                            string existingNoteForDate = existingPlansForDate.FirstOrDefault()?.NoteText ?? "";
                             
                             // Noteの削除処理（バージョン管理対応）
                             if (!string.IsNullOrEmpty(existingNoteForDate))
@@ -599,14 +544,14 @@ namespace backend.Services
 
                                 // 指定バージョンのレコードが存在するかチェック
                                 // existing の version が targetVersion と一致する場合に存在
-                                bool existsAtTarget = existing.version == targetVersion;
+                                bool existsAtTarget = existing.Version == targetVersion;
 
                                 if (targetVersion == 0)
                                 {
                                     // version=0 期間：DELETE処理（物理削除）
                                     if (existsAtTarget)
                                     {
-                                        _repository.DeletePlan(db, tran, dateToDelete, existing.content_type_id, targetVersion);
+                                        _repository.DeletePlan(db, tran, dateToDelete, existing.ContentTypeId, targetVersion);
                                     }
                                 }
                                 else
@@ -620,14 +565,14 @@ namespace backend.Services
                                         if (existsAtTarget)
                                         {
                                             var emptyItem = new TestItem { Company = null, Vol = null, Time = null };
-                                            _repository.UpdatePlan(db, tran, dateToDelete, existing.content_type_id, emptyItem, targetVersion);
+                                            _repository.UpdatePlan(db, tran, dateToDelete, existing.ContentTypeId, emptyItem, targetVersion);
                                         }
                                         else
                                         {
                                             var planEntity = new PlanEntity
                                             {
                                                 Date = dateToDelete,
-                                                ContentTypeId = existing.content_type_id,
+                                                ContentTypeId = existing.ContentTypeId,
                                                 Company = null,
                                                 Vol = null,
                                                 Time = null,

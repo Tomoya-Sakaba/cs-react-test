@@ -19,9 +19,9 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    INSERT INTO dbo.Reports (
-                        ReportNo, Title, Content, 
-                        Created_At, Created_User, Updated_At, Updated_User
+                    INSERT INTO dbo.t_reports (
+                        report_no, title, content, 
+                        created_at, created_user, updated_at, updated_user
                     )
                     VALUES (
                         @ReportNo, @Title, @Content,
@@ -37,10 +37,10 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    UPDATE dbo.Reports
-                    SET Title = @Title, Content = @Content,
-                        Updated_At = GETDATE(), Updated_User = @UpdatedUser
-                    WHERE ReportNo = @ReportNo";
+                    UPDATE dbo.t_reports
+                    SET title = @Title, content = @Content,
+                        updated_at = GETDATE(), updated_user = @UpdatedUser
+                    WHERE report_no = @ReportNo";
                 db.Execute(sql, report);
             }
         }
@@ -51,11 +51,17 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    SELECT Id, ReportNo, Title, Content,
-                           Created_At AS CreatedAt, Created_User AS CreatedUser,
-                           Updated_At AS UpdatedAt, Updated_User AS UpdatedUser
-                    FROM dbo.Reports
-                    WHERE ReportNo = @ReportNo";
+                    SELECT 
+                        id AS Id,
+                        report_no AS ReportNo,
+                        title AS Title,
+                        content AS Content,
+                        created_at AS CreatedAt,
+                        created_user AS CreatedUser,
+                        updated_at AS UpdatedAt,
+                        updated_user AS UpdatedUser
+                    FROM dbo.t_reports
+                    WHERE report_no = @ReportNo";
                 return db.QueryFirstOrDefault<ReportEntity>(sql, new { ReportNo = reportNo });
             }
         }
@@ -66,11 +72,17 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    SELECT Id, ReportNo, Title, Content,
-                           Created_At AS CreatedAt, Created_User AS CreatedUser,
-                           Updated_At AS UpdatedAt, Updated_User AS UpdatedUser
-                    FROM dbo.Reports
-                    WHERE Id = @Id";
+                    SELECT 
+                        id AS Id,
+                        report_no AS ReportNo,
+                        title AS Title,
+                        content AS Content,
+                        created_at AS CreatedAt,
+                        created_user AS CreatedUser,
+                        updated_at AS UpdatedAt,
+                        updated_user AS UpdatedUser
+                    FROM dbo.t_reports
+                    WHERE id = @Id";
                 return db.QueryFirstOrDefault<ReportEntity>(sql, new { Id = id });
             }
         }
@@ -81,11 +93,17 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    SELECT Id, ReportNo, Title, Content,
-                           Created_At AS CreatedAt, Created_User AS CreatedUser,
-                           Updated_At AS UpdatedAt, Updated_User AS UpdatedUser
-                    FROM dbo.Reports
-                    ORDER BY Created_At DESC";
+                    SELECT 
+                        id AS Id,
+                        report_no AS ReportNo,
+                        title AS Title,
+                        content AS Content,
+                        created_at AS CreatedAt,
+                        created_user AS CreatedUser,
+                        updated_at AS UpdatedAt,
+                        updated_user AS UpdatedUser
+                    FROM dbo.t_reports
+                    ORDER BY created_at DESC";
                 return db.Query<ReportEntity>(sql).ToList();
             }
         }
@@ -97,8 +115,8 @@ namespace backend.Models.Repository
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
-                    DELETE FROM dbo.Reports
-                    WHERE ReportNo = @ReportNo";
+                    DELETE FROM dbo.t_reports
+                    WHERE report_no = @ReportNo";
                 db.Execute(sql, new { ReportNo = reportNo });
             }
         }
@@ -110,8 +128,8 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     SELECT COUNT(1)
-                    FROM dbo.Reports
-                    WHERE ReportNo = @ReportNo";
+                    FROM dbo.t_reports
+                    WHERE report_no = @ReportNo";
                 return db.QuerySingle<int>(sql, new { ReportNo = reportNo }) > 0;
             }
         }
