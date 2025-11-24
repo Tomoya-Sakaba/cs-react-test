@@ -484,7 +484,7 @@ const AgTest = () => {
       }
 
       // 上程中は承認者のみが編集可能
-      if (!canEdit()) {
+      if (!canEdit()) { // useApproval: 編集可能かどうか判定
         alert('上程中です。承認者のみが編集できます。');
         return;
       }
@@ -682,6 +682,7 @@ const AgTest = () => {
   //---------------------------------------------------------------------------
   // 上程関連（useApproval hookを使用）
   //---------------------------------------------------------------------------
+  const reportNo = `計画${currentYear}-${currentIndexMonth + 1}`;
   const {
     approvalStatus,
     canEdit,
@@ -689,12 +690,14 @@ const AgTest = () => {
     isDrawerOpen,
     setIsDrawerOpen,
     refresh: refreshApprovalStatus,
+    getApprovalFlowDirection,
   } = useApproval({
-    pageCode: 1, // 複数レコード型ページ（計画書ページ）
     year: currentYear,
     month: currentIndexMonth + 1,
+    reportNo: reportNo, // ページ固有のreportNo（year-month形式）
     autoFetch: true,
   });
+
 
   // 上程状態をチェック（承認者のみが操作可能かどうか）
   const checkCanEdit = (): boolean => {
@@ -703,10 +706,10 @@ const AgTest = () => {
       return true;
     }
     // 完了済みの場合は編集不可
-    if (isCompleted()) {
+    if (isCompleted()) { // useApproval: 完了しているか判定
       return false;
     }
-    return canEdit();
+    return canEdit(); // useApproval: 編集可能かどうか判定
   };
 
   //---------------------------------------------------------------------------
@@ -753,30 +756,56 @@ const AgTest = () => {
             </button>
             <button
               className="h-full w-32 rounded-lg bg-orange-500 px-4 py-2 text-sm text-white hover:bg-orange-600"
-              onClick={() => setIsDrawerOpen(true)}
+              onClick={() => setIsDrawerOpen(true)} // useApproval: Drawerの開閉状態を設定
             >
               上程
             </button>
 
             {/* 上程状態表示（上程ボタンの右側） */}
-            {approvalStatus.length > 0 && (
-              <div className="flex items-center rounded-lg border-2 border-orange-500 bg-orange-50 px-3 py-2">
-                {isCompleted() ? (
-                  <div className="text-sm font-bold text-green-700">
-                    承認済み
-                  </div>
-                ) : (
-                  <div className="text-sm font-bold text-orange-700">
-                    上程中 -{' '}
-                    {approvalStatus
-                      .filter((a) => a.status === 1 || a.status === 6)
-                      .map((a) => a.userName)
-                      .join(', ')}{' '}
-                    が承認待ち
-                  </div>
-                )}
-              </div>
-            )}
+            {approvalStatus.length > 0 && (() => {
+              const flowDirection = getApprovalFlowDirection();
+              return (
+                <div className="flex flex-col rounded-lg border-2 border-orange-500 bg-orange-50 px-3 py-2">
+                  {flowDirection.action === '完了' ? (
+                    <div className="text-sm font-bold text-green-700">
+                      承認完了
+                    </div>
+                  ) : flowDirection.action === '差し戻し' ? (
+                    <>
+                      <div className="text-sm font-bold text-red-700">
+                        {flowDirection.flow.join(' → ')}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-red-600">
+                        <span>差戻</span>
+                        {flowDirection.actionDate && (
+                          <span>
+                            ({new Date(flowDirection.actionDate).toLocaleString('ja-JP')})
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : flowDirection.flow.length > 0 ? (
+                    <>
+                      <div className="text-sm font-bold text-orange-700">
+                        {flowDirection.flow.join(' → ')}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-orange-600">
+                        <span>上程中</span>
+                        {flowDirection.actionDate && (
+                          <span>
+                            ({new Date(flowDirection.actionDate).toLocaleString('ja-JP')})
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm font-bold text-orange-700">
+                      上程中
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div>
@@ -924,13 +953,13 @@ const AgTest = () => {
         )}
 
         {/* 上程Drawer（開いている時のみレンダリング） */}
-        {isDrawerOpen && (
+        {isDrawerOpen && ( // useApproval: Drawerの開閉状態を取得
           <ApprovalDrawer
-            onClose={() => setIsDrawerOpen(false)}
-            pageCode={1} // 複数レコード型ページ（計画書ページ）
+            onClose={() => setIsDrawerOpen(false)} // useApproval: Drawerの開閉状態を設定
             year={currentYear}
             month={currentIndexMonth + 1}
-            onApprovalChange={refreshApprovalStatus}
+            reportNo={reportNo}
+            onApprovalChange={refreshApprovalStatus} // useApproval: 上程状態を再取得
           />
         )}
 

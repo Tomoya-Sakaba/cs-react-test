@@ -35,8 +35,8 @@ namespace backend.Services
                 throw new ArgumentException("リクエストが無効です。");
             }
 
-            // PageCode=2（1レコード型）の場合はReportNo必須、PageCode=1（複数レコード型）の場合はReportNo不要
-            if (request.PageCode == 2 && string.IsNullOrEmpty(request.ReportNo))
+            // ReportNoは必須
+            if (string.IsNullOrEmpty(request.ReportNo))
             {
                 throw new ArgumentException("報告書Noが必要です。");
             }
@@ -46,14 +46,10 @@ namespace backend.Services
                 throw new ArgumentException("承認者を1人以上選択してください。");
             }
 
-            // PageCode=1（複数レコード型）の場合はReportNoをnullまたは空文字列に設定
-            string reportNo = request.PageCode == 1 ? null : request.ReportNo;
-
             // 上程者のレコードを作成（FlowOrder=0, Status=0）
             var submitterApproval = new ApprovalEntity
             {
-                PageCode = request.PageCode,
-                ReportNo = reportNo,
+                ReportNo = request.ReportNo,
                 Year = request.Year,
                 Month = request.Month,
                 UserName = request.SubmitterName,
@@ -64,13 +60,13 @@ namespace backend.Services
             };
             _repository.AddApproval(submitterApproval);
 
-            // 承認者のレコードを作成（FlowOrder=1,2,3..., Status=1）
+            // 承認者のレコードを作成（すべてStatus=1: 承認待ち）
+            // 承認フローを順番通りに進めるため、最小FlowOrderの承認者のみが承認可能
             for (int i = 0; i < request.ApproverNames.Length; i++)
             {
                 var approverApproval = new ApprovalEntity
                 {
-                    PageCode = request.PageCode,
-                    ReportNo = reportNo,
+                    ReportNo = request.ReportNo,
                     Year = request.Year,
                     Month = request.Month,
                     UserName = request.ApproverNames[i],
@@ -82,20 +78,27 @@ namespace backend.Services
                 _repository.AddApproval(approverApproval);
             }
 
-            // メールログを記録
-            WriteMailLog(request.SubmitterName, request.ApproverNames, request.Comment, "新規上程");
+            // 最初の承認者（最小FlowOrder）にメールを送信
+            if (request.ApproverNames.Length > 0)
+            {
+                WriteMailLog(
+                    request.SubmitterName, // 送信者：上程者
+                    new[] { request.ApproverNames[0] }, // 宛先：最初の承認者
+                    request.Comment, // コメント
+                    "新規上程"
+                );
+            }
         }
 
         //---------------------------------------------------------------------
-        // PageCode、報告書No、年、月で上程データを取得
+        // 報告書No、年、月で上程データを取得
         //---------------------------------------------------------------------
-        public List<ApprovalDto> GetApprovalsByReport(int pageCode, string reportNo, int year, int month)
+        public List<ApprovalDto> GetApprovalsByReport(string reportNo, int year, int month)
         {
-            var entities = _repository.GetApprovalsByReport(pageCode, reportNo, year, month);
+            var entities = _repository.GetApprovalsByReport(reportNo, year, month);
             return entities.Select(e => new ApprovalDto
             {
                 Id = e.Id,
-                PageCode = e.PageCode,
                 ReportNo = e.ReportNo,
                 Year = e.Year,
                 Month = e.Month,
@@ -118,7 +121,6 @@ namespace backend.Services
             return entities.Select(e => new ApprovalDto
             {
                 Id = e.Id,
-                PageCode = e.PageCode,
                 ReportNo = e.ReportNo,
                 Year = e.Year,
                 Month = e.Month,
@@ -136,16 +138,15 @@ namespace backend.Services
         // 承認アクション（承認または差し戻し）
         // 
         // 承認処理：
-        // 1. 承認待ち（Status=1）または承認スキップ（Status=6）の場合のみ承認可能
+        // 1. 承認待ち（Status=1）の場合のみ承認可能（順番通りに承認する必要がある）
         // 2. 最後の承認者の場合、Status=5（完了）に変更
         // 3. それ以外の場合、Status=2（承認済み）に変更
-        // 4. 承認した承認者より前の承認待ち（Status=1）を承認スキップ（Status=6）に変更
+        // 4. 次の承認者（FlowOrderが1つ大きい）をStatus=1（承認待ち）に変更し、メールを送信
         // 
         // 差し戻し処理：
-        // 1. 承認待ち（Status=1）または承認スキップ（Status=6）の場合のみ差し戻し可能
+        // 1. 承認待ち（Status=1）の場合のみ差し戻し可能（順番通りに承認する必要がある）
         // 2. 差し戻しした承認者のStatusを3（差し戻し）に変更
         // 3. 差し戻しした承認者より後の承認待ち（Status=1）を削除
-        // 4. 差し戻しした承認者より前の承認待ち（Status=1）を承認スキップ（Status=6）に変更
         //---------------------------------------------------------------------
         public void ProcessApprovalAction(ApprovalActionRequest request)
         {
@@ -154,18 +155,14 @@ namespace backend.Services
                 throw new ArgumentException("リクエストが無効です。");
             }
 
-            // 現在の承認レコードを取得（PageCodeは既存レコードから取得）
-            // まず既存のレコードを取得してPageCodeを特定
-            var tempApprovals = _repository.GetApprovalsByReport(1, null, request.Year, request.Month)
-                .Concat(_repository.GetApprovalsByReport(2, request.ReportNo ?? string.Empty, request.Year, request.Month))
-                .ToList();
-            var targetApproval = tempApprovals.FirstOrDefault(a => a.Id == request.Id);
-            if (targetApproval == null)
+            // ReportNoは必須
+            if (string.IsNullOrEmpty(request.ReportNo))
             {
-                throw new ArgumentException("承認レコードが見つかりません。");
+                throw new ArgumentException("報告書Noが必要です。");
             }
-            int pageCode = targetApproval.PageCode;
-            var allApprovals = _repository.GetApprovalsByReport(pageCode, request.ReportNo, request.Year, request.Month);
+
+            // 現在の承認レコードを取得（reportNo、year、monthで取得）
+            var allApprovals = _repository.GetApprovalsByReport(request.ReportNo, request.Year, request.Month);
             var currentApproval = allApprovals.FirstOrDefault(a => a.Id == request.Id);
 
             if (currentApproval == null)
@@ -178,10 +175,22 @@ namespace backend.Services
                 throw new UnauthorizedAccessException("この承認はあなたのものではありません。");
             }
 
-            // 承認待ち（Status=1）または承認スキップ（Status=6）の場合のみ承認可能
-            if (currentApproval.Status != 1 && currentApproval.Status != 6)
+            // 承認待ち（Status=1）の場合のみ承認可能
+            if (currentApproval.Status != 1)
             {
-                throw new InvalidOperationException("承認待ちまたは承認スキップの状態ではありません。");
+                throw new InvalidOperationException("承認待ちの状態ではありません。");
+            }
+
+            // 順番通りに承認する必要がある：最小FlowOrderの承認待ち（Status=1）の承認者のみ承認可能
+            var minPendingFlowOrder = allApprovals
+                .Where(a => a.FlowOrder > 0 && a.Status == 1)
+                .Select(a => a.FlowOrder)
+                .DefaultIfEmpty(int.MaxValue)
+                .Min();
+
+            if (currentApproval.FlowOrder != minPendingFlowOrder)
+            {
+                throw new InvalidOperationException("順番通りに承認してください。先に前の承認者の承認が必要です。");
             }
 
             if (request.Action == "approve")
@@ -205,18 +214,23 @@ namespace backend.Services
                 currentApproval.ActionDate = DateTime.Now;
                 _repository.UpdateApproval(currentApproval);
 
-                // 承認した承認者より前の承認待ち（Status=1）の承認者を承認スキップ（Status=6）に変更
-                // これにより、後続の承認者が承認したため、前の承認待ちがスキップされたことを明確にする
-                var pendingApprovalsBeforeApproval = allApprovals
-                    .Where(a => a.FlowOrder > 0 && 
-                                a.FlowOrder < currentApproval.FlowOrder && 
-                                a.Status == 1) // 承認待ちのみ
-                    .ToList();
-
-                foreach (var pendingApproval in pendingApprovalsBeforeApproval)
+                // 最後の承認者でない場合、次の承認者（FlowOrderが1つ大きい）にメールを送信
+                // 次の承認者は既にStatus=1（承認待ち）で作成されているため、Status変更は不要
+                if (!isLastApprover)
                 {
-                    pendingApproval.Status = 6; // 承認スキップ
-                    _repository.UpdateApproval(pendingApproval);
+                    var nextApprover = allApprovals
+                        .FirstOrDefault(a => a.FlowOrder == currentApproval.FlowOrder + 1);
+                    
+                    if (nextApprover != null)
+                    {
+                        // 次の承認者にメールを送信
+                        WriteMailLog(
+                            request.UserName, // 送信者：承認した承認者
+                            new[] { nextApprover.UserName }, // 宛先：次の承認者
+                            request.Comment, // コメント
+                            "承認"
+                        );
+                    }
                 }
             }
             else if (request.Action == "reject")
@@ -238,20 +252,6 @@ namespace backend.Services
                     _repository.DeleteApproval(subsequentApproval.Id);
                 }
 
-                // 差し戻しした承認者より前の承認待ち（Status=1）の承認者を承認スキップ（Status=6）に変更
-                // これにより、後続の承認者が差し戻ししたため、前の承認待ちがスキップされたことを明確にする
-                var pendingApprovalsBeforeRejection = allApprovals
-                    .Where(a => a.FlowOrder > 0 && 
-                                a.FlowOrder < currentApproval.FlowOrder && 
-                                a.Status == 1) // 承認待ちのみ
-                    .ToList();
-
-                foreach (var pendingApproval in pendingApprovalsBeforeRejection)
-                {
-                    pendingApproval.Status = 6; // 承認スキップ
-                    _repository.UpdateApproval(pendingApproval);
-                }
-
                 // 差し戻し対象者（上程者、FlowOrder=0）のレコードを取得
                 var submitterApproval = allApprovals.FirstOrDefault(a => a.FlowOrder == 0);
                 if (submitterApproval != null)
@@ -259,7 +259,6 @@ namespace backend.Services
                     // 差し戻し対象者のレコードを作成（FlowOrder = 差し戻しした承認者のFlowOrder + 1）
                     var rejectionTargetApproval = new ApprovalEntity
                     {
-                        PageCode = submitterApproval.PageCode,
                         ReportNo = submitterApproval.ReportNo,
                         Year = submitterApproval.Year,
                         Month = submitterApproval.Month,
@@ -291,8 +290,8 @@ namespace backend.Services
         // 
         // 処理内容：
         // 1. 上程者（FlowOrder=0, Status=0）：全レコードを削除（上程を取り消し）
-        // 2. 再上程者（FlowOrder=rejectionTarget.flowOrder, Status=0）：Status=7（差し戻し対象）に戻す、その後のレコードを削除
-        // 3. 承認者（Status=2または3）：Status=1（承認待ち）に戻す、その後の承認者をStatus=6（承認スキップ）に戻す
+        // 2. 再上程者（FlowOrder > 0, Status=0）：Status=7（差し戻し対象）に戻す、その後のレコードを削除
+        // 注意：取り戻しができるのは上程者と再上程者のみ（承認者の取り戻しは不可）
         //---------------------------------------------------------------------
         public void RecallApproval(int approvalId, string userName)
         {
@@ -304,7 +303,6 @@ namespace backend.Services
             }
 
             var allApprovals = _repository.GetApprovalsByReport(
-                targetApproval.PageCode,
                 targetApproval.ReportNo,
                 targetApproval.Year,
                 targetApproval.Month
@@ -320,7 +318,6 @@ namespace backend.Services
             if (targetApproval.FlowOrder == 0 && targetApproval.Status == 0)
             {
                 _repository.DeleteApprovalsByReport(
-                    targetApproval.PageCode,
                     targetApproval.ReportNo,
                     targetApproval.Year,
                     targetApproval.Month
@@ -328,11 +325,10 @@ namespace backend.Services
                 return;
             }
 
-            // 再上程者（Status=0で、差し戻し対象レコードのFlowOrderと一致）の場合
-            var rejectionTarget = allApprovals.FirstOrDefault(a => a.Status == 7);
-            if (rejectionTarget != null && targetApproval.FlowOrder == rejectionTarget.FlowOrder && targetApproval.Status == 0)
+            // 再上程者（Status=0で、FlowOrder > 0）の場合
+            if (targetApproval.FlowOrder > 0 && targetApproval.Status == 0)
             {
-                // Status=7（差し戻し対象）に戻す
+                // 再上程レコードをStatus=7（差し戻し対象）に戻す
                 targetApproval.Status = 7;
                 targetApproval.Comment = null;
                 targetApproval.ActionDate = null;
@@ -350,37 +346,7 @@ namespace backend.Services
                 return;
             }
 
-            // 差し戻し（Status=3）は取り戻し不可
-            if (targetApproval.Status == 3)
-            {
-                throw new InvalidOperationException("差し戻しは取り戻しできません。");
-            }
-
-            // 承認者（Status=2）の場合
-            if (targetApproval.FlowOrder > 0 && targetApproval.Status == 2)
-            {
-                // Status=1（承認待ち）に戻す
-                targetApproval.Status = 1;
-                targetApproval.Comment = null;
-                targetApproval.ActionDate = null;
-                _repository.UpdateApproval(targetApproval);
-
-                // その後の承認者をStatus=6（承認スキップ）に戻す
-                var subsequentApprovals = allApprovals
-                    .Where(a => a.FlowOrder > targetApproval.FlowOrder && a.FlowOrder > 0)
-                    .ToList();
-
-                foreach (var subsequentApproval in subsequentApprovals)
-                {
-                    if (subsequentApproval.Status == 2)
-                    {
-                        subsequentApproval.Status = 6; // 承認スキップ
-                        _repository.UpdateApproval(subsequentApproval);
-                    }
-                }
-                return;
-            }
-
+            // それ以外（承認者、差し戻しなど）は取り戻し不可
             throw new InvalidOperationException("取り戻しできない状態です。");
         }
 
@@ -405,17 +371,17 @@ namespace backend.Services
                 throw new ArgumentException("リクエストが無効です。");
             }
 
-            // PageCode=2（1レコード型）の場合はReportNo必須、PageCode=1（複数レコード型）の場合はReportNo不要
-            if (request.PageCode == 2 && string.IsNullOrEmpty(request.ReportNo))
+            // ReportNoは必須
+            if (string.IsNullOrEmpty(request.ReportNo))
             {
                 throw new ArgumentException("報告書Noが必要です。");
             }
 
-            // PageCode=1（複数レコード型）の場合はReportNoをnullまたは空文字列に設定
-            string reportNo = request.PageCode == 1 ? null : request.ReportNo;
+            // ReportNoを使用
+            string reportNo = request.ReportNo;
 
             // 既存の上程データを取得
-            var existingApprovals = _repository.GetApprovalsByReport(request.PageCode, reportNo, request.Year, request.Month);
+            var existingApprovals = _repository.GetApprovalsByReport(reportNo, request.Year, request.Month);
             
             if (existingApprovals.Count == 0)
             {
@@ -451,13 +417,13 @@ namespace backend.Services
             rejectionTargetApproval.ActionDate = DateTime.Now;
             _repository.UpdateApproval(rejectionTargetApproval);
 
-            // 新しい承認者を追加
+            // 新しい承認者を追加（すべてStatus=1: 承認待ち）
+            // 承認フローを順番通りに進めるため、最小FlowOrderの承認者のみが承認可能
             int startApproverFlowOrder = rejectionTargetApproval.FlowOrder + 1;
             for (int i = 0; i < request.ApproverNames.Length; i++)
             {
                 var approverApproval = new ApprovalEntity
                 {
-                    PageCode = request.PageCode,
                     ReportNo = reportNo,
                     Year = request.Year,
                     Month = request.Month,
@@ -470,8 +436,16 @@ namespace backend.Services
                 _repository.AddApproval(approverApproval);
             }
 
-            // メールログを記録
-            WriteMailLog(request.SubmitterName, request.ApproverNames, request.Comment, "再上程");
+            // 最初の承認者（最小FlowOrder）にメールを送信
+            if (request.ApproverNames.Length > 0)
+            {
+                WriteMailLog(
+                    request.SubmitterName, // 送信者：再上程者
+                    new[] { request.ApproverNames[0] }, // 宛先：最初の承認者
+                    request.Comment, // コメント
+                    "再上程"
+                );
+            }
 
             // 差し戻しまでのフローは履歴としてそのまま保持（変更なし）
         }

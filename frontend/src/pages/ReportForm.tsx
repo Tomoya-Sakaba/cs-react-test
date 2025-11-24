@@ -25,15 +25,14 @@ const ReportForm = () => {
 
   const {
     approvalStatus,
-    isCompleted,
     isDrawerOpen,
     setIsDrawerOpen,
     refresh: refreshApprovalStatus,
+    getApprovalFlowDirection,
   } = useApproval({
-    pageCode: 2, // 1レコード型ページ（報告書ページ）
     year: currentYear,
     month: currentMonth,
-    reportNo: report?.reportNo, // 報告書のReportNoを使用
+    reportNo: report?.reportNo || '', // 報告書のReportNoを使用（存在しない場合は空文字列）
     autoFetch: !!report?.reportNo, // 報告書が存在する場合のみ自動取得
   });
 
@@ -76,7 +75,7 @@ const ReportForm = () => {
         alert('報告書を更新しました。');
         // 上程状態も更新
         if (report?.reportNo) {
-          await refreshApprovalStatus();
+          await refreshApprovalStatus(); // useApproval: 上程状態を再取得
         }
       } else {
         // 作成
@@ -149,20 +148,6 @@ const ReportForm = () => {
   // 編集可能かどうか（新規作成時は常にtrue、編集モード時はisEditingの値）
   const isEditable = !isEditMode || isEditing;
 
-  // 上程状態のラベルを取得
-  const getApprovalStatusLabel = () => {
-    if (approvalStatus.length === 0) return null;
-    if (isCompleted()) {
-      return '承認済み';
-    }
-    const pendingApprovers = approvalStatus
-      .filter((a) => a.status === 1 || a.status === 6)
-      .map((a) => a.userName);
-    if (pendingApprovers.length > 0) {
-      return `上程中 - ${pendingApprovers.join(', ')}が承認待ち`;
-    }
-    return '上程済み';
-  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -178,17 +163,54 @@ const ReportForm = () => {
           </div>
           <div className="flex items-center gap-4">
             {/* 上程状態表示（報告書が存在する場合のみ） */}
-            {isEditMode && report && approvalStatus.length > 0 && (
-              <div className="flex items-center rounded-lg border-2 border-orange-500 bg-orange-50 px-3 py-2">
-                <div className={`text-sm font-bold ${isCompleted() ? 'text-green-700' : 'text-orange-700'}`}>
-                  {getApprovalStatusLabel()}
+            {isEditMode && report && approvalStatus.length > 0 && (() => {
+              const flowDirection = getApprovalFlowDirection();
+              return (
+                <div className="flex flex-col rounded-lg border-2 border-orange-500 bg-orange-50 px-3 py-2">
+                  {flowDirection.action === '完了' ? (
+                    <div className="text-sm font-bold text-green-700">
+                      承認完了
+                    </div>
+                  ) : flowDirection.action === '差し戻し' ? (
+                    <>
+                      <div className="text-sm font-bold text-red-700">
+                        {flowDirection.flow.join(' → ')}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-red-600">
+                        <span>差戻</span>
+                        {flowDirection.actionDate && (
+                          <span>
+                            ({new Date(flowDirection.actionDate).toLocaleString('ja-JP')})
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : flowDirection.flow.length > 0 ? (
+                    <>
+                      <div className="text-sm font-bold text-orange-700">
+                        {flowDirection.flow.join(' → ')}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-orange-600">
+                        <span>上程中</span>
+                        {flowDirection.actionDate && (
+                          <span>
+                            ({new Date(flowDirection.actionDate).toLocaleString('ja-JP')})
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm font-bold text-orange-700">
+                      上程中
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {/* 上程ボタン（報告書が存在する場合のみ） */}
             {isEditMode && report && (
               <button
-                onClick={() => setIsDrawerOpen(true)}
+                onClick={() => setIsDrawerOpen(true)} // useApproval: Drawerの開閉状態を設定
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
                 上程
@@ -265,14 +287,13 @@ const ReportForm = () => {
       </form>
 
       {/* 上程Drawer（開いている時のみレンダリング） */}
-      {isEditMode && report && isDrawerOpen && (
+      {isEditMode && report && isDrawerOpen && ( // useApproval: Drawerの開閉状態を取得
         <ApprovalDrawer
-          onClose={() => setIsDrawerOpen(false)}
-          pageCode={2} // 1レコード型ページ（報告書ページ）
+          onClose={() => setIsDrawerOpen(false)} // useApproval: Drawerの開閉状態を設定
           year={currentYear}
           month={currentMonth}
           reportNo={report.reportNo}
-          onApprovalChange={refreshApprovalStatus}
+          onApprovalChange={refreshApprovalStatus} // useApproval: 上程状態を再取得
         />
       )}
     </div>

@@ -15,9 +15,12 @@ type ApprovalFlowCardProps = {
   onReject?: () => void; // 差し戻しハンドラ
   onRecall?: () => void; // 取り戻しハンドラ
   canRecall?: boolean; // 取り戻し可能かどうか
-  onResubmit?: () => void; // 再上程ハンドラ
-  canResubmit?: boolean; // 再上程可能かどうか
   userEmail?: string; // ユーザーのメールアドレス
+  // プレビュー用のprops
+  previewMode?: boolean; // プレビューモードかどうか
+  previewUserName?: string; // プレビュー時のユーザー名（再上程者の場合）
+  previewStatusLabel?: string; // プレビュー時のステータスラベル（再上程者の場合）
+  previewColor?: 'red' | 'blue' | 'gray'; // プレビュー時の色（最後の差し戻し、再上程者、その他）
 };
 
 const ApprovalFlowCard = ({
@@ -34,19 +37,26 @@ const ApprovalFlowCard = ({
   onReject,
   onRecall,
   canRecall = false,
-  onResubmit,
-  canResubmit = false,
   userEmail,
+  previewMode = false,
+  previewUserName,
+  previewStatusLabel,
+  previewColor,
 }: ApprovalFlowCardProps) => {
   const isRejected = record.status === 3;
   const isRejectionTarget = record.status === 7; // 差し戻し対象
-  const isPending = record.status === 1 || record.status === 6; // 承認待ちまたは承認スキップ
+  const isPending = record.status === 1; // 承認待ち
   const isCompleted = record.status === 5;
 
   /**
    * カードの色付けロジック
    * 
-   * 基本方針：
+   * プレビューモードの場合：
+   * - 最後の差し戻し：赤色
+   * - 再上程者：青色
+   * - その他：灰色
+   * 
+   * 通常モードの場合：
    * - 現在のアクティブフェーズ（再上程がある場合は再上程フェーズ、ない場合は最初の上程フェーズ）のみ色付け
    * - アクティブフェーズ外はすべて灰色
    * - 差し戻しと差し戻し対象は特別扱い（常に色付け）
@@ -62,6 +72,17 @@ const ApprovalFlowCard = ({
    * 5. アクティブフェーズ外：すべて灰色
    */
   const getCardColor = () => {
+    // プレビューモードの場合
+    if (previewMode && previewColor) {
+      if (previewColor === 'red') {
+        return 'border-red-500 bg-red-50 text-red-700';
+      }
+      if (previewColor === 'blue') {
+        return 'border-blue-500 bg-blue-50 text-blue-700';
+      }
+      return 'border-gray-300 bg-gray-50 text-gray-700';
+    }
+
     // 基本は灰色
     let baseColor = 'border-gray-300 bg-gray-50 text-gray-700';
 
@@ -106,7 +127,7 @@ const ApprovalFlowCard = ({
 
     // アクティブフェーズ内のレコードのみ色付け
     if (isPending) {
-      // 承認待ちまたは承認スキップ：黄色
+      // 承認待ち：黄色
       baseColor = 'border-yellow-500 bg-yellow-50 text-yellow-700 ring-2 ring-yellow-400';
     } else if (record.status === 2) {
       // 承認済み：緑色
@@ -114,7 +135,7 @@ const ApprovalFlowCard = ({
     } else if (record.status === 0) {
       // 上程済み：青色（承認待ちがある場合のみ）
       const hasPendingApproval = approvalStatus.some((a) =>
-        (a.status === 1 || a.status === 6) &&
+        a.status === 1 &&
         a.flowOrder >= activePhaseStartFlowOrder
       );
       if (hasPendingApproval) {
@@ -134,11 +155,11 @@ const ApprovalFlowCard = ({
         <div className="flex items-center justify-between">
           {/* ユーザー名 */}
           <div className="text-lg font-semibold">
-            {record.userName}
+            {previewMode && previewUserName ? previewUserName : record.userName}
           </div>
           {/* 状態を右上に表示 */}
           <div className="text-lg font-semibold">
-            {getStatusLabel(record.status)}
+            {previewMode && previewStatusLabel ? previewStatusLabel : getStatusLabel(record.status)}
           </div>
         </div>
 
@@ -165,8 +186,9 @@ const ApprovalFlowCard = ({
           </div>
         )}
 
+        {/* プレビューモードの場合はフォームを表示しない */}
         {/* 現在の承認待ちレコードの場合、カード内に承認・差し戻しフォームを表示 */}
-        {isCurrentPendingRecord && isPending && (
+        {!previewMode && isCurrentPendingRecord && isPending && (
           <div className="mt-4 border-t border-yellow-400 pt-3">
             <div className="mb-2 text-xs font-bold text-yellow-800">
               あなたの承認待ちです
@@ -200,20 +222,9 @@ const ApprovalFlowCard = ({
           </div>
         )}
 
-        {/* 再上程可能なレコードの場合、再上程ボタンを表示 */}
-        {canResubmit && onResubmit && (
-          <div className="mt-3">
-            <button
-              onClick={onResubmit}
-              className="w-full rounded bg-blue-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue-600"
-            >
-              再上程
-            </button>
-          </div>
-        )}
-
+        {/* プレビューモードの場合は取り戻しボタンを表示しない */}
         {/* 取り戻し可能なレコードの場合、取り戻しボタンを表示 */}
-        {canRecall && onRecall && (
+        {!previewMode && canRecall && onRecall && (
           <div className="mt-3">
             <button
               onClick={onRecall}

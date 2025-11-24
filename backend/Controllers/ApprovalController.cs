@@ -29,14 +29,14 @@ namespace backend.Controllers
             }
         }
 
-        // PageCode、報告書No、年、月で上程データを取得
+        // 報告書No、年、月で上程データを取得
         [HttpGet]
         [Route("api/approval")]
-        public IHttpActionResult GetApprovals(int pageCode, string reportNo, int year, int month)
+        public IHttpActionResult GetApprovals(string reportNo, int year, int month)
         {
             try
             {
-                var dtos = _service.GetApprovalsByReport(pageCode, reportNo, year, month);
+                var dtos = _service.GetApprovalsByReport(reportNo, year, month);
                 return Ok(dtos);
             }
             catch (Exception ex)

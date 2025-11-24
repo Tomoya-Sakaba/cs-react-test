@@ -8,9 +8,6 @@ namespace backend.Models.DTOs
         [JsonProperty("id")]
         public int Id { get; set; }
 
-        [JsonProperty("pageCode")]
-        public int PageCode { get; set; }
-
         [JsonProperty("reportNo")]
         public string ReportNo { get; set; }
 
@@ -44,11 +41,8 @@ namespace backend.Models.DTOs
 
     public class CreateApprovalRequest
     {
-        [JsonProperty("pageCode")]
-        public int PageCode { get; set; } // ページタイプコード（1: 複数レコード型, 2: 1レコード型）
-
         [JsonProperty("reportNo")]
-        public string ReportNo { get; set; } // PageCode=2の場合は必須、PageCode=1の場合はnull可
+        public string ReportNo { get; set; } // 必須
 
         [JsonProperty("year")]
         public int Year { get; set; }
