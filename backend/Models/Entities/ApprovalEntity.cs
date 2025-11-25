@@ -4,10 +4,8 @@ namespace backend.Models.Entity
 {
     public class ApprovalEntity
     {
-        public int Id { get; set; }
+        public string ApprovalId { get; set; } // nvarchar(4): 4桁の文字列（例："0101"）
         public string ReportNo { get; set; }
-        public int Year { get; set; }
-        public int Month { get; set; }
         public string UserName { get; set; }
         public int FlowOrder { get; set; }
         public int Status { get; set; }

@@ -5,17 +5,11 @@ namespace backend.Models.DTOs
 {
     public class ApprovalDto
     {
-        [JsonProperty("id")]
-        public int Id { get; set; }
+        [JsonProperty("approvalId")]
+        public string ApprovalId { get; set; } // nvarchar(4): 4桁の文字列（例："0101"）
 
         [JsonProperty("reportNo")]
         public string ReportNo { get; set; }
-
-        [JsonProperty("year")]
-        public int Year { get; set; }
-
-        [JsonProperty("month")]
-        public int Month { get; set; }
 
         [JsonProperty("userName")]
         public string UserName { get; set; }
@@ -44,11 +38,8 @@ namespace backend.Models.DTOs
         [JsonProperty("reportNo")]
         public string ReportNo { get; set; } // 必須
 
-        [JsonProperty("year")]
-        public int Year { get; set; }
-
-        [JsonProperty("month")]
-        public int Month { get; set; }
+        [JsonProperty("approvalId")]
+        public string ApprovalId { get; set; } // 必須（4桁の文字列、例："0101"）
 
         [JsonProperty("comment")]
         public string Comment { get; set; }
@@ -60,34 +51,52 @@ namespace backend.Models.DTOs
         public string SubmitterName { get; set; }
     }
 
-    public class ApprovalActionRequest
+    public class ApproveRequest
     {
-        [JsonProperty("id")]
-        public int Id { get; set; }
+        [JsonProperty("approvalId")]
+        public string ApprovalId { get; set; } // nvarchar(4)
 
         [JsonProperty("reportNo")]
         public string ReportNo { get; set; }
 
-        [JsonProperty("year")]
-        public int Year { get; set; }
-
-        [JsonProperty("month")]
-        public int Month { get; set; }
+        [JsonProperty("flowOrder")]
+        public int FlowOrder { get; set; }
 
         [JsonProperty("userName")]
         public string UserName { get; set; }
-
-        [JsonProperty("action")]
-        public string Action { get; set; } // "approve" or "reject"
 
         [JsonProperty("comment")]
         public string Comment { get; set; }
     }
 
+    public class RejectRequest
+    {
+        [JsonProperty("approvalId")]
+        public string ApprovalId { get; set; } // nvarchar(4)
+
+        [JsonProperty("reportNo")]
+        public string ReportNo { get; set; }
+
+        [JsonProperty("flowOrder")]
+        public int FlowOrder { get; set; }
+
+        [JsonProperty("userName")]
+        public string UserName { get; set; }
+
+        [JsonProperty("comment")]
+        public string Comment { get; set; } // 必須
+    }
+
     public class RecallApprovalRequest
     {
-        [JsonProperty("id")]
-        public int Id { get; set; }
+        [JsonProperty("approvalId")]
+        public string ApprovalId { get; set; } // nvarchar(4)
+
+        [JsonProperty("reportNo")]
+        public string ReportNo { get; set; }
+
+        [JsonProperty("flowOrder")]
+        public int FlowOrder { get; set; }
 
         [JsonProperty("userName")]
         public string UserName { get; set; }

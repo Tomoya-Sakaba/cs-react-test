@@ -1,14 +1,12 @@
-import { type ApprovalStatus } from '../hooks/useApproval';
+import type { ApprovalStatus } from '../types/approval';
 
 type ApprovalFlowCardProps = {
   record: ApprovalStatus;
-  rejectedApprover: ApprovalStatus | undefined;
-  resubmissionFlow: ApprovalStatus[];
-  approvalStatus: ApprovalStatus[]; // 承認待ちの判定に使用
   showArrow: boolean;
   getStatusLabel: (status: number) => string;
   // 承認・差し戻しフォーム用のprops（現在の承認待ちレコードの場合のみ使用）
-  isCurrentPendingRecord?: boolean; // 現在の承認待ちレコードかどうか
+  isCurrentPendingRecord?: boolean; // ログインユーザーが次にアクションが必要な場合（フォーム表示用）
+  isNextPendingRecord?: boolean; // 次にアクションが必要なレコードかどうか（色付け用）
   approvalComment?: string; // 承認・差し戻し用のコメント
   onApprovalCommentChange?: (comment: string) => void; // コメント変更ハンドラ
   onApprove?: () => void; // 承認ハンドラ
@@ -20,17 +18,15 @@ type ApprovalFlowCardProps = {
   previewMode?: boolean; // プレビューモードかどうか
   previewUserName?: string; // プレビュー時のユーザー名（再上程者の場合）
   previewStatusLabel?: string; // プレビュー時のステータスラベル（再上程者の場合）
-  previewColor?: 'red' | 'blue' | 'gray'; // プレビュー時の色（最後の差し戻し、再上程者、その他）
+  previewColor?: 'orange' | 'gray'; // プレビュー時の色（アクティブ、その他）
 };
 
 const ApprovalFlowCard = ({
   record,
-  rejectedApprover,
-  resubmissionFlow,
-  approvalStatus,
   showArrow,
   getStatusLabel,
   isCurrentPendingRecord = false,
+  isNextPendingRecord = false,
   approvalComment = '',
   onApprovalCommentChange,
   onApprove,
@@ -43,107 +39,37 @@ const ApprovalFlowCard = ({
   previewStatusLabel,
   previewColor,
 }: ApprovalFlowCardProps) => {
-  const isRejected = record.status === 3;
-  const isRejectionTarget = record.status === 7; // 差し戻し対象
   const isPending = record.status === 1; // 承認待ち
-  const isCompleted = record.status === 5;
 
   /**
    * カードの色付けロジック
-   * 
-   * プレビューモードの場合：
-   * - 最後の差し戻し：赤色
-   * - 再上程者：青色
-   * - その他：灰色
-   * 
-   * 通常モードの場合：
-   * - 現在のアクティブフェーズ（再上程がある場合は再上程フェーズ、ない場合は最初の上程フェーズ）のみ色付け
-   * - アクティブフェーズ外はすべて灰色
-   * - 差し戻しと差し戻し対象は特別扱い（常に色付け）
-   * 
-   * 色付けの優先順位：
-   * 1. 完了状態の場合：完了のカードのみ緑色、それ以外はすべて灰色
-   * 2. 最新の差し戻し：赤色（常に表示）
-   * 3. 差し戻し対象：オレンジ色（常に表示）
-   * 4. アクティブフェーズ内のレコード：
-   *    - 承認待ち（Status=1または6）：黄色
-   *    - 承認済み（Status=2）：緑色
-   *    - 上程済み（Status=0）で承認待ちがある場合：青色
-   * 5. アクティブフェーズ外：すべて灰色
+   * オレンジ基調のUI：
+   * - 次にアクションが必要なレコード（承認待ち）の場合のみオレンジ
+   * - 差し戻し対象（Status=6）の場合もオレンジ
+   * - それ以外はすべてグレー
+   * - プレビューモードの場合も同様
    */
   const getCardColor = () => {
     // プレビューモードの場合
     if (previewMode && previewColor) {
-      if (previewColor === 'red') {
-        return 'border-red-500 bg-red-50 text-red-700';
-      }
-      if (previewColor === 'blue') {
-        return 'border-blue-500 bg-blue-50 text-blue-700';
+      if (previewColor === 'orange') {
+        return 'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-400';
       }
       return 'border-gray-300 bg-gray-50 text-gray-700';
     }
 
-    // 基本は灰色
-    let baseColor = 'border-gray-300 bg-gray-50 text-gray-700';
-
-    // 完了状態かどうかを判定
-    const isCompletedPhase = approvalStatus.some((a) => a.status === 5);
-
-    if (isCompletedPhase) {
-      // 完了状態の場合、完了のカードのみ色付け、それ以外はすべて灰色
-      if (isCompleted) {
-        baseColor = 'border-green-600 bg-green-100 text-green-800 ring-2 ring-green-400';
-      }
-      return baseColor;
+    // 通常モード：次にアクションが必要なレコード（承認待ち）の場合のみオレンジ
+    if (isNextPendingRecord && isPending) {
+      return 'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-400';
     }
 
-    // 最新の差し戻しの場合のみ色付け（常に表示）
-    if (rejectedApprover && isRejected && record.flowOrder === rejectedApprover.flowOrder) {
-      baseColor = 'border-red-500 bg-red-50 text-red-700';
-      return baseColor;
+    // 差し戻し対象（Status=6）の場合もオレンジ
+    if (record.status === 6) {
+      return 'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-400';
     }
 
-    // 差し戻し対象者の場合：オレンジ色で表示（常に表示）
-    if (isRejectionTarget) {
-      baseColor = 'border-orange-500 bg-orange-50 text-orange-700';
-      return baseColor;
-    }
-
-    // 現在のアクティブフェーズを判定
-    // 再上程がある場合：再上程フェーズがアクティブ
-    // 再上程がない場合：最初の上程フェーズがアクティブ
-    const isResubmissionPhase = rejectedApprover && resubmissionFlow.length > 0;
-    const activePhaseStartFlowOrder = isResubmissionPhase && resubmissionFlow.length > 0
-      ? resubmissionFlow[0].flowOrder // 再上程フェーズの開始FlowOrder
-      : 0; // 最初の上程フェーズの開始FlowOrder
-
-    // このレコードがアクティブフェーズ内かどうかを判定
-    const isInActivePhase = record.flowOrder >= activePhaseStartFlowOrder;
-
-    // アクティブフェーズ外はすべて灰色
-    if (!isInActivePhase) {
-      return baseColor;
-    }
-
-    // アクティブフェーズ内のレコードのみ色付け
-    if (isPending) {
-      // 承認待ち：黄色
-      baseColor = 'border-yellow-500 bg-yellow-50 text-yellow-700 ring-2 ring-yellow-400';
-    } else if (record.status === 2) {
-      // 承認済み：緑色
-      baseColor = 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-400';
-    } else if (record.status === 0) {
-      // 上程済み：青色（承認待ちがある場合のみ）
-      const hasPendingApproval = approvalStatus.some((a) =>
-        a.status === 1 &&
-        a.flowOrder >= activePhaseStartFlowOrder
-      );
-      if (hasPendingApproval) {
-        baseColor = 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-400';
-      }
-    }
-
-    return baseColor;
+    // それ以外はすべてグレー
+    return 'border-gray-300 bg-gray-50 text-gray-700';
   };
 
   const cardColor = getCardColor();
@@ -189,8 +115,8 @@ const ApprovalFlowCard = ({
         {/* プレビューモードの場合はフォームを表示しない */}
         {/* 現在の承認待ちレコードの場合、カード内に承認・差し戻しフォームを表示 */}
         {!previewMode && isCurrentPendingRecord && isPending && (
-          <div className="mt-4 border-t border-yellow-400 pt-3">
-            <div className="mb-2 text-xs font-bold text-yellow-800">
+          <div className="mt-4 border-t border-orange-400 pt-3">
+            <div className="mb-2 text-xs font-bold text-orange-800">
               あなたの承認待ちです
             </div>
             <div className="mb-3">
@@ -201,20 +127,20 @@ const ApprovalFlowCard = ({
                 value={approvalComment}
                 onChange={(e) => onApprovalCommentChange?.(e.target.value)}
                 rows={3}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-black focus:border-blue-500 focus:outline-none"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-black focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-400"
                 placeholder="コメントを入力してください"
               />
             </div>
             <div className="flex gap-2">
               <button
                 onClick={onApprove}
-                className="flex-1 rounded bg-green-500 px-3 py-2 text-xs font-medium text-white hover:bg-green-600"
+                className="flex-1 rounded bg-orange-500 px-3 py-2 text-xs font-medium text-white hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400"
               >
                 承認
               </button>
               <button
                 onClick={onReject}
-                className="flex-1 rounded bg-red-500 px-3 py-2 text-xs font-medium text-white hover:bg-red-600"
+                className="flex-1 rounded bg-orange-600 px-3 py-2 text-xs font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
                 差し戻し
               </button>
@@ -237,7 +163,7 @@ const ApprovalFlowCard = ({
       </div>
       {/* 下矢印を表示（カードの下、フォームの下ではない） */}
       {showArrow && (
-        <div className="my-1 text-2xl text-gray-400">↓</div>
+        <div className="my-1 text-2xl text-orange-300">↓</div>
       )}
     </div>
   );

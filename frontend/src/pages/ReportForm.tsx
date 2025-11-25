@@ -18,11 +18,6 @@ const ReportForm = () => {
   // 編集モードの切り替え（編集モードの場合のみ使用）
   const [isEditing, setIsEditing] = useState(false);
 
-  // 上程機能（報告書が存在する場合のみ使用）
-  const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1;
-
   const {
     approvalStatus,
     isDrawerOpen,
@@ -30,8 +25,7 @@ const ReportForm = () => {
     refresh: refreshApprovalStatus,
     getApprovalFlowDirection,
   } = useApproval({
-    year: currentYear,
-    month: currentMonth,
+    approvalId: '0201', // 報告書ページ固有のapprovalId（固定値）
     reportNo: report?.reportNo || '', // 報告書のReportNoを使用（存在しない場合は空文字列）
     autoFetch: !!report?.reportNo, // 報告書が存在する場合のみ自動取得
   });
@@ -290,9 +284,10 @@ const ReportForm = () => {
       {isEditMode && report && isDrawerOpen && ( // useApproval: Drawerの開閉状態を取得
         <ApprovalDrawer
           onClose={() => setIsDrawerOpen(false)} // useApproval: Drawerの開閉状態を設定
-          year={currentYear}
-          month={currentMonth}
+          approvalId="0201" // 報告書ページ固有のapprovalId（固定値）
           reportNo={report.reportNo}
+          approvalStatus={approvalStatus} // useApproval: 承認状態
+          loading={false} // useApproval: 読み込み状態（必要に応じて追加）
           onApprovalChange={refreshApprovalStatus} // useApproval: 上程状態を再取得
         />
       )}

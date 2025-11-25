@@ -20,27 +20,25 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     INSERT INTO dbo.t_approvals (
-                        report_no, year, month, user_name, flow_order, status, comment, action_date, created_at, updated_at
+                        approval_id, report_no, user_name, flow_order, status, comment, action_date, created_at, updated_at
                     )
                     VALUES (
-                        @ReportNo, @Year, @Month, @UserName, @FlowOrder, @Status, @Comment, @ActionDate, GETDATE(), GETDATE()
+                        @ApprovalId, @ReportNo, @UserName, @FlowOrder, @Status, @Comment, @ActionDate, GETDATE(), GETDATE()
                     )";
                 db.Execute(sql, approval);
             }
         }
 
-        // 報告書No、年、月で上程データを取得
-        public List<ApprovalEntity> GetApprovalsByReport(string reportNo, int year, int month)
+        // ApprovalIdと報告書Noで上程データを取得
+        public List<ApprovalEntity> GetApprovalsByReport(string approvalId, string reportNo)
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
-                // ReportNo、Year、Monthで検索
+                // ApprovalIdとReportNoで検索
                 string sql = @"
                     SELECT 
-                        id AS Id,
+                        approval_id AS ApprovalId,
                         report_no AS ReportNo,
-                        year AS Year,
-                        month AS Month,
                         user_name AS UserName,
                         flow_order AS FlowOrder,
                         status AS Status,
@@ -49,10 +47,10 @@ namespace backend.Models.Repository
                         created_at AS CreatedAt,
                         updated_at AS UpdatedAt
                     FROM dbo.t_approvals
-                    WHERE report_no = @ReportNo AND year = @Year AND month = @Month
+                    WHERE approval_id = @ApprovalId AND report_no = @ReportNo
                     ORDER BY flow_order";
                 
-                var parameters = new { ReportNo = reportNo, Year = year, Month = month };
+                var parameters = new { ApprovalId = approvalId, ReportNo = reportNo };
                 return db.Query<ApprovalEntity>(sql, parameters).ToList();
             }
         }
@@ -64,10 +62,8 @@ namespace backend.Models.Repository
             {
                 string sql = @"
                     SELECT 
-                        id AS Id,
+                        approval_id AS ApprovalId,
                         report_no AS ReportNo,
-                        year AS Year,
-                        month AS Month,
                         user_name AS UserName,
                         flow_order AS FlowOrder,
                         status AS Status,
@@ -90,47 +86,45 @@ namespace backend.Models.Repository
                 string sql = @"
                     UPDATE dbo.t_approvals
                     SET status = @Status, comment = @Comment, action_date = @ActionDate, updated_at = GETDATE()
-                    WHERE id = @Id";
+                    WHERE approval_id = @ApprovalId AND report_no = @ReportNo AND flow_order = @FlowOrder";
                 db.Execute(sql, approval);
             }
         }
 
-        // 報告書No、年、月で上程データを削除（取り戻し時など）
-        public void DeleteApprovalsByReport(string reportNo, int year, int month)
+        // 報告書Noで上程データを削除（取り戻し時など）
+        public void DeleteApprovalsByReport(string reportNo)
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
-                // ReportNo、Year、Monthで削除
+                // ReportNoで削除
                 string sql = @"
                     DELETE FROM dbo.t_approvals
-                    WHERE report_no = @ReportNo AND year = @Year AND month = @Month";
-                db.Execute(sql, new { ReportNo = reportNo, Year = year, Month = month });
+                    WHERE report_no = @ReportNo";
+                db.Execute(sql, new { ReportNo = reportNo });
             }
         }
 
-        // IDで上程データを削除
-        public void DeleteApproval(int id)
+        // 複合主キーで上程データを削除
+        public void DeleteApproval(string approvalId, string reportNo, int flowOrder)
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
                     DELETE FROM dbo.t_approvals
-                    WHERE id = @Id";
-                db.Execute(sql, new { Id = id });
+                    WHERE approval_id = @ApprovalId AND report_no = @ReportNo AND flow_order = @FlowOrder";
+                db.Execute(sql, new { ApprovalId = approvalId, ReportNo = reportNo, FlowOrder = flowOrder });
             }
         }
 
-        // IDで上程データを取得
-        public ApprovalEntity GetApprovalById(int id)
+        // 複合主キーで上程データを取得
+        public ApprovalEntity GetApprovalByKey(string approvalId, string reportNo, int flowOrder)
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
                 string sql = @"
                     SELECT 
-                        id AS Id,
+                        approval_id AS ApprovalId,
                         report_no AS ReportNo,
-                        year AS Year,
-                        month AS Month,
                         user_name AS UserName,
                         flow_order AS FlowOrder,
                         status AS Status,
@@ -139,8 +133,8 @@ namespace backend.Models.Repository
                         created_at AS CreatedAt,
                         updated_at AS UpdatedAt
                     FROM dbo.t_approvals
-                    WHERE id = @Id";
-                return db.Query<ApprovalEntity>(sql, new { Id = id }).FirstOrDefault();
+                    WHERE approval_id = @ApprovalId AND report_no = @ReportNo AND flow_order = @FlowOrder";
+                return db.Query<ApprovalEntity>(sql, new { ApprovalId = approvalId, ReportNo = reportNo, FlowOrder = flowOrder }).FirstOrDefault();
             }
         }
     }

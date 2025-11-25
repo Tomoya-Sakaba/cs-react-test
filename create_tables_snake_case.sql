@@ -94,19 +94,16 @@ CREATE INDEX [IX_t_reports_created_at] ON [dbo].[t_reports]([created_at]);
 -- 6. t_approvals テーブル
 -- =============================================
 CREATE TABLE [dbo].[t_approvals] (
-  [id] int identity not null,
-  [page_code] int default 2 not null,
-  [report_no] nvarchar(50) null,
-  [year] int not null,
-  [month] int not null,
-  [user_name] nvarchar(100) not null,
-  [flow_order] int not null,
-  [status] int not null,
-  [comment] nvarchar(1000) null,
-  [action_date] datetime null,
-  [created_at] datetime default getdate() not null,
-  [updated_at] datetime default getdate() not null,
-  primary key ([id])
+    [approval_id] nvarchar(4) NOT NULL,
+    [report_no] nvarchar(50) NOT NULL,
+    [user_name] nvarchar(100) NOT NULL,
+    [flow_order] int NOT NULL,
+    [status] int NOT NULL,
+    [comment] nvarchar(1000),
+    [action_date] datetime,
+    [created_at] datetime DEFAULT GETDATE() NOT NULL,
+    [updated_at] datetime DEFAULT GETDATE() NOT NULL,
+    PRIMARY KEY ([approval_id], [report_no], [flow_order])
 );
 
 

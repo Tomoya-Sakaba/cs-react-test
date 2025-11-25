@@ -29,14 +29,14 @@ namespace backend.Controllers
             }
         }
 
-        // 報告書No、年、月で上程データを取得
+        // ApprovalIdと報告書Noで上程データを取得
         [HttpGet]
         [Route("api/approval")]
-        public IHttpActionResult GetApprovals(string reportNo, int year, int month)
+        public IHttpActionResult GetApprovals(string approvalId, string reportNo)
         {
             try
             {
-                var dtos = _service.GetApprovalsByReport(reportNo, year, month);
+                var dtos = _service.GetApprovalsByReport(approvalId, reportNo);
                 return Ok(dtos);
             }
             catch (Exception ex)
@@ -61,15 +61,43 @@ namespace backend.Controllers
             }
         }
 
-        // 承認アクション（承認または差し戻し）
+        // 承認
         [HttpPost]
-        [Route("api/approval/action")]
-        public IHttpActionResult ProcessApprovalAction([FromBody] ApprovalActionRequest request)
+        [Route("api/approval/approve")]
+        public IHttpActionResult ApproveApproval([FromBody] ApproveRequest request)
         {
             try
             {
-                _service.ProcessApprovalAction(request);
-                return Ok(new { message = request.Action == "approve" ? "承認が完了しました。" : "差し戻しが完了しました。" });
+                _service.ApproveApproval(request);
+                return Ok(new { message = "承認が完了しました。" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return InternalServerError(ex);
+            }
+        }
+
+        // 差し戻し
+        [HttpPost]
+        [Route("api/approval/reject")]
+        public IHttpActionResult RejectApproval([FromBody] RejectRequest request)
+        {
+            try
+            {
+                _service.RejectApproval(request);
+                return Ok(new { message = "差し戻しが完了しました。" });
             }
             catch (ArgumentException ex)
             {
@@ -124,7 +152,7 @@ namespace backend.Controllers
         {
             try
             {
-                _service.RecallApproval(request.Id, request.UserName);
+                _service.RecallApproval(request.ApprovalId, request.ReportNo, request.FlowOrder, request.UserName);
                 return Ok(new { message = "取り戻しが完了しました。" });
             }
             catch (ArgumentException ex)

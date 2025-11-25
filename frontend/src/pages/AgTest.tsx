@@ -692,8 +692,7 @@ const AgTest = () => {
     refresh: refreshApprovalStatus,
     getApprovalFlowDirection,
   } = useApproval({
-    year: currentYear,
-    month: currentIndexMonth + 1,
+    approvalId: '0101', // ページ固有のapprovalId（固定値）
     reportNo: reportNo, // ページ固有のreportNo（year-month形式）
     autoFetch: true,
   });
@@ -956,9 +955,10 @@ const AgTest = () => {
         {isDrawerOpen && ( // useApproval: Drawerの開閉状態を取得
           <ApprovalDrawer
             onClose={() => setIsDrawerOpen(false)} // useApproval: Drawerの開閉状態を設定
-            year={currentYear}
-            month={currentIndexMonth + 1}
+            approvalId="0101" // ページ固有のapprovalId（固定値）
             reportNo={reportNo}
+            approvalStatus={approvalStatus} // useApproval: 承認状態
+            loading={false} // useApproval: 読み込み状態（必要に応じて追加）
             onApprovalChange={refreshApprovalStatus} // useApproval: 上程状態を再取得
           />
         )}
