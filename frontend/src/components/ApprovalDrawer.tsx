@@ -8,7 +8,13 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAtom } from 'jotai';
 import axios from 'axios';
 import { currentUserAtom } from '../atoms/authAtom';
-import type { ApprovalStatus, ApprovalRequest } from '../types/approval';
+import type {
+  ApprovalStatus,
+  ApprovalRequest,
+  ApproveRequest,
+  RejectRequest,
+  RecallRequest,
+} from '../types/approval';
 import {
   approveApproval,
   rejectApproval,
@@ -38,6 +44,12 @@ type ApprovalDrawerProps = {
   approvalStatus: ApprovalStatus[]; // 承認状態（親コンポーネントから受け取る）
   loading?: boolean; // 読み込み状態
   onApprovalChange: () => void; // 上程状態が変更された時に呼ばれるコールバック（必須）
+  // 各アクション後に呼び出されるコールバック（オプション）
+  onAfterCreate?: (request: ApprovalRequest) => Promise<void> | void; // 新規上程後
+  onAfterApprove?: (request: ApproveRequest) => Promise<void> | void; // 承認後
+  onAfterReject?: (request: RejectRequest) => Promise<void> | void; // 差し戻し後
+  onAfterResubmit?: (request: ApprovalRequest) => Promise<void> | void; // 再上程後
+  onAfterRecall?: (request: RecallRequest) => Promise<void> | void; // 取り戻し後
 };
 
 // ============================================================================
@@ -50,6 +62,11 @@ const ApprovalDrawer = ({
   approvalStatus,
   loading: approvalLoading = false,
   onApprovalChange,
+  onAfterCreate,
+  onAfterApprove,
+  onAfterReject,
+  onAfterResubmit,
+  onAfterRecall,
 }: ApprovalDrawerProps) => {
   // ============================================================================
   // 状態管理
@@ -60,7 +77,8 @@ const ApprovalDrawer = ({
   const [selectedApprovers, setSelectedApprovers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [approvalComment, setApprovalComment] = useState('');
-  const [hasResetResubmissionForm, setHasResetResubmissionForm] = useState(false);
+  const [hasResetResubmissionForm, setHasResetResubmissionForm] =
+    useState(false);
 
   // 右側列のスクロールコンテナへの参照
   const rightColumnScrollRef = useRef<HTMLDivElement>(null);
@@ -123,7 +141,9 @@ const ApprovalDrawer = ({
       const statusZeroRecords = approvalStatus.filter((a) => a.status === 0);
       if (statusZeroRecords.length === 0) return false;
 
-      const maxFlowOrder = Math.max(...statusZeroRecords.map((a) => a.flowOrder));
+      const maxFlowOrder = Math.max(
+        ...statusZeroRecords.map((a) => a.flowOrder)
+      );
       return record.flowOrder === maxFlowOrder;
     },
     [currentUser, approvalStatus]
@@ -188,7 +208,9 @@ const ApprovalDrawer = ({
 
     setSelectedApprovers((prev) => {
       const isSelected = prev.some((a) => a.id === userId);
-      return isSelected ? prev.filter((a) => a.id !== userId) : [...prev, selectedUser];
+      return isSelected
+        ? prev.filter((a) => a.id !== userId)
+        : [...prev, selectedUser];
     });
   };
 
@@ -218,6 +240,16 @@ const ApprovalDrawer = ({
       };
 
       await createApproval(request);
+
+      // 追加のコールバックを実行（ページ固有の処理）
+      if (onAfterCreate) {
+        try {
+          await onAfterCreate(request);
+        } catch (error) {
+          console.warn('onAfterCreateコールバックの実行に失敗:', error);
+        }
+      }
+
       alert('上程が完了しました。');
 
       setComment('');
@@ -246,13 +278,25 @@ const ApprovalDrawer = ({
 
     try {
       setLoading(true);
-      await approveApproval({
+      const request: ApproveRequest = {
         approvalId: pendingApproval.approvalId,
         reportNo: pendingApproval.reportNo,
         flowOrder: pendingApproval.flowOrder,
         userName: currentUser.name,
         comment: approvalComment.trim(),
-      });
+      };
+
+      await approveApproval(request);
+
+      // 追加のコールバックを実行（ページ固有の処理）
+      if (onAfterApprove) {
+        try {
+          await onAfterApprove(request);
+        } catch (error) {
+          console.warn('onAfterApproveコールバックの実行に失敗:', error);
+        }
+      }
+
       alert('承認が完了しました。');
       setApprovalComment('');
       onApprovalChange();
@@ -289,18 +333,32 @@ const ApprovalDrawer = ({
 
     try {
       setLoading(true);
-      await rejectApproval({
+      const request: RejectRequest = {
         approvalId: pendingApproval.approvalId,
         reportNo: pendingApproval.reportNo,
         flowOrder: pendingApproval.flowOrder,
         userName: currentUser.name,
         comment: approvalComment.trim(),
-      });
+      };
+
+      await rejectApproval(request);
+
+      // 追加のコールバックを実行（ページ固有の処理）
+      if (onAfterReject) {
+        try {
+          await onAfterReject(request);
+        } catch (error) {
+          console.warn('onAfterRejectコールバックの実行に失敗:', error);
+        }
+      }
+
       alert('差し戻しが完了しました。');
       setApprovalComment('');
       onApprovalChange();
     } catch (error) {
-      alert(error instanceof Error ? error.message : '差し戻しに失敗しました。');
+      alert(
+        error instanceof Error ? error.message : '差し戻しに失敗しました。'
+      );
     } finally {
       setLoading(false);
     }
@@ -329,6 +387,16 @@ const ApprovalDrawer = ({
       };
 
       await resubmitApproval(request);
+
+      // 追加のコールバックを実行（ページ固有の処理）
+      if (onAfterResubmit) {
+        try {
+          await onAfterResubmit(request);
+        } catch (error) {
+          console.warn('onAfterResubmitコールバックの実行に失敗:', error);
+        }
+      }
+
       alert('再上程が完了しました。');
 
       setComment('');
@@ -360,16 +428,30 @@ const ApprovalDrawer = ({
 
     try {
       setLoading(true);
-      await recallApproval({
+      const request: RecallRequest = {
         approvalId: record.approvalId,
         reportNo: record.reportNo,
         flowOrder: record.flowOrder,
         userName: currentUser.name,
-      });
+      };
+
+      await recallApproval(request);
+
+      // 追加のコールバックを実行（ページ固有の処理）
+      if (onAfterRecall) {
+        try {
+          await onAfterRecall(request);
+        } catch (error) {
+          console.warn('onAfterRecallコールバックの実行に失敗:', error);
+        }
+      }
+
       alert('取り戻しが完了しました。');
       onApprovalChange();
     } catch (error) {
-      alert(error instanceof Error ? error.message : '取り戻しに失敗しました。');
+      alert(
+        error instanceof Error ? error.message : '取り戻しに失敗しました。'
+      );
     } finally {
       setLoading(false);
     }
@@ -437,7 +519,10 @@ const ApprovalDrawer = ({
    * 左側列の表示状態を判定
    */
   const shouldShowLeftColumn = () => {
-    return (existingFlow && showResubmissionForm && rejectedApprover) || !existingFlow;
+    return (
+      (existingFlow && showResubmissionForm && rejectedApprover) ||
+      !existingFlow
+    );
   };
 
   /**
@@ -488,7 +573,14 @@ const ApprovalDrawer = ({
 
     const timer = setTimeout(scrollToBottom, 100);
     return () => clearTimeout(timer);
-  }, [loading, approvalLoading, shouldShowExistingFlow(), allFlowRecords.length, selectedApprovers.length, approvalStatus.length]);
+  }, [
+    loading,
+    approvalLoading,
+    shouldShowExistingFlow(),
+    allFlowRecords.length,
+    selectedApprovers.length,
+    approvalStatus.length,
+  ]);
 
   // ============================================================================
   // UI レンダリング
@@ -514,7 +606,9 @@ const ApprovalDrawer = ({
             {currentUser?.name || 'ログインが必要です'}
           </div>
           {currentUser?.email && (
-            <div className="mt-2 text-sm text-gray-600">{currentUser.email}</div>
+            <div className="mt-2 text-sm text-gray-600">
+              {currentUser.email}
+            </div>
           )}
         </div>
 
@@ -567,7 +661,8 @@ const ApprovalDrawer = ({
   ) => {
     let borderColor: string;
     if (cardType === 'submitter') {
-      borderColor = 'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-400';
+      borderColor =
+        'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-400';
     } else if (cardType === 'approver') {
       borderColor = 'border-green-300 bg-green-50 text-green-700';
     } else {
@@ -621,8 +716,14 @@ const ApprovalDrawer = ({
                   <>
                     {renderApprovalForm(existingFlow ? '再上程' : '新規上程')}
                     <button
-                      onClick={existingFlow ? handleResubmit : handleNewSubmission}
-                      disabled={isLoading || !currentUser || selectedApprovers.length === 0}
+                      onClick={
+                        existingFlow ? handleResubmit : handleNewSubmission
+                      }
+                      disabled={
+                        isLoading ||
+                        !currentUser ||
+                        selectedApprovers.length === 0
+                      }
                       className="w-full rounded bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
                       {existingFlow ? '再上程' : '上程'}
@@ -633,7 +734,10 @@ const ApprovalDrawer = ({
             )}
 
             {/* 右側列：承認フロー表示 or プレビュー */}
-            <div ref={rightColumnScrollRef} className={`overflow-y-auto px-4 pb-16 ${rightColumnWidth}`}>
+            <div
+              ref={rightColumnScrollRef}
+              className={`overflow-y-auto px-4 pb-16 ${rightColumnWidth}`}
+            >
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <p className="text-gray-500">読み込み中...</p>
@@ -651,18 +755,26 @@ const ApprovalDrawer = ({
                       <div className="space-y-3">
                         {allFlowRecords.map((record, index) => {
                           const isRejected = record.status === 3;
-                          const showArrow = isRejected || index < allFlowRecords.length - 1;
+                          const showArrow =
+                            isRejected || index < allFlowRecords.length - 1;
                           const nextPendingApproval = getNextPendingApproval();
                           const isNextPendingRecord =
-                            nextPendingApproval?.approvalId === record.approvalId &&
+                            nextPendingApproval?.approvalId ===
+                              record.approvalId &&
                             nextPendingApproval?.reportNo === record.reportNo &&
                             nextPendingApproval?.flowOrder === record.flowOrder;
-                          const currentPendingApproval = getCurrentPendingApproval();
+                          const currentPendingApproval =
+                            getCurrentPendingApproval();
                           const isCurrentPendingRecord =
-                            currentPendingApproval?.approvalId === record.approvalId &&
-                            currentPendingApproval?.reportNo === record.reportNo &&
-                            currentPendingApproval?.flowOrder === record.flowOrder;
-                          const user = users.find((u) => u.name === record.userName);
+                            currentPendingApproval?.approvalId ===
+                              record.approvalId &&
+                            currentPendingApproval?.reportNo ===
+                              record.reportNo &&
+                            currentPendingApproval?.flowOrder ===
+                              record.flowOrder;
+                          const user = users.find(
+                            (u) => u.name === record.userName
+                          );
                           const recordCanRecall = canRecall(record);
 
                           return (
@@ -698,7 +810,9 @@ const ApprovalDrawer = ({
                       {/* 固定ヘッダー：プレビュー */}
                       <div className="sticky top-0 z-10 bg-white pb-3 mb-3 border-b border-orange-200 -mx-4 px-4 pt-2">
                         <label className="block text-sm font-medium text-orange-800">
-                          {existingFlow ? '再上程プレビュー' : '承認フロープレビュー'}
+                          {existingFlow
+                            ? '再上程プレビュー'
+                            : '承認フロープレビュー'}
                         </label>
                       </div>
 
@@ -707,13 +821,18 @@ const ApprovalDrawer = ({
                           {/* 既存の上程フロー（差し戻し対象まで） */}
                           {allFlowRecords
                             .filter((record) => {
-                              const rejectionTarget = approvalStatus.find((a) => a.status === 6);
+                              const rejectionTarget = approvalStatus.find(
+                                (a) => a.status === 6
+                              );
                               if (!rejectionTarget) {
                                 return rejectedApprover
-                                  ? record.flowOrder <= rejectedApprover.flowOrder
+                                  ? record.flowOrder <=
+                                      rejectedApprover.flowOrder
                                   : true;
                               }
-                              return record.flowOrder <= rejectionTarget.flowOrder;
+                              return (
+                                record.flowOrder <= rejectionTarget.flowOrder
+                              );
                             })
                             .map((record, index, filteredRecords) => {
                               const isRejectionTarget = record.status === 6;
@@ -723,7 +842,9 @@ const ApprovalDrawer = ({
                                 index < filteredRecords.length - 1 ||
                                 selectedApprovers.length > 0;
 
-                              const user = users.find((u) => u.name === record.userName);
+                              const user = users.find(
+                                (u) => u.name === record.userName
+                              );
                               const userEmail =
                                 isRejectionTarget && currentUser
                                   ? currentUser.email
@@ -733,10 +854,11 @@ const ApprovalDrawer = ({
                                 isRejectionTarget && currentUser
                                   ? currentUser.name
                                   : undefined;
-                              const previewStatusLabel = isRejectionTarget ? '再上程' : undefined;
-                              const previewColor: 'orange' | 'gray' = isRejectionTarget
-                                ? 'orange'
-                                : 'gray';
+                              const previewStatusLabel = isRejectionTarget
+                                ? '再上程'
+                                : undefined;
+                              const previewColor: 'orange' | 'gray' =
+                                isRejectionTarget ? 'orange' : 'gray';
 
                               return (
                                 <ApprovalFlowCard
@@ -761,42 +883,48 @@ const ApprovalDrawer = ({
                             >
                               {renderPreviewUserCard(approver, 'approver')}
                               {index < selectedApprovers.length - 1 && (
-                                <div className="my-1 text-2xl text-orange-300">↓</div>
+                                <div className="my-1 text-2xl text-orange-300">
+                                  ↓
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : currentUser || selectedApprovers.length > 0 ? (
+                        <div className="space-y-3">
+                          {/* 上程者（オレンジ） */}
+                          {currentUser && (
+                            <div className="flex flex-col items-center">
+                              {renderPreviewUserCard(currentUser, 'submitter')}
+                              {selectedApprovers.length > 0 && (
+                                <div className="my-1 text-2xl text-orange-300">
+                                  ↓
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* 承認者（すべて薄緑） */}
+                          {selectedApprovers.map((approver, index) => (
+                            <div
+                              key={`preview-${approver.id}-${index}`}
+                              className="flex flex-col items-center"
+                            >
+                              {renderPreviewUserCard(approver, 'approver')}
+                              {index < selectedApprovers.length - 1 && (
+                                <div className="my-1 text-2xl text-orange-300">
+                                  ↓
+                                </div>
                               )}
                             </div>
                           ))}
                         </div>
                       ) : (
-                        currentUser || selectedApprovers.length > 0 ? (
-                          <div className="space-y-3">
-                            {/* 上程者（オレンジ） */}
-                            {currentUser && (
-                              <div className="flex flex-col items-center">
-                                {renderPreviewUserCard(currentUser, 'submitter')}
-                                {selectedApprovers.length > 0 && (
-                                  <div className="my-1 text-2xl text-orange-300">↓</div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* 承認者（すべて薄緑） */}
-                            {selectedApprovers.map((approver, index) => (
-                              <div
-                                key={`preview-${approver.id}-${index}`}
-                                className="flex flex-col items-center"
-                              >
-                                {renderPreviewUserCard(approver, 'approver')}
-                                {index < selectedApprovers.length - 1 && (
-                                  <div className="my-1 text-2xl text-orange-300">↓</div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center py-8 rounded border-2 border-dashed border-gray-300">
-                            <p className="text-gray-400">左側で承認者を選択してください</p>
-                          </div>
-                        )
+                        <div className="flex items-center justify-center py-8 rounded border-2 border-dashed border-gray-300">
+                          <p className="text-gray-400">
+                            左側で承認者を選択してください
+                          </p>
+                        </div>
                       )}
                     </>
                   )}

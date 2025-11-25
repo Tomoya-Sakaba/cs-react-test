@@ -10,9 +10,16 @@ import {
 } from '../hooks/usePdfPreview';
 import TestPdf from '../components/TestPdf';
 import PdfPreview from '../components/PdfPreview';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 import { testApi } from '../api/testApi';
+import type {
+  ApprovalRequest,
+  ApproveRequest,
+  RejectRequest,
+  RecallRequest,
+} from '../types/approval';
 import YearMonthFilter from '../components/YearMonthFilter';
 import { useYearMonthParams } from '../hooks/useYearMonthParams';
 import {
@@ -374,9 +381,12 @@ const AgTest = () => {
     }
 
     // バージョンを決定（新規モードの場合は0、通常モードの場合は選択されたバージョン、nullの場合は0）
-    const versionToFetch = isNewMode && !skipNewModeCheck
-      ? 0
-      : (selectedVersion !== null ? selectedVersion : 0);
+    const versionToFetch =
+      isNewMode && !skipNewModeCheck
+        ? 0
+        : selectedVersion !== null
+        ? selectedVersion
+        : 0;
 
     // バージョン指定でデータを取得（常にfetchPlanHistoryを使用）
     const res = await testApi.fetchPlanHistory(
@@ -407,13 +417,18 @@ const AgTest = () => {
     }
   };
 
-
   //---------------------------------------------------------------------------
   // 初回レンダリング処理
   //---------------------------------------------------------------------------
   useEffect(() => {
     fetchData();
-  }, [currentYear, currentIndexMonth, isNewMode, showExistingDataDialog, selectedVersion]);
+  }, [
+    currentYear,
+    currentIndexMonth,
+    isNewMode,
+    showExistingDataDialog,
+    selectedVersion,
+  ]);
 
   //---------------------------------------------------------------------------
   // コンテントタイプIDを数字のリストに変換する関数
@@ -484,7 +499,8 @@ const AgTest = () => {
       }
 
       // 上程中は承認者のみが編集可能
-      if (!canEdit()) { // useApproval: 編集可能かどうか判定
+      if (!canEdit()) {
+        // useApproval: 編集可能かどうか判定
         alert('上程中です。承認者のみが編集できます。');
         return;
       }
@@ -697,6 +713,135 @@ const AgTest = () => {
     autoFetch: true,
   });
 
+  //---------------------------------------------------------------------------
+  // AgTest固有の追加リクエスト（承認アクション後に実行）
+  //---------------------------------------------------------------------------
+  /**
+   * 新規上程後の追加リクエスト
+   */
+  const handleAfterCreate = useCallback(
+    async (request: ApprovalRequest) => {
+      try {
+        await axios.post('/api/agtest/approval-action', {
+          action: 'create',
+          approvalId: request.approvalId,
+          reportNo: request.reportNo,
+          year: currentYear,
+          month: currentIndexMonth + 1,
+          version: selectedVersion,
+          submitterName: request.submitterName,
+          approverNames: request.approverNames,
+          timestamp: new Date().toISOString(),
+        });
+        console.log('AgTest固有のリクエスト（新規上程）を送信しました');
+      } catch (error) {
+        console.error('AgTest固有のリクエスト（新規上程）の送信に失敗:', error);
+        // エラーは無視（元の処理には影響しない）
+      }
+    },
+    [currentYear, currentIndexMonth, selectedVersion]
+  );
+
+  /**
+   * 承認後の追加リクエスト
+   */
+  const handleAfterApprove = useCallback(
+    async (request: ApproveRequest) => {
+      try {
+        await axios.post('/api/agtest/approval-action', {
+          action: 'approve',
+          approvalId: request.approvalId,
+          reportNo: request.reportNo,
+          flowOrder: request.flowOrder,
+          userName: request.userName,
+          year: currentYear,
+          month: currentIndexMonth + 1,
+          version: selectedVersion,
+          timestamp: new Date().toISOString(),
+        });
+        console.log('AgTest固有のリクエスト（承認）を送信しました');
+      } catch (error) {
+        console.error('AgTest固有のリクエスト（承認）の送信に失敗:', error);
+      }
+    },
+    [currentYear, currentIndexMonth, selectedVersion]
+  );
+
+  /**
+   * 差し戻し後の追加リクエスト
+   */
+  const handleAfterReject = useCallback(
+    async (request: RejectRequest) => {
+      try {
+        await axios.post('/api/agtest/approval-action', {
+          action: 'reject',
+          approvalId: request.approvalId,
+          reportNo: request.reportNo,
+          flowOrder: request.flowOrder,
+          userName: request.userName,
+          comment: request.comment,
+          year: currentYear,
+          month: currentIndexMonth + 1,
+          version: selectedVersion,
+          timestamp: new Date().toISOString(),
+        });
+        console.log('AgTest固有のリクエスト（差し戻し）を送信しました');
+      } catch (error) {
+        console.error('AgTest固有のリクエスト（差し戻し）の送信に失敗:', error);
+      }
+    },
+    [currentYear, currentIndexMonth, selectedVersion]
+  );
+
+  /**
+   * 再上程後の追加リクエスト
+   */
+  const handleAfterResubmit = useCallback(
+    async (request: ApprovalRequest) => {
+      try {
+        await axios.post('/api/agtest/approval-action', {
+          action: 'resubmit',
+          approvalId: request.approvalId,
+          reportNo: request.reportNo,
+          year: currentYear,
+          month: currentIndexMonth + 1,
+          version: selectedVersion,
+          submitterName: request.submitterName,
+          approverNames: request.approverNames,
+          timestamp: new Date().toISOString(),
+        });
+        console.log('AgTest固有のリクエスト（再上程）を送信しました');
+      } catch (error) {
+        console.error('AgTest固有のリクエスト（再上程）の送信に失敗:', error);
+      }
+    },
+    [currentYear, currentIndexMonth, selectedVersion]
+  );
+
+  /**
+   * 取り戻し後の追加リクエスト
+   */
+  const handleAfterRecall = useCallback(
+    async (request: RecallRequest) => {
+      try {
+        await axios.post('/api/agtest/approval-action', {
+          action: 'recall',
+          approvalId: request.approvalId,
+          reportNo: request.reportNo,
+          flowOrder: request.flowOrder,
+          userName: request.userName,
+          year: currentYear,
+          month: currentIndexMonth + 1,
+          version: selectedVersion,
+          timestamp: new Date().toISOString(),
+        });
+        console.log('AgTest固有のリクエスト（取り戻し）を送信しました');
+      } catch (error) {
+        console.error('AgTest固有のリクエスト（取り戻し）の送信に失敗:', error);
+      }
+    },
+    [currentYear, currentIndexMonth, selectedVersion]
+  );
 
   // 上程状態をチェック（承認者のみが操作可能かどうか）
   const checkCanEdit = (): boolean => {
@@ -705,7 +850,8 @@ const AgTest = () => {
       return true;
     }
     // 完了済みの場合は編集不可
-    if (isCompleted()) { // useApproval: 完了しているか判定
+    if (isCompleted()) {
+      // useApproval: 完了しているか判定
       return false;
     }
     return canEdit(); // useApproval: 編集可能かどうか判定
@@ -761,50 +907,59 @@ const AgTest = () => {
             </button>
 
             {/* 上程状態表示（上程ボタンの右側） */}
-            {approvalStatus.length > 0 && (() => {
-              const flowDirection = getApprovalFlowDirection();
-              return (
-                <div className="flex flex-col rounded-lg border-2 border-orange-500 bg-orange-50 px-3 py-2">
-                  {flowDirection.action === '完了' ? (
-                    <div className="text-sm font-bold text-green-700">
-                      承認完了
-                    </div>
-                  ) : flowDirection.action === '差し戻し' ? (
-                    <>
-                      <div className="text-sm font-bold text-red-700">
-                        {flowDirection.flow.join(' → ')}
+            {approvalStatus.length > 0 &&
+              (() => {
+                const flowDirection = getApprovalFlowDirection();
+                return (
+                  <div className="flex flex-col rounded-lg border-2 border-orange-500 bg-orange-50 px-3 py-2">
+                    {flowDirection.action === '完了' ? (
+                      <div className="text-sm font-bold text-green-700">
+                        承認完了
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-red-600">
-                        <span>差戻</span>
-                        {flowDirection.actionDate && (
-                          <span>
-                            ({new Date(flowDirection.actionDate).toLocaleString('ja-JP')})
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  ) : flowDirection.flow.length > 0 ? (
-                    <>
+                    ) : flowDirection.action === '差し戻し' ? (
+                      <>
+                        <div className="text-sm font-bold text-red-700">
+                          {flowDirection.flow.join(' → ')}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-red-600">
+                          <span>差戻</span>
+                          {flowDirection.actionDate && (
+                            <span>
+                              (
+                              {new Date(
+                                flowDirection.actionDate
+                              ).toLocaleString('ja-JP')}
+                              )
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : flowDirection.flow.length > 0 ? (
+                      <>
+                        <div className="text-sm font-bold text-orange-700">
+                          {flowDirection.flow.join(' → ')}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-orange-600">
+                          <span>上程中</span>
+                          {flowDirection.actionDate && (
+                            <span>
+                              (
+                              {new Date(
+                                flowDirection.actionDate
+                              ).toLocaleString('ja-JP')}
+                              )
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
                       <div className="text-sm font-bold text-orange-700">
-                        {flowDirection.flow.join(' → ')}
+                        上程中
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-orange-600">
-                        <span>上程中</span>
-                        {flowDirection.actionDate && (
-                          <span>
-                            ({new Date(flowDirection.actionDate).toLocaleString('ja-JP')})
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-sm font-bold text-orange-700">
-                      上程中
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+                    )}
+                  </div>
+                );
+              })()}
           </div>
 
           <div>
@@ -828,7 +983,8 @@ const AgTest = () => {
               <select
                 value={selectedVersion ?? ''}
                 onChange={(e) => {
-                  const version = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                  const version =
+                    e.target.value === '' ? null : parseInt(e.target.value, 10);
                   setSelectedVersion(version);
                 }}
                 disabled={isLoadingVersions || availableVersions.length === 0}
@@ -960,6 +1116,12 @@ const AgTest = () => {
             approvalStatus={approvalStatus} // useApproval: 承認状態
             loading={false} // useApproval: 読み込み状態（必要に応じて追加）
             onApprovalChange={refreshApprovalStatus} // useApproval: 上程状態を再取得
+            // AgTest固有の追加リクエスト（各アクション後に実行）
+            onAfterCreate={handleAfterCreate}
+            onAfterApprove={handleAfterApprove}
+            onAfterReject={handleAfterReject}
+            onAfterResubmit={handleAfterResubmit}
+            onAfterRecall={handleAfterRecall}
           />
         )}
 
