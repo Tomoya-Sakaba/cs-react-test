@@ -1122,6 +1122,8 @@ const AgTest = () => {
             onAfterReject={handleAfterReject}
             onAfterResubmit={handleAfterResubmit}
             onAfterRecall={handleAfterRecall}
+            // 承認者選択の制限（3人必須）
+            requiredApproverCount={3}
           />
         )}
 
