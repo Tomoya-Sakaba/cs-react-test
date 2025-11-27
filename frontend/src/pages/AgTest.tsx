@@ -385,8 +385,8 @@ const AgTest = () => {
       isNewMode && !skipNewModeCheck
         ? 0
         : selectedVersion !== null
-        ? selectedVersion
-        : 0;
+          ? selectedVersion
+          : 0;
 
     // バージョン指定でデータを取得（常にfetchPlanHistoryを使用）
     const res = await testApi.fetchPlanHistory(
@@ -722,17 +722,17 @@ const AgTest = () => {
   const handleAfterCreate = useCallback(
     async (request: ApprovalRequest) => {
       try {
-        await axios.post('/api/agtest/approval-action', {
-          action: 'create',
-          approvalId: request.approvalId,
-          reportNo: request.reportNo,
-          year: currentYear,
-          month: currentIndexMonth + 1,
-          version: selectedVersion,
-          submitterName: request.submitterName,
-          approverNames: request.approverNames,
-          timestamp: new Date().toISOString(),
-        });
+        // await axios.post('/api/agtest/approval-action', {
+        //   action: 'create',
+        //   approvalId: request.approvalId,
+        //   reportNo: request.reportNo,
+        //   year: currentYear,
+        //   month: currentIndexMonth + 1,
+        //   version: selectedVersion,
+        //   submitterName: request.submitterName,
+        //   approverNames: request.approverNames,
+        //   timestamp: new Date().toISOString(),
+        // });
         console.log('AgTest固有のリクエスト（新規上程）を送信しました');
       } catch (error) {
         console.error('AgTest固有のリクエスト（新規上程）の送信に失敗:', error);
@@ -748,17 +748,17 @@ const AgTest = () => {
   const handleAfterApprove = useCallback(
     async (request: ApproveRequest) => {
       try {
-        await axios.post('/api/agtest/approval-action', {
-          action: 'approve',
-          approvalId: request.approvalId,
-          reportNo: request.reportNo,
-          flowOrder: request.flowOrder,
-          userName: request.userName,
-          year: currentYear,
-          month: currentIndexMonth + 1,
-          version: selectedVersion,
-          timestamp: new Date().toISOString(),
-        });
+        // await axios.post('/api/agtest/approval-action', {
+        //   action: 'approve',
+        //   approvalId: request.approvalId,
+        //   reportNo: request.reportNo,
+        //   flowOrder: request.flowOrder,
+        //   userName: request.userName,
+        //   year: currentYear,
+        //   month: currentIndexMonth + 1,
+        //   version: selectedVersion,
+        //   timestamp: new Date().toISOString(),
+        // });
         console.log('AgTest固有のリクエスト（承認）を送信しました');
       } catch (error) {
         console.error('AgTest固有のリクエスト（承認）の送信に失敗:', error);
@@ -773,18 +773,18 @@ const AgTest = () => {
   const handleAfterReject = useCallback(
     async (request: RejectRequest) => {
       try {
-        await axios.post('/api/agtest/approval-action', {
-          action: 'reject',
-          approvalId: request.approvalId,
-          reportNo: request.reportNo,
-          flowOrder: request.flowOrder,
-          userName: request.userName,
-          comment: request.comment,
-          year: currentYear,
-          month: currentIndexMonth + 1,
-          version: selectedVersion,
-          timestamp: new Date().toISOString(),
-        });
+        // await axios.post('/api/agtest/approval-action', {
+        //   action: 'reject',
+        //   approvalId: request.approvalId,
+        //   reportNo: request.reportNo,
+        //   flowOrder: request.flowOrder,
+        //   userName: request.userName,
+        //   comment: request.comment,
+        //   year: currentYear,
+        //   month: currentIndexMonth + 1,
+        //   version: selectedVersion,
+        //   timestamp: new Date().toISOString(),
+        // });
         console.log('AgTest固有のリクエスト（差し戻し）を送信しました');
       } catch (error) {
         console.error('AgTest固有のリクエスト（差し戻し）の送信に失敗:', error);
@@ -799,17 +799,17 @@ const AgTest = () => {
   const handleAfterResubmit = useCallback(
     async (request: ApprovalRequest) => {
       try {
-        await axios.post('/api/agtest/approval-action', {
-          action: 'resubmit',
-          approvalId: request.approvalId,
-          reportNo: request.reportNo,
-          year: currentYear,
-          month: currentIndexMonth + 1,
-          version: selectedVersion,
-          submitterName: request.submitterName,
-          approverNames: request.approverNames,
-          timestamp: new Date().toISOString(),
-        });
+        // await axios.post('/api/agtest/approval-action', {
+        //   action: 'resubmit',
+        //   approvalId: request.approvalId,
+        //   reportNo: request.reportNo,
+        //   year: currentYear,
+        //   month: currentIndexMonth + 1,
+        //   version: selectedVersion,
+        //   submitterName: request.submitterName,
+        //   approverNames: request.approverNames,
+        //   timestamp: new Date().toISOString(),
+        // });
         console.log('AgTest固有のリクエスト（再上程）を送信しました');
       } catch (error) {
         console.error('AgTest固有のリクエスト（再上程）の送信に失敗:', error);
@@ -824,17 +824,17 @@ const AgTest = () => {
   const handleAfterRecall = useCallback(
     async (request: RecallRequest) => {
       try {
-        await axios.post('/api/agtest/approval-action', {
-          action: 'recall',
-          approvalId: request.approvalId,
-          reportNo: request.reportNo,
-          flowOrder: request.flowOrder,
-          userName: request.userName,
-          year: currentYear,
-          month: currentIndexMonth + 1,
-          version: selectedVersion,
-          timestamp: new Date().toISOString(),
-        });
+        // await axios.post('/api/agtest/approval-action', {
+        //   action: 'recall',
+        //   approvalId: request.approvalId,
+        //   reportNo: request.reportNo,
+        //   flowOrder: request.flowOrder,
+        //   userName: request.userName,
+        //   year: currentYear,
+        //   month: currentIndexMonth + 1,
+        //   version: selectedVersion,
+        //   timestamp: new Date().toISOString(),
+        // });
         console.log('AgTest固有のリクエスト（取り戻し）を送信しました');
       } catch (error) {
         console.error('AgTest固有のリクエスト（取り戻し）の送信に失敗:', error);
@@ -1124,6 +1124,7 @@ const AgTest = () => {
             onAfterRecall={handleAfterRecall}
             // 承認者選択の制限（3人必須）
             requiredApproverCount={3}
+            approverLabels={['社長', '課長', '班長']}
           />
         )}
 

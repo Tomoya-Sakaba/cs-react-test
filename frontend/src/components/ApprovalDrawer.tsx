@@ -23,6 +23,8 @@ import {
   resubmitApproval,
 } from '../api/approvalApi';
 import ApprovalFlowCard from './ApprovalFlowCard';
+import ApproverSelector from './ApproverSelector';
+import UnlimitedApproverSelector from './UnlimitedApproverSelector';
 
 // ============================================================================
 // 型定義
@@ -52,6 +54,7 @@ type ApprovalDrawerProps = {
   onAfterRecall?: (request: RecallRequest) => Promise<void> | void; // 取り戻し後
   // 承認者選択の制限（オプション）
   requiredApproverCount?: number; // 必須の承認者数（指定した場合、その数だけ選択する必要がある）
+  approverLabels?: string[]; // 承認者のラベル配列（例：["社長", "課長", "班長"]）。requiredApproverCountと同数の要素が必要
 };
 
 // ============================================================================
@@ -70,6 +73,7 @@ const ApprovalDrawer = ({
   onAfterResubmit,
   onAfterRecall,
   requiredApproverCount,
+  approverLabels,
 }: ApprovalDrawerProps) => {
   // ============================================================================
   // 状態管理
@@ -86,13 +90,19 @@ const ApprovalDrawer = ({
   const [approvalComment, setApprovalComment] = useState('');
   const [hasResetResubmissionForm, setHasResetResubmissionForm] =
     useState(false);
+  // 各承認者枠の検索キーワード（固定数の場合）
+  const [searchKeywords, setSearchKeywords] = useState<string[]>([]);
+  // 各承認者枠の開閉状態（固定数の場合）
+  const [openDropdownIndex, setOpenDropdownIndex] = useState<number | null>(null);
 
   // 固定数の承認者配列を初期化
   useEffect(() => {
     if (requiredApproverCount !== undefined) {
       setFixedApprovers(Array(requiredApproverCount).fill(undefined));
+      setSearchKeywords(Array(requiredApproverCount).fill(''));
     } else {
       setFixedApprovers([]);
+      setSearchKeywords([]);
     }
   }, [requiredApproverCount]);
 
@@ -259,15 +269,14 @@ const ApprovalDrawer = ({
     }
   };
 
-  // チェックボックスの選択状態を判定（制限なしの場合）
-  const isApproverSelected = (userId: number) => {
-    if (requiredApproverCount !== undefined) return false; // 固定数の場合は使用しない
-    return selectedApprovers.some((a) => a.id === userId);
-  };
-
-  // 承認者として選択可能なユーザー一覧を取得
+  // 承認者として選択可能なユーザー一覧を取得（制限なしの場合）
+  // 選択済みのユーザーは除外する
   const getAvailableUsers = () => {
-    return users.filter((user) => user.name !== currentUser?.name);
+    const selectedIds = selectedApprovers.map((a) => a.id);
+    return users.filter(
+      (user) =>
+        user.name !== currentUser?.name && !selectedIds.includes(user.id)
+    );
   };
 
   // 固定数の承認者選択用：指定位置の承認者を取得
@@ -282,12 +291,25 @@ const ApprovalDrawer = ({
       .map((a, idx) => (idx !== currentIndex && a ? a.id : null))
       .filter((id) => id !== null) as number[];
 
-    return users.filter(
+    const availableUsers = users.filter(
       (user) =>
         user.name !== currentUser?.name &&
         (!selectedIds.includes(user.id) || user.id === currentApprover?.id)
     );
+
+    // 検索キーワードでフィルタリング（名前とメールアドレスのみ）
+    const keyword = searchKeywords[currentIndex]?.toLowerCase() || '';
+    if (keyword) {
+      return availableUsers.filter(
+        (user) =>
+          user.name.toLowerCase().includes(keyword) ||
+          user.email?.toLowerCase().includes(keyword)
+      );
+    }
+
+    return availableUsers;
   };
+
 
   // 固定数の承認者を通常の配列に変換（API送信用）
   const getSelectedApproversForSubmit = (): User[] => {
@@ -722,67 +744,50 @@ const ApprovalDrawer = ({
             )}
           </label>
           {requiredApproverCount !== undefined ? (
-            // 固定数の承認者選択UI
-            <div className="space-y-3">
-              {Array.from({ length: requiredApproverCount }, (_, index) => (
-                <div
-                  key={index}
-                  className="rounded border-2 border-gray-300 bg-white"
-                >
-                  <select
-                    value={getApproverAt(index)?.id || ''}
-                    onChange={(e) => {
-                      const userId =
-                        e.target.value === ''
-                          ? null
-                          : parseInt(e.target.value, 10);
-                      handleSelectApproverAt(index, userId);
+            // 固定数の承認者選択UI（モダンなカード型）
+            <div className="space-y-4">
+              {Array.from({ length: requiredApproverCount }, (_, index) => {
+                const selectedApprover = getApproverAt(index);
+                const isOpen = openDropdownIndex === index;
+                const availableUsers = getAvailableUsersForFixedSelection(index);
+
+                return (
+                  <ApproverSelector
+                    key={index}
+                    label={approverLabels?.[index]}
+                    selectedApprover={selectedApprover}
+                    availableUsers={availableUsers}
+                    searchKeyword={searchKeywords[index] || ''}
+                    isOpen={isOpen}
+                    onSelect={(userId) => handleSelectApproverAt(index, userId)}
+                    onSearchChange={(keyword) => {
+                      setSearchKeywords((prev) => {
+                        const newKeywords = [...prev];
+                        newKeywords[index] = keyword;
+                        return newKeywords;
+                      });
                     }}
-                    className="w-full rounded border-0 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                  >
-                    <option value="">
-                      {index + 1}人目の承認者を選択してください
-                    </option>
-                    {getAvailableUsersForFixedSelection(index).map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name}
-                      </option>
-                    ))}
-                  </select>
-                  {getApproverAt(index) && (
-                    <div className="px-3 pb-2 text-xs text-gray-600">
-                      {getApproverAt(index)?.email}
-                    </div>
-                  )}
-                </div>
-              ))}
+                    onOpenChange={(isOpen) =>
+                      setOpenDropdownIndex(isOpen ? index : null)
+                    }
+                  />
+                );
+              })}
               {fixedApprovers.filter((a) => a !== undefined).length <
                 requiredApproverCount && (
-                <div className="rounded border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                  {requiredApproverCount -
-                    fixedApprovers.filter((a) => a !== undefined).length}
-                  人の承認者を選択してください
-                </div>
-              )}
+                  <div className="rounded border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                    {requiredApproverCount -
+                      fixedApprovers.filter((a) => a !== undefined).length}
+                    人の承認者を選択してください
+                  </div>
+                )}
             </div>
           ) : (
-            // 制限なしの承認者選択UI（従来のチェックボックス形式）
-            <div className="max-h-64 overflow-y-auto rounded border border-gray-300 p-3">
-              {getAvailableUsers().map((user) => (
-                <label
-                  key={user.id}
-                  className="flex items-center gap-2 px-2 py-2 hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={isApproverSelected(user.id)}
-                    onChange={() => handleToggleApprover(user.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-800">{user.name}</span>
-                </label>
-              ))}
-            </div>
+            // 制限なしの承認者選択UI（モダンなカード型）
+            <UnlimitedApproverSelector
+              availableUsers={getAvailableUsers()}
+              onSelect={(userId) => handleToggleApprover(userId)}
+            />
           )}
         </div>
       </>
@@ -863,7 +868,7 @@ const ApprovalDrawer = ({
                         !currentUser ||
                         (requiredApproverCount !== undefined
                           ? fixedApprovers.filter((a) => a !== undefined)
-                              .length !== requiredApproverCount
+                            .length !== requiredApproverCount
                           : selectedApprovers.length === 0)
                       }
                       className="w-full rounded bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:bg-gray-400 disabled:cursor-not-allowed"
@@ -902,18 +907,18 @@ const ApprovalDrawer = ({
                           const nextPendingApproval = getNextPendingApproval();
                           const isNextPendingRecord =
                             nextPendingApproval?.approvalId ===
-                              record.approvalId &&
+                            record.approvalId &&
                             nextPendingApproval?.reportNo === record.reportNo &&
                             nextPendingApproval?.flowOrder === record.flowOrder;
                           const currentPendingApproval =
                             getCurrentPendingApproval();
                           const isCurrentPendingRecord =
                             currentPendingApproval?.approvalId ===
-                              record.approvalId &&
+                            record.approvalId &&
                             currentPendingApproval?.reportNo ===
-                              record.reportNo &&
+                            record.reportNo &&
                             currentPendingApproval?.flowOrder ===
-                              record.flowOrder;
+                            record.flowOrder;
                           const user = users.find(
                             (u) => u.name === record.userName
                           );
@@ -969,7 +974,7 @@ const ApprovalDrawer = ({
                               if (!rejectionTarget) {
                                 return rejectedApprover
                                   ? record.flowOrder <=
-                                      rejectedApprover.flowOrder
+                                  rejectedApprover.flowOrder
                                   : true;
                               }
                               return (
@@ -982,7 +987,8 @@ const ApprovalDrawer = ({
                               const showArrow =
                                 record.status === 3 ||
                                 index < filteredRecords.length - 1 ||
-                                getSelectedApproversForSubmit().length > 0;
+                                getSelectedApproversForSubmit().length > 0 ||
+                                requiredApproverCount !== undefined;
 
                               const user = users.find(
                                 (u) => u.name === record.userName
@@ -1017,55 +1023,166 @@ const ApprovalDrawer = ({
                               );
                             })}
 
-                          {/* 選択した承認者（すべて薄緑） */}
-                          {getSelectedApproversForSubmit().map(
-                            (approver, index) => (
-                              <div
-                                key={`preview-${approver.id}-${index}`}
-                                className="flex flex-col items-center"
-                              >
-                                {renderPreviewUserCard(approver, 'approver')}
-                                {index <
-                                  getSelectedApproversForSubmit().length -
-                                    1 && (
-                                  <div className="my-1 text-2xl text-orange-300">
-                                    ↓
+                          {/* 選択した承認者（固定数の枠を表示） */}
+                          {requiredApproverCount !== undefined
+                            ? Array.from(
+                              { length: requiredApproverCount }, (_, index) => {
+                                const approver = fixedApprovers[index];
+                                return (
+                                  <div
+                                    key={`preview-fixed-${index}`}
+                                    className="flex flex-col items-center"
+                                  >
+                                    {approver ? (
+                                      <div className="relative w-full group">
+                                        {renderPreviewUserCard(
+                                          approver,
+                                          'approver'
+                                        )}
+                                        {/* 削除ボタン（固定数の場合） */}
+                                        <button
+                                          onClick={() =>
+                                            handleSelectApproverAt(index, null)
+                                          }
+                                          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-400 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-300"
+                                          title="選択を解除"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="w-full rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-3">
+                                        <div className="text-sm text-gray-400 text-center">
+                                          {approverLabels && approverLabels[index]
+                                            ? approverLabels[index]
+                                            : `${index + 1}人目の承認者`}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {index < requiredApproverCount - 1 && (
+                                      <div className="my-1 text-2xl text-orange-300">
+                                        ↓
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
+                                );
+                              }
                             )
-                          )}
+                            : getSelectedApproversForSubmit().map(
+                              (approver, index) => (
+                                <div
+                                  key={`preview-${approver.id}-${index}`}
+                                  className="flex flex-col items-center"
+                                >
+                                  <div className="relative w-full group">
+                                    {renderPreviewUserCard(approver, 'approver')}
+                                    {/* 削除ボタン（制限なしの場合のみ） */}
+                                    <button
+                                      onClick={() =>
+                                        handleToggleApprover(approver.id)
+                                      }
+                                      className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-400 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-300"
+                                      title="選択を解除"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                  {index <
+                                    getSelectedApproversForSubmit().length -
+                                    1 && (
+                                      <div className="my-1 text-2xl text-orange-300">
+                                        ↓
+                                      </div>
+                                    )}
+                                </div>
+                              )
+                            )}
                         </div>
                       ) : currentUser ||
-                        getSelectedApproversForSubmit().length > 0 ? (
+                        getSelectedApproversForSubmit().length > 0 ||
+                        requiredApproverCount !== undefined ? (
                         <div className="space-y-3">
                           {/* 上程者（オレンジ） */}
                           {currentUser && (
                             <div className="flex flex-col items-center">
                               {renderPreviewUserCard(currentUser, 'submitter')}
-                              {getSelectedApproversForSubmit().length > 0 && (
-                                <div className="my-1 text-2xl text-orange-300">
-                                  ↓
-                                </div>
-                              )}
+                              {(getSelectedApproversForSubmit().length > 0 ||
+                                requiredApproverCount !== undefined) && (
+                                  <div className="my-1 text-2xl text-orange-300">
+                                    ↓
+                                  </div>
+                                )}
                             </div>
                           )}
 
-                          {/* 承認者（すべて薄緑） */}
-                          {selectedApprovers.map((approver, index) => (
-                            <div
-                              key={`preview-${approver.id}-${index}`}
-                              className="flex flex-col items-center"
-                            >
-                              {renderPreviewUserCard(approver, 'approver')}
-                              {index <
-                                getSelectedApproversForSubmit().length - 1 && (
-                                <div className="my-1 text-2xl text-orange-300">
-                                  ↓
+                          {/* 承認者（固定数の枠を表示） */}
+                          {requiredApproverCount !== undefined
+                            ? Array.from({ length: requiredApproverCount }, (_, index) => {
+                              const approver = fixedApprovers[index];
+                              return (
+                                <div
+                                  key={`preview-fixed-${index}`}
+                                  className="flex flex-col items-center"
+                                >
+                                  {approver ? (
+                                    <div className="relative w-full group">
+                                      {renderPreviewUserCard(approver, 'approver')}
+                                      {/* 削除ボタン（固定数の場合） */}
+                                      <button
+                                        onClick={() =>
+                                          handleSelectApproverAt(index, null)
+                                        }
+                                        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-400 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-300"
+                                        title="選択を解除"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="w-full rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-3">
+                                      <div className="text-sm text-gray-400 text-center">
+                                        {approverLabels && approverLabels[index]
+                                          ? approverLabels[index]
+                                          : `${index + 1}人目の承認者`}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {index < requiredApproverCount - 1 && (
+                                    <div className="my-1 text-2xl text-orange-300">
+                                      ↓
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                              );
+                            }
+                            )
+                            : selectedApprovers.map((approver, index) => (
+                              <div
+                                key={`preview-${approver.id}-${index}`}
+                                className="flex flex-col items-center"
+                              >
+                                <div className="relative w-full group">
+                                  {renderPreviewUserCard(approver, 'approver')}
+                                  {/* 削除ボタン（制限なしの場合のみ） */}
+                                  <button
+                                    onClick={() =>
+                                      handleToggleApprover(approver.id)
+                                    }
+                                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-gray-400 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-300"
+                                    title="選択を解除"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                                {index <
+                                  getSelectedApproversForSubmit().length -
+                                  1 && (
+                                    <div className="my-1 text-2xl text-orange-300">
+                                      ↓
+                                    </div>
+                                  )}
+                              </div>
+                            ))}
                         </div>
                       ) : (
                         <div className="flex items-center justify-center py-8 rounded border-2 border-dashed border-gray-300">
