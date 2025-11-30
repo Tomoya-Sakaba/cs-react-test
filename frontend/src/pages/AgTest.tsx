@@ -1107,26 +1107,25 @@ const AgTest = () => {
           </div>
         )}
 
-        {/* 上程Drawer（開いている時のみレンダリング） */}
-        {isDrawerOpen && ( // useApproval: Drawerの開閉状態を取得
-          <ApprovalDrawer
-            onClose={() => setIsDrawerOpen(false)} // useApproval: Drawerの開閉状態を設定
-            approvalId="0101" // ページ固有のapprovalId（固定値）
-            reportNo={reportNo}
-            approvalStatus={approvalStatus} // useApproval: 承認状態
-            loading={false} // useApproval: 読み込み状態（必要に応じて追加）
-            onApprovalChange={refreshApprovalStatus} // useApproval: 上程状態を再取得
-            // AgTest固有の追加リクエスト（各アクション後に実行）
-            onAfterCreate={handleAfterCreate}
-            onAfterApprove={handleAfterApprove}
-            onAfterReject={handleAfterReject}
-            onAfterResubmit={handleAfterResubmit}
-            onAfterRecall={handleAfterRecall}
-            // 承認者選択の制限（3人必須）
-            requiredApproverCount={3}
-            approverLabels={['社長', '課長', '班長']}
-          />
-        )}
+        {/* 上程Drawer（常にレンダリング、isOpenで制御） */}
+        <ApprovalDrawer
+          isOpen={isDrawerOpen} // useApproval: Drawerの開閉状態を取得
+          onClose={() => setIsDrawerOpen(false)} // useApproval: Drawerの開閉状態を設定
+          approvalId="0101" // ページ固有のapprovalId（固定値）
+          reportNo={reportNo}
+          approvalStatus={approvalStatus} // useApproval: 承認状態
+          loading={false} // useApproval: 読み込み状態（必要に応じて追加）
+          onApprovalChange={refreshApprovalStatus} // useApproval: 上程状態を再取得
+          // AgTest固有の追加リクエスト（各アクション後に実行）
+          onAfterCreate={handleAfterCreate}
+          onAfterApprove={handleAfterApprove}
+          onAfterReject={handleAfterReject}
+          onAfterResubmit={handleAfterResubmit}
+          onAfterRecall={handleAfterRecall}
+          // 承認者選択の制限（3人必須）
+          requiredApproverCount={3}
+          approverLabels={['社長', '課長', '班長']}
+        />
 
         {/* 既存データがある場合の確認ダイアログ */}
         {showExistingDataDialog && (

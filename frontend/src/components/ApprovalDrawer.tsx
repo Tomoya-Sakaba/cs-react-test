@@ -23,7 +23,6 @@ import {
   resubmitApproval,
 } from '../api/approvalApi';
 import ApprovalFlowCard from './ApprovalFlowCard';
-import ApproverSelector from './ApproverSelector';
 import UnlimitedApproverSelector from './UnlimitedApproverSelector';
 
 // ============================================================================
@@ -40,6 +39,7 @@ export type User = {
 };
 
 type ApprovalDrawerProps = {
+  isOpen: boolean; // 開閉状態（親から受け取る）
   onClose: () => void;
   approvalId: string; // 必須（4桁の文字列、例："0101"）
   reportNo: string; // 必須
@@ -61,6 +61,7 @@ type ApprovalDrawerProps = {
 // コンポーネント
 // ============================================================================
 const ApprovalDrawer = ({
+  isOpen,
   onClose,
   approvalId,
   reportNo,
@@ -90,19 +91,13 @@ const ApprovalDrawer = ({
   const [approvalComment, setApprovalComment] = useState('');
   const [hasResetResubmissionForm, setHasResetResubmissionForm] =
     useState(false);
-  // 各承認者枠の検索キーワード（固定数の場合）
-  const [searchKeywords, setSearchKeywords] = useState<string[]>([]);
-  // 各承認者枠の開閉状態（固定数の場合）
-  const [openDropdownIndex, setOpenDropdownIndex] = useState<number | null>(null);
 
   // 固定数の承認者配列を初期化
   useEffect(() => {
     if (requiredApproverCount !== undefined) {
       setFixedApprovers(Array(requiredApproverCount).fill(undefined));
-      setSearchKeywords(Array(requiredApproverCount).fill(''));
     } else {
       setFixedApprovers([]);
-      setSearchKeywords([]);
     }
   }, [requiredApproverCount]);
 
@@ -279,35 +274,16 @@ const ApprovalDrawer = ({
     );
   };
 
-  // 固定数の承認者選択用：指定位置の承認者を取得
-  const getApproverAt = (index: number): User | undefined => {
-    return fixedApprovers[index];
-  };
-
-  // 固定数の承認者選択用：選択可能なユーザー一覧（既に選択されているユーザーを除外、ただし現在の位置のユーザーは含める）
-  const getAvailableUsersForFixedSelection = (currentIndex: number) => {
-    const currentApprover = getApproverAt(currentIndex);
+  // 固定数の承認者選択用：選択可能なユーザー一覧（既に選択されているユーザーを除外）
+  const getAvailableUsersForFixedSelection = () => {
     const selectedIds = fixedApprovers
-      .map((a, idx) => (idx !== currentIndex && a ? a.id : null))
-      .filter((id) => id !== null) as number[];
+      .filter((a) => a !== undefined)
+      .map((a) => a!.id);
 
-    const availableUsers = users.filter(
+    return users.filter(
       (user) =>
-        user.name !== currentUser?.name &&
-        (!selectedIds.includes(user.id) || user.id === currentApprover?.id)
+        user.name !== currentUser?.name && !selectedIds.includes(user.id)
     );
-
-    // 検索キーワードでフィルタリング（名前とメールアドレスのみ）
-    const keyword = searchKeywords[currentIndex]?.toLowerCase() || '';
-    if (keyword) {
-      return availableUsers.filter(
-        (user) =>
-          user.name.toLowerCase().includes(keyword) ||
-          user.email?.toLowerCase().includes(keyword)
-      );
-    }
-
-    return availableUsers;
   };
 
 
@@ -744,46 +720,61 @@ const ApprovalDrawer = ({
             )}
           </label>
           {requiredApproverCount !== undefined ? (
-            // 固定数の承認者選択UI（モダンなカード型）
-            <div className="space-y-4">
+            // 固定数の承認者選択UI（必要な人数分の枠を最初から表示）
+            <div className="space-y-3">
               {Array.from({ length: requiredApproverCount }, (_, index) => {
-                const selectedApprover = getApproverAt(index);
-                const isOpen = openDropdownIndex === index;
-                const availableUsers = getAvailableUsersForFixedSelection(index);
-
+                const approver = fixedApprovers[index];
                 return (
-                  <ApproverSelector
-                    key={index}
-                    label={approverLabels?.[index]}
-                    selectedApprover={selectedApprover}
-                    availableUsers={availableUsers}
-                    searchKeyword={searchKeywords[index] || ''}
-                    isOpen={isOpen}
-                    onSelect={(userId) => handleSelectApproverAt(index, userId)}
-                    onSearchChange={(keyword) => {
-                      setSearchKeywords((prev) => {
-                        const newKeywords = [...prev];
-                        newKeywords[index] = keyword;
-                        return newKeywords;
-                      });
-                    }}
-                    onOpenChange={(isOpen) =>
-                      setOpenDropdownIndex(isOpen ? index : null)
-                    }
-                  />
+                  <div key={`slot-${index}`} className="space-y-1">
+                    {/* ラベル */}
+                    {approverLabels?.[index] && (
+                      <label className="block text-sm font-semibold text-gray-700">
+                        {approverLabels[index]}
+                      </label>
+                    )}
+                    {approver ? (
+                      // 選択済みの場合はカード表示
+                      <div className="group relative">
+                        <div className="flex items-center gap-3 rounded-lg border-2 border-orange-300 bg-orange-50 px-4 py-3 transition-all hover:border-orange-400 hover:shadow-md">
+                          {/* ユーザー情報 */}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-gray-900">
+                              {approver.name}
+                            </div>
+                            {approver.email && (
+                              <div className="text-xs text-gray-600">
+                                {approver.email}
+                              </div>
+                            )}
+                          </div>
+                          {/* 削除ボタン */}
+                          <button
+                            onClick={() => handleSelectApproverAt(index, null)}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-gray-400 transition-all hover:bg-red-50 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-300"
+                            title="選択を解除"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      // 未選択の場合は検索コンポーネント表示
+                      <UnlimitedApproverSelector
+                        availableUsers={getAvailableUsersForFixedSelection()}
+                        onSelect={(userId) => handleSelectApproverAt(index, userId)}
+                        placeholder={
+                          approverLabels?.[index]
+                            ? `${approverLabels[index]}を検索...`
+                            : '承認者を検索...'
+                        }
+                      />
+                    )}
+                  </div>
                 );
               })}
-              {fixedApprovers.filter((a) => a !== undefined).length <
-                requiredApproverCount && (
-                  <div className="rounded border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                    {requiredApproverCount -
-                      fixedApprovers.filter((a) => a !== undefined).length}
-                    人の承認者を選択してください
-                  </div>
-                )}
             </div>
           ) : (
-            // 制限なしの承認者選択UI（モダンなカード型）
+            // 制限なしの承認者選択UI
             <UnlimitedApproverSelector
               availableUsers={getAvailableUsers()}
               onSelect={(userId) => handleToggleApprover(userId)}
@@ -827,13 +818,17 @@ const ApprovalDrawer = ({
     <>
       {/* 背景オーバーレイ */}
       <div
-        className="fixed inset-0 z-40 bg-black bg-opacity-50 transition-opacity"
+        className={`fixed inset-0 z-40 bg-black transition-opacity duration-300 ${
+          isOpen ? 'opacity-50' : 'opacity-0 pointer-events-none'
+        }`}
         onClick={handleClose}
       />
 
       {/* Drawer */}
       <div
-        className={`fixed right-0 top-0 z-50 h-full bg-white shadow-xl transition-all duration-300 ease-in-out translate-x-0 ${drawerWidth}`}
+        className={`fixed right-0 top-0 z-50 h-full bg-white shadow-xl transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        } ${drawerWidth}`}
       >
         <div className="flex h-full flex-col">
           {/* ヘッダー */}

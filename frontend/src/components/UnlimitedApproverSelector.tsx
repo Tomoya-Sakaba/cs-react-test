@@ -1,20 +1,28 @@
 /* ----------------------------------------------------------------
  * UnlimitedApproverSelector.tsx
- * 制限なしの承認者選択コンポーネント
- * 複数の承認者を選択可能
+ * 承認者検索・選択コンポーネント
+ * シンプルな検索機能のみを提供
  * ---------------------------------------------------------------- */
 
 import { useState } from 'react';
 import type { User } from './ApprovalDrawer';
 
 type UnlimitedApproverSelectorProps = {
+  /** 選択可能なユーザー一覧 */
   availableUsers: User[];
+  /** ユーザーが選択された時のコールバック */
   onSelect: (userId: number) => void;
+  /** オプションのラベル */
+  label?: string;
+  /** 検索プレースホルダー */
+  placeholder?: string;
 };
 
 const UnlimitedApproverSelector = ({
   availableUsers,
   onSelect,
+  label,
+  placeholder = '承認者を検索...',
 }: UnlimitedApproverSelectorProps) => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -38,6 +46,13 @@ const UnlimitedApproverSelector = ({
 
   return (
     <div className="space-y-3">
+      {/* ラベル */}
+      {label && (
+        <label className="block text-sm font-semibold text-gray-700">
+          {label}
+        </label>
+      )}
+
       {/* 検索バー */}
       <div className="relative">
         <input
@@ -45,7 +60,7 @@ const UnlimitedApproverSelector = ({
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
           onFocus={() => setIsDropdownOpen(true)}
-          placeholder="承認者を検索..."
+          placeholder={placeholder}
           className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-sm transition-all focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-200"
         />
       </div>
