@@ -91,7 +91,8 @@ export type UseApprovalReturn = {
 
   // 判定関数
   hasExistingFlow: () => boolean; // 既存の上程フローがあるか
-  canEdit: () => boolean; // 編集可能かどうか
+  canEdit: () => boolean; // 編集可能かどうか（後方互換性のため残す）
+  getEditStatus: () => { canEdit: boolean; message: string }; // 編集可否と理由を取得
   isCompleted: () => boolean; // 完了しているか
   getApprovalFlowDirection: () => ApprovalFlowDirection; // 現在の承認フローの方向（誰から誰に）を取得
 

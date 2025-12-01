@@ -73,7 +73,7 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
   }, [approvalStatus]);
 
   /**
-   * 編集可能かどうかをチェック
+   * 編集可能かどうかをチェック（後方互換性のため残す）
    */
   const canEdit = useCallback((): boolean => {
     if (approvalStatus.length === 0) {
@@ -96,6 +96,57 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
       (a) => a.status === 1 && a.userName === currentUser.name
     );
     return pendingApproval !== undefined;
+  }, [approvalStatus, currentUser]);
+
+  /**
+   * 編集可否と理由を取得
+   */
+  const getEditStatus = useCallback((): {
+    canEdit: boolean;
+    message: string;
+  } => {
+    // 上程前：誰でも編集可能
+    if (approvalStatus.length === 0) {
+      return { canEdit: true, message: '' };
+    }
+
+    // 完了済み：誰も編集不可
+    if (approvalStatus.some((a) => a.status === 5)) {
+      return {
+        canEdit: false,
+        message: '承認が完了しています。編集する場合はバージョンを切ってください',
+      };
+    }
+
+    // 差し戻し中：上程者のみ編集可能
+    const isRejected = approvalStatus.some((a) => a.status === 3);
+    if (isRejected) {
+      const submitterRecord =
+        approvalStatus.find((a) => a.flowOrder === 0) || null;
+      const isSubmitter = submitterRecord?.userName === currentUser?.name;
+      return {
+        canEdit: isSubmitter,
+        message: isSubmitter
+          ? ''
+          : '差し戻し中です。上程者のみが編集可能です。',
+      };
+    }
+
+    // 上程中：承認待ちの人のみ編集可能
+    if (!currentUser) {
+      return {
+        canEdit: false,
+        message: '上程中です。承認者のみが編集できます。',
+      };
+    }
+
+    const pendingApproval = approvalStatus.find(
+      (a) => a.status === 1 && a.userName === currentUser.name
+    );
+    return {
+      canEdit: pendingApproval !== undefined,
+      message: pendingApproval ? '' : '上程中です。承認者のみが編集できます。',
+    };
   }, [approvalStatus, currentUser]);
 
   /**
@@ -216,6 +267,7 @@ export const useApproval = (options: UseApprovalOptions): UseApprovalReturn => {
     // 判定関数
     hasExistingFlow,
     canEdit,
+    getEditStatus,
     isCompleted,
     getApprovalFlowDirection,
 

@@ -492,16 +492,10 @@ const AgTest = () => {
   const toggleEditMode = () => {
     // 新規作成モードの場合は上程チェックをスキップ
     if (!isNewMode) {
-      // 上程完了済みの場合は編集不可
-      if (approvalStatus.some((a) => a.status === 5)) {
-        alert('上程が完了しているため、編集できません。');
-        return;
-      }
-
-      // 上程中は承認者のみが編集可能
-      if (!canEdit()) {
-        // useApproval: 編集可能かどうか判定
-        alert('上程中です。承認者のみが編集できます。');
+      // 編集可否をチェック
+      const editStatus = getEditStatus();
+      if (!editStatus.canEdit) {
+        alert(editStatus.message);
         return;
       }
     }
@@ -702,6 +696,7 @@ const AgTest = () => {
   const {
     approvalStatus,
     canEdit,
+    getEditStatus,
     isCompleted,
     isDrawerOpen,
     setIsDrawerOpen,
