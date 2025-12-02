@@ -28,6 +28,9 @@ import {
 } from '../utils/mappingData';
 import Toggle from '../components/Toggle';
 import CustomInputEditor from '../components/CustomInputEditor';
+import TimeInputEditor from '../components/TimeInputEditor';
+import CompanyCellRenderer from '../components/CompanyCellRenderer';
+import CompanyCellEditor from '../components/CompanyCellEditor';
 import type { AgGridReact as AgGridReactType } from 'ag-grid-react'; // 型補完用
 import { convertPlanData } from '../utils/convertData';
 import ApprovalDrawer from '../components/ApprovalDrawer';
@@ -46,9 +49,10 @@ export type fetchTestType = {
 };
 
 export type testItem = {
-  company: number | null;
-  vol: number | null;
-  time: string | null;
+  // 値なしは null ではなく undefined を基本としつつ、過去データとの互換のため null も許容
+  company: number | undefined;
+  vol: number | undefined;
+  time: string | undefined;
   isChanged?: boolean;
 };
 
@@ -84,6 +88,14 @@ export type MapedTestType = {
   note: string;
 };
 
+// 会社マスタ（m_company）の型
+export type Company = {
+  companyId: number;
+  companyName: string;
+  bgColor: string;
+  type: number;
+};
+
 // 初期表示するcontentTypeIdのリストを決定する関数
 const getInitialContentTypeIds = (data: MapdePlan[]): number[] => {
   const initialIds: number[] = [2, 4]; // デフォルトは2, 4のみ
@@ -96,10 +108,11 @@ const getInitialContentTypeIds = (data: MapdePlan[]): number[] => {
     if (!hasContentType1) {
       const contentType1 = row.contentType[1];
       if (contentType1) {
+        // null / undefined 以外（0 や '' は有効な値とみなす）
         hasContentType1 =
-          contentType1.company !== null ||
-          contentType1.vol !== null ||
-          contentType1.time !== null;
+          contentType1.company != null ||
+          contentType1.vol != null ||
+          contentType1.time != null;
       }
     }
 
@@ -108,9 +121,9 @@ const getInitialContentTypeIds = (data: MapdePlan[]): number[] => {
       const contentType3 = row.contentType[3];
       if (contentType3) {
         hasContentType3 =
-          contentType3.company !== null ||
-          contentType3.vol !== null ||
-          contentType3.time !== null;
+          contentType3.company != null ||
+          contentType3.vol != null ||
+          contentType3.time != null;
       }
     }
 
@@ -132,7 +145,9 @@ const getInitialContentTypeIds = (data: MapdePlan[]): number[] => {
 const getColumnDefs = (
   isEditing: boolean,
   selectedIds: number[],
-  originalList: ContentTypeList[]
+  originalList: ContentTypeList[],
+  companies: Company[],
+  onRequestStopEditing: () => void
 ): (ColDef<MapdePlan> | ColGroupDef<MapdePlan>)[] => {
   // 選択されたIDのみをフィルタリングし、オリジナルの順序でソート
   const filteredAndSorted = originalList
@@ -168,8 +183,12 @@ const getColumnDefs = (
           minWidth: 90,
           flex: 1,
           editable: isEditing,
-          cellEditor: CustomInputEditor,
-          cellEditorParams: { type: 'number' },
+          cellRenderer: CompanyCellRenderer,
+          cellRendererParams: { companies },
+          cellEditor: CompanyCellEditor,
+          cellEditorPopup: true,
+          cellEditorPopupPosition: 'under',
+          cellEditorParams: { companies, onRequestStopEditing },
           cellClass: (params: CellClassParams<MapdePlan>) => {
             const item = params.data?.contentType?.[type.contentTypeId];
             return item?.isChanged ? 'bg-red-100' : '';
@@ -194,8 +213,7 @@ const getColumnDefs = (
           flex: 1,
           minWidth: 90,
           editable: isEditing,
-          cellEditor: CustomInputEditor,
-          cellEditorParams: { type: 'time' },
+          cellEditor: TimeInputEditor,
           cellClass: (params: CellClassParams<MapdePlan>) => {
             const item = params.data?.contentType?.[type.contentTypeId];
             return item?.isChanged ? 'bg-red-100' : '';
@@ -246,6 +264,8 @@ const AgTest = () => {
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const gridRef = useRef<AgGridReactType<MapdePlan>>(null);
+  // 会社マスタ
+  const [companies, setCompanies] = useState<Company[]>([]);
 
   //---------------------------------------------------------------------------
   // 利用可能な年月を取得
@@ -262,6 +282,21 @@ const AgTest = () => {
       }
     };
     fetchAvailableYearMonths();
+  }, []);
+
+  //---------------------------------------------------------------------------
+  // 会社マスタを取得
+  //---------------------------------------------------------------------------
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const data = await testApi.fetchCompanyList();
+        setCompanies(data);
+      } catch (error) {
+        console.error('会社マスタの取得に失敗しました:', error);
+      }
+    };
+    fetchCompanies();
   }, []);
 
   //---------------------------------------------------------------------------
@@ -441,8 +476,9 @@ const AgTest = () => {
   // コンテントタイプIDごとにデフォルト値を設定する関数（マッピングで使用）
   //---------------------------------------------------------------------------
   const getDefaultRecord = (IdList: number[]): Record<number, testItem> => {
+    // すべて undefined（= 未入力）で初期化
     return IdList.reduce((acc, id) => {
-      acc[id] = { company: null, vol: null, time: null };
+      acc[id] = { company: undefined, vol: undefined, time: undefined };
       return acc;
     }, {} as Record<number, testItem>);
   };
@@ -1008,17 +1044,27 @@ const AgTest = () => {
             <AgGridReact
               ref={gridRef}
               rowData={agRowData}
+              enterNavigatesVertically={true}
+              enterNavigatesVerticallyAfterEdit={true}
               columnDefs={getColumnDefs(
                 isEditing && checkCanEdit(), // 編集可能かつ承認対象の場合のみ編集可能
                 selectedContentTypeIds,
-                originalContentType
+                originalContentType,
+                companies,
+                () => {
+                  // セルエディタ側から呼ばれたときに編集を確定して閉じる
+                  gridRef.current?.api.stopEditing();
+                }
               )}
               defaultColDef={{
                 resizable: false,
                 singleClickEdit: true,
                 valueFormatter: (params) => {
                   const v = params.value;
-                  if (v === '' || v === 0) return '-';
+                  // undefined / null / 空文字 / 0 は「-」表示
+                  if (v === undefined) {
+                    return '-';
+                  }
                   return v;
                 },
               }}

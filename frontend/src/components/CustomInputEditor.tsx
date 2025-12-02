@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 //import type { ICellEditorParams } from "ag-grid-community";
 import type { CustomCellEditorProps } from "ag-grid-react";
 
@@ -8,13 +8,19 @@ interface Props extends CustomCellEditorProps {
   type?: InputType;
 }
 
-const CustomInputEditor: React.FC<Props> = ({ value, onValueChange, type = "string" }) => {
-  const [inputValue, setInputValue] = useState(value ?? "");
-  const refInput = useRef<HTMLInputElement>(null);
+const CustomInputEditor: React.FC<Props> = ({ value, onValueChange, eventKey, type = "string" }) => {
+  // 初期値を決定
+  const initialValue = useMemo(() => {
+    if (eventKey === "Backspace" || eventKey === "Delete") {
+      return "";
+    } else if (eventKey && eventKey.length === 1) {
+      return eventKey;
+    }
+    return value ?? "";
+  }, [eventKey, value]);
 
-  useEffect(() => {
-    refInput.current?.focus();
-  }, []);
+  const [inputValue, setInputValue] = useState(initialValue);
+  const refInput = useRef<HTMLInputElement>(null);
 
   const handleChange = (val: string) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,11 +28,8 @@ const CustomInputEditor: React.FC<Props> = ({ value, onValueChange, type = "stri
 
     switch (type) {
       case "number":
-        parsedValue = val === "" ? null : Number(val);
-        break;
-      case "time":
-        // 時間列の場合は hh:mm 形式で保持する例
-        parsedValue = val === "" ? null : val;
+        // 空文字のときは「値なし」として undefined を返す
+        parsedValue = val === "" ? undefined : Number(val);
         break;
       case "string":
       default:
@@ -37,14 +40,20 @@ const CustomInputEditor: React.FC<Props> = ({ value, onValueChange, type = "stri
     onValueChange?.(parsedValue);
   };
 
+  useEffect(() => {
+    refInput.current?.focus();
+
+    // キー入力で編集が開始された場合、その値を通知しておく
+    if (eventKey && (eventKey.length === 1 || eventKey === "Backspace" || eventKey === "Delete")) {
+      handleChange(initialValue);
+    }
+  }, []);
+
   // inputのtype属性
   let inputType: string;
   switch (type) {
     case "number":
       inputType = "number";
-      break;
-    case "time":
-      inputType = "time";
       break;
     case "string":
     default:

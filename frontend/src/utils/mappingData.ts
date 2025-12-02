@@ -40,9 +40,10 @@ export const mapMonthlyTestData = (
             acc[contentTypeId] = {
               ...defaultContentType[contentTypeId],
               ...(recordItem && {
-                company: recordItem.company,
-                vol: recordItem.vol,
-                time: recordItem.time,
+                // API などからの null は undefined に正規化して扱う
+                company: recordItem.company ?? undefined,
+                vol: recordItem.vol ?? undefined,
+                time: recordItem.time ?? undefined,
                 isChanged: recordItem.isChanged,
               }),
             };
@@ -133,15 +134,16 @@ export const mapMonthlyTestDataWithDefaults = (
       // timeがnullでない場合のみ、timeとvolを設定
       if (timeRecord && timeRecord.defTime !== null) {
         updatedContentType[id] = {
-          company: null,
-          vol: volRecord?.defVol ?? null,
-          time: timeRecord.defTime,
+          company: undefined,
+          // defVol が null の場合も undefined に正規化
+          vol: volRecord?.defVol ?? undefined,
+          time: timeRecord.defTime ?? undefined,
         };
       } else {
         updatedContentType[id] = {
-          company: null,
-          vol: null,
-          time: null,
+          company: undefined,
+          vol: undefined,
+          time: undefined,
         };
       }
     }

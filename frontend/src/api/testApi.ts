@@ -3,6 +3,7 @@ import type {
   ContentTypeList,
   FetchPlanType,
   fetchTestType,
+  Company,
 } from '../pages/AgTest';
 
 export const testApi = {
@@ -161,6 +162,15 @@ export const testApi = {
         year,
         month,
       },
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+    return res.data;
+  },
+
+  async fetchCompanyList(): Promise<Company[]> {
+    const res = await axios.get<Company[]>('/api/company', {
       headers: {
         Accept: 'application/json',
       },

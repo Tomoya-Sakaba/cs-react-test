@@ -158,6 +158,20 @@ CREATE TABLE [dbo].[m_content_type_default_time] (
   primary key ([id])
 );
 
+
+-- =============================================
+-- 11. m_company テーブル
+-- =============================================
+CREATE TABLE [dbo].[m_company] (
+  [company_id] int identity not null,
+  [company_name] nvarchar(100) not null,
+  [bg_color] nvarchar(20) not null,
+  [type] int not null,
+  [created_at] datetime default getdate() not null,
+  [updated_at] datetime default getdate() not null,
+  primary key ([company_id])
+);
+
 -- =============================================
 -- 完了
 -- =============================================

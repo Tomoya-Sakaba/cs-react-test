@@ -159,6 +159,7 @@
     <Compile Include="Areas\HelpPage\SampleGeneration\TextSample.cs" />
     <Compile Include="Areas\HelpPage\XmlDocumentationProvider.cs" />
     <Compile Include="Controllers\ApprovalController.cs" />
+    <Compile Include="Controllers\CompanyController.cs" />
     <Compile Include="Controllers\HelloController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Controllers\PdfController.cs" />
@@ -171,6 +172,7 @@
     </Compile>
     <Compile Include="Models\DTOs\ApprovalDto.cs" />
     <Compile Include="Models\DTOs\AvailableYearMonthDto.cs" />
+    <Compile Include="Models\DTOs\CompanyDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeDefaultTimeDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeDefaultVolDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeDto.cs" />
@@ -191,12 +193,14 @@
     <Compile Include="Models\Entities\ReportEntity.cs" />
     <Compile Include="Models\Entities\UsersEntity.cs" />
     <Compile Include="Models\Repository\ApprovalRepository.cs" />
+    <Compile Include="Models\Repository\CompanyRepository.cs" />
     <Compile Include="Models\Repository\PlanRepository.cs" />
     <Compile Include="Models\Repository\ReportRepository.cs" />
     <Compile Include="Models\Repository\UsersRepository.cs" />
     <Compile Include="Models\DTOs\CreateUserRequest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\ApprovalService.cs" />
+    <Compile Include="Services\CompanyService.cs" />
     <Compile Include="Services\PlanService.cs" />
     <Compile Include="Services\ReportService.cs" />
     <Compile Include="Services\TestService.cs" />
