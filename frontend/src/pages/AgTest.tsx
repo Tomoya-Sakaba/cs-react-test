@@ -889,6 +889,29 @@ const AgTest = () => {
   };
 
   //---------------------------------------------------------------------------
+  // フォーカス中セルを編集状態にする（ボタン用）
+  //---------------------------------------------------------------------------
+  const startEditingFocusedCell = () => {
+    if (!gridRef.current) return;
+
+    // 編集可能でない場合は何もしない
+    if (!(isEditing && checkCanEdit())) {
+      return;
+    }
+
+    const api = gridRef.current.api;
+    const focusedCell = api.getFocusedCell();
+    if (!focusedCell) {
+      return;
+    }
+
+    api.startEditingCell({
+      rowIndex: focusedCell.rowIndex,
+      colKey: focusedCell.column.getColId(),
+    });
+  };
+
+  //---------------------------------------------------------------------------
   // 描画JSX
   //---------------------------------------------------------------------------
   return (
@@ -916,6 +939,13 @@ const AgTest = () => {
               onClick={handleSave}
             >
               保存
+            </button>
+            <button
+              className="h-full w-28 rounded-lg bg-indigo-500 px-4 py-2 text-sm text-white hover:bg-indigo-600 disabled:bg-gray-300 disabled:text-gray-600"
+              onClick={startEditingFocusedCell}
+              disabled={!(isEditing && checkCanEdit())}
+            >
+              セル編集
             </button>
             {/* バージョンを切る（断面固定化） */}
             <button
@@ -1058,7 +1088,7 @@ const AgTest = () => {
               )}
               defaultColDef={{
                 resizable: false,
-                singleClickEdit: true,
+                singleClickEdit: false,
                 valueFormatter: (params) => {
                   const v = params.value;
                   // undefined / null / 空文字 / 0 は「-」表示
