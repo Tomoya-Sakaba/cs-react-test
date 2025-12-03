@@ -8,12 +8,8 @@ interface Props extends CustomCellEditorProps {
   onRequestStopEditing?: () => void;
 }
 
-const CompanyCellEditor: React.FC<Props> = ({
-  value,
-  onValueChange,
-  companies,
-  onRequestStopEditing,
-}) => {
+const CompanyCellEditor: React.FC<Props> = (props) => {
+  const { value, onValueChange, companies, onRequestStopEditing } = props;
   // 選択肢の ID リスト（先頭は「未選択」＝undefined）
   const optionIds: (number | undefined)[] = [
     undefined,
@@ -31,10 +27,36 @@ const CompanyCellEditor: React.FC<Props> = ({
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // 編集中の元セルにも枠線を付けて、どのセルを編集しているか分かりやすくする
+  const eGridCell = (props as any).eGridCell as HTMLElement | undefined;
+  useEffect(() => {
+    if (!eGridCell) return;
+
+    const prevOutline = eGridCell.style.outline;
+    const prevOutlineOffset = eGridCell.style.outlineOffset;
+
+    eGridCell.style.outline = '2px solid #3b82f6'; // Tailwindのblue-500相当
+    eGridCell.style.outlineOffset = '-2px';
+
+    return () => {
+      eGridCell.style.outline = prevOutline;
+      eGridCell.style.outlineOffset = prevOutlineOffset;
+    };
+  }, [eGridCell]);
 
   useEffect(() => {
     containerRef.current?.focus();
   }, []);
+
+  // ハイライトされた行が見える位置に来るようにスクロール
+  useEffect(() => {
+    const el = itemRefs.current[highlightIndex];
+    if (el) {
+      el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [highlightIndex]);
 
   const handleSelect = (id: number | undefined) => {
     setSelectedId(id);
@@ -75,6 +97,9 @@ const CompanyCellEditor: React.FC<Props> = ({
       {/* 未選択 */}
       <button
         type="button"
+        ref={(el) => {
+          itemRefs.current[0] = el;
+        }}
         className={`flex w-full items-center px-2 py-1 text-left hover:bg-blue-50 ${
           highlightIndex === 0 ? 'bg-blue-100 font-semibold' : ''
         }`}
@@ -89,6 +114,9 @@ const CompanyCellEditor: React.FC<Props> = ({
         <button
           key={c.companyId}
           type="button"
+          ref={(el) => {
+            itemRefs.current[index + 1] = el;
+          }}
           className={`flex w-full items-center px-2 py-1 text-left hover:bg-blue-50 ${
             highlightIndex === index + 1 ? 'bg-blue-100 font-semibold' : ''
           }`}
