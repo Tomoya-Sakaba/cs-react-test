@@ -15,6 +15,9 @@ namespace backend.Models.DTOs
 
         [JsonProperty("type")]
         public int Type { get; set; }
+
+        [JsonProperty("defTime")]
+        public string DefTime { get; set; }
     }
 }
 

@@ -131,13 +131,14 @@ export const mapMonthlyTestDataWithDefaults = (
       // ContentTypeDefaultVolから該当レコードを取得
       const volRecord = defaultVolData.find((d) => d.contentTypeId === id);
 
-      // timeがnullでない場合のみ、timeとvolを設定
+      // time が設定されている日だけ、「量」のデフォルトを反映する
+      // ※ 時間はここでは設定せず、会社選択時に別途設定する
       if (timeRecord && timeRecord.defTime !== null) {
         updatedContentType[id] = {
           company: undefined,
           // defVol が null の場合も undefined に正規化
           vol: volRecord?.defVol ?? undefined,
-          time: timeRecord.defTime ?? undefined,
+          time: undefined,
         };
       } else {
         updatedContentType[id] = {

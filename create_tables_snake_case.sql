@@ -167,6 +167,7 @@ CREATE TABLE [dbo].[m_company] (
   [company_name] nvarchar(100) not null,
   [bg_color] nvarchar(20) not null,
   [type] int not null,
+  [def_time] time null,
   [created_at] datetime default getdate() not null,
   [updated_at] datetime default getdate() not null,
   primary key ([company_id])

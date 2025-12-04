@@ -48,7 +48,7 @@ namespace backend.Services
                         {
                             Company = record.Company,
                             Vol = record.Vol,
-                            Time = record.Time.HasValue ? record.Time.Value.ToString(@"hh\:mm") : null,
+                            Time = record.Time.HasValue ? record.Time.Value.ToString(@"h\:mm") : null,
                             Version = record.Version
                         };
                     }

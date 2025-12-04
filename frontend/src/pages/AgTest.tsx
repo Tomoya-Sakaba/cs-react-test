@@ -1,6 +1,5 @@
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
-import type { ColDef, ColGroupDef, CellClassParams } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import {
   fetchTestData,
@@ -27,10 +26,7 @@ import {
   mapMonthlyTestDataWithDefaults,
 } from '../utils/mappingData';
 import Toggle from '../components/Toggle';
-import CustomInputEditor from '../components/CustomInputEditor';
-import TimeInputEditor from '../components/TimeInputEditor';
-import CompanyCellRenderer from '../components/CompanyCellRenderer';
-import CompanyCellEditor from '../components/CompanyCellEditor';
+import { getAgTestColumnDefs } from '../components/AgTestColumnDefs';
 import type { AgGridReact as AgGridReactType } from 'ag-grid-react'; // 型補完用
 import { convertPlanData } from '../utils/convertData';
 import ApprovalDrawer from '../components/ApprovalDrawer';
@@ -94,6 +90,8 @@ export type Company = {
   companyName: string;
   bgColor: string;
   type: number;
+  // DBの def_time（time型）を文字列で受け取る想定（例: "09:00:00"）
+  defTime?: string | null;
 };
 
 // 初期表示するcontentTypeIdのリストを決定する関数
@@ -140,96 +138,6 @@ const getInitialContentTypeIds = (data: MapdePlan[]): number[] => {
   }
 
   return initialIds;
-};
-
-const getColumnDefs = (
-  isEditing: boolean,
-  selectedIds: number[],
-  originalList: ContentTypeList[],
-  companies: Company[],
-  onRequestStopEditing: () => void
-): (ColDef<MapdePlan> | ColGroupDef<MapdePlan>)[] => {
-  // 選択されたIDのみをフィルタリングし、オリジナルの順序でソート
-  const filteredAndSorted = originalList
-    .filter((type) => selectedIds.includes(type.contentTypeId))
-    .sort((a, b) => {
-      const indexA = originalList.findIndex(
-        (t) => t.contentTypeId === a.contentTypeId
-      );
-      const indexB = originalList.findIndex(
-        (t) => t.contentTypeId === b.contentTypeId
-      );
-      return indexA - indexB;
-    });
-
-  return [
-    {
-      headerName: '日付',
-      field: 'dayLabel',
-      width: 100,
-      pinned: 'left',
-      cellClass: (params) => {
-        if (params.data?.isHoliday) return 'text-red-500 font-bold';
-        if (params.data?.isSturday) return 'text-blue-500 font-bold';
-        return 'text-gray-800';
-      },
-    },
-    ...filteredAndSorted.map((type) => ({
-      headerName: type.contentName,
-      children: [
-        {
-          headerName: '会社',
-          field: `contentType.${type.contentTypeId}.company`,
-          minWidth: 90,
-          flex: 1,
-          editable: isEditing,
-          cellRenderer: CompanyCellRenderer,
-          cellRendererParams: { companies },
-          cellEditor: CompanyCellEditor,
-          cellEditorPopup: true,
-          cellEditorPopupPosition: 'under',
-          cellEditorParams: { companies, onRequestStopEditing },
-          cellClass: (params: CellClassParams<MapdePlan>) => {
-            const item = params.data?.contentType?.[type.contentTypeId];
-            return item?.isChanged ? 'bg-red-100' : '';
-          },
-        },
-        {
-          headerName: '数量',
-          field: `contentType.${type.contentTypeId}.vol`,
-          minWidth: 90,
-          flex: 1,
-          editable: isEditing,
-          cellEditor: CustomInputEditor,
-          cellEditorParams: { type: 'number' },
-          cellClass: (params: CellClassParams<MapdePlan>) => {
-            const item = params.data?.contentType?.[type.contentTypeId];
-            return item?.isChanged ? 'bg-red-100' : '';
-          },
-        },
-        {
-          headerName: '時間',
-          field: `contentType.${type.contentTypeId}.time`,
-          flex: 1,
-          minWidth: 90,
-          editable: isEditing,
-          cellEditor: TimeInputEditor,
-          cellClass: (params: CellClassParams<MapdePlan>) => {
-            const item = params.data?.contentType?.[type.contentTypeId];
-            return item?.isChanged ? 'bg-red-100' : '';
-          },
-        },
-      ],
-    })),
-    {
-      headerName: '備考',
-      field: 'note',
-      minWidth: 200,
-      editable: isEditing, // ここで toggle 状態で編集可否切替
-      cellEditor: CustomInputEditor,
-      cellEditorParams: { type: 'text' },
-    },
-  ];
 };
 
 const AgTest = () => {
@@ -1071,12 +979,12 @@ const AgTest = () => {
 
         <div className="flex flex-1">
           <div className="ag-theme-alpine h-full min-h-0 w-full">
-            <AgGridReact
+              <AgGridReact
               ref={gridRef}
               rowData={agRowData}
               enterNavigatesVertically={true}
               enterNavigatesVerticallyAfterEdit={true}
-              columnDefs={getColumnDefs(
+              columnDefs={getAgTestColumnDefs(
                 isEditing && checkCanEdit(), // 編集可能かつ承認対象の場合のみ編集可能
                 selectedContentTypeIds,
                 originalContentType,

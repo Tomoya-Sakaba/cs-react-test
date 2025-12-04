@@ -1,4 +1,4 @@
-﻿using backend.Models.DTOs;
+﻿using backend.Models.Entities;
 using Dapper;
 using System.Collections.Generic;
 using System.Configuration;
@@ -12,7 +12,7 @@ namespace backend.Models.Repository
     {
         private readonly string connectionString = ConfigurationManager.ConnectionStrings["MyDbConnection"].ConnectionString;
 
-        public List<CompanyDto> GetAllCompanies()
+        public List<CompanyEntity> GetAllCompanies()
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
@@ -21,12 +21,13 @@ namespace backend.Models.Repository
                         company_id   AS CompanyId,
                         company_name AS CompanyName,
                         bg_color     AS BgColor,
-                        [type]       AS [Type]
+                        type         AS Type,
+                        def_time     AS DefTime
                     FROM dbo.m_company
                     ORDER BY company_id;
                 ";
 
-                return db.Query<CompanyDto>(sql).ToList();
+                return db.Query<CompanyEntity>(sql).ToList();
             }
         }
     }

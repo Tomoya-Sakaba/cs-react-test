@@ -17,6 +17,7 @@ import AttendanceRecord from "../pages/attendance/AttendanceRecord";
 import Login from "../pages/Login";
 import ReportList from "../pages/ReportList";
 import ReportForm from "../pages/ReportForm";
+import NewPlan from "../pages/NewPlan";
 
 const Router = createBrowserRouter(
   createRoutesFromElements(
@@ -41,6 +42,8 @@ const Router = createBrowserRouter(
         <Route path="/reports" element={<ReportList />} />
         <Route path="/reports/new" element={<ReportForm />} />
         <Route path="/reports/edit/:reportNo" element={<ReportForm />} />
+
+        <Route path="/new-plan" element={<NewPlan />} />
       </Route>
     </>
   )

@@ -188,6 +188,7 @@
     <Compile Include="Models\DTOs\UpdateUserRepuest.cs" />
     <Compile Include="Models\DTOs\UserResponse.cs" />
     <Compile Include="Models\Entities\ApprovalEntity.cs" />
+    <Compile Include="Models\Entities\CompanyEntity.cs" />
     <Compile Include="Models\Entities\PlanEntity.cs" />
     <Compile Include="Models\Entities\PlanVersionSnapshotEntity.cs" />
     <Compile Include="Models\Entities\ReportEntity.cs" />
