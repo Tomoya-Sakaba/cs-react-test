@@ -280,17 +280,16 @@ const ReportForm = () => {
         </div>
       </form>
 
-      {/* 上程Drawer（開いている時のみレンダリング） */}
-      {isEditMode && report && isDrawerOpen && ( // useApproval: Drawerの開閉状態を取得
-        <ApprovalDrawer
-          onClose={() => setIsDrawerOpen(false)} // useApproval: Drawerの開閉状態を設定
-          approvalId="0201" // 報告書ページ固有のapprovalId（固定値）
-          reportNo={report.reportNo}
-          approvalStatus={approvalStatus} // useApproval: 承認状態
-          loading={false} // useApproval: 読み込み状態（必要に応じて追加）
-          onApprovalChange={refreshApprovalStatus} // useApproval: 上程状態を再取得
-        />
-      )}
+      {/* 上程Drawer */}
+      <ApprovalDrawer
+        isOpen={isEditMode && report !== null && isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)} // useApproval: Drawerの開閉状態を設定
+        approvalId="0201" // 報告書ページ固有のapprovalId（固定値）
+        reportNo={report?.reportNo || ''}
+        approvalStatus={approvalStatus} // useApproval: 承認状態
+        loading={false} // useApproval: 読み込み状態（必要に応じて追加）
+        onApprovalChange={refreshApprovalStatus} // useApproval: 上程状態を再取得
+      />
     </div>
   );
 };

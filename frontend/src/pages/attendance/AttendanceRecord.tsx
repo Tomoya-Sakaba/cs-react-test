@@ -57,7 +57,7 @@ const AttendanceRecord: React.FC = () => {
         subtitle="Attendance Record"
         title="勤怠表"
         userName={""}
-        filters={<YearMonthFilter />}
+        filters={<YearMonthFilter availableYearMonths={[]} loading={false} />}
         actions={
           <ToolButton onClick={toggleEditMode}>
             {isEditing ? "保存" : "編集"}

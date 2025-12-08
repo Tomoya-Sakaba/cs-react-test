@@ -11,7 +11,6 @@ import TestPdf from '../components/TestPdf';
 import PdfPreview from '../components/PdfPreview';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
 import { testApi } from '../api/testApi';
 import type {
   ApprovalRequest,
@@ -366,29 +365,9 @@ const AgTest = () => {
   //---------------------------------------------------------------------------
   // 初回レンダリング処理
   //---------------------------------------------------------------------------
-  // 前回の年月を記憶して、実際に変更されたときのみ実行
-  const lastYearMonthMode = useRef<string>('');
-  
   useEffect(() => {
-    const currentYearMonthMode = `${currentYear}-${currentIndexMonth}-${isNewMode}`;
-    console.log(`🔔 [年月変更] useEffect発火: ${currentYear}年${currentIndexMonth + 1}月 isNewMode=${isNewMode} prev=${lastYearMonthMode.current} current=${currentYearMonthMode}`);
-    
-    // 前回と同じ年月・モードの場合はスキップ（useYearMonthParamsの複数回更新を防ぐ）
-    if (lastYearMonthMode.current === currentYearMonthMode) {
-      console.log('⏭️  年月・モード変更なしのためスキップ');
-      return;
-    }
-    
-    lastYearMonthMode.current = currentYearMonthMode;
-    console.log('✅ 年月またはモード変更: fetchData実行');
     fetchData();
-  }, [
-    currentYear,
-    currentIndexMonth,
-    isNewMode,
-    // showExistingDataDialog と selectedVersion を削除
-    // これらが変更されてもデータ再取得は不要
-  ]);
+  }, [currentYear, currentIndexMonth, isNewMode]);
 
   //---------------------------------------------------------------------------
   // バージョン選択変更時の処理（ユーザーが手動で変更した場合のみ）
@@ -554,8 +533,8 @@ const AgTest = () => {
     try {
       if (isNew) {
         // --- API呼び出し（あなたのtestApi経由）---
-        const res = await testApi.createNewPlan(reqData);
-        // console.log('登録成功:', res);
+        await testApi.createNewPlan(reqData);
+        // console.log('登録成功');
         alert('新規登録が完了しました。');
 
         setIsNew(false);
@@ -577,8 +556,8 @@ const AgTest = () => {
         setIsEditing(false);
       } else {
         // --- API呼び出し（あなたのtestApi経由）---
-        const res = await testApi.savePlan(reqData);
-        // console.log('保存成功:', res);
+        await testApi.savePlan(reqData);
+        // console.log('保存成功');
         alert('保存が完了しました。');
 
         // 編集モード解除
@@ -607,11 +586,11 @@ const AgTest = () => {
     }
 
     try {
-      const res = await testApi.createVersion(
+      await testApi.createVersion(
         currentYear,
         currentIndexMonth + 1
       );
-      // console.log('バージョン作成成功:', res);
+      // console.log('バージョン作成成功');
       alert('バージョンの作成が完了しました。');
 
       // データを再取得（最新バージョンを指定）
@@ -723,17 +702,17 @@ const AgTest = () => {
    * 新規上程後の追加リクエスト
    */
   const handleAfterCreate = useCallback(
-    async (request: ApprovalRequest) => {
+    async (_request: ApprovalRequest) => {
       try {
         // await axios.post('/api/agtest/approval-action', {
         //   action: 'create',
-        //   approvalId: request.approvalId,
-        //   reportNo: request.reportNo,
+        //   approvalId: _request.approvalId,
+        //   reportNo: _request.reportNo,
         //   year: currentYear,
         //   month: currentIndexMonth + 1,
         //   version: selectedVersion,
-        //   submitterName: request.submitterName,
-        //   approverNames: request.approverNames,
+        //   submitterName: _request.submitterName,
+        //   approverNames: _request.approverNames,
         //   timestamp: new Date().toISOString(),
         // });
         console.log('AgTest固有のリクエスト（新規上程）を送信しました');
@@ -749,7 +728,7 @@ const AgTest = () => {
    * 承認後の追加リクエスト
    */
   const handleAfterApprove = useCallback(
-    async (request: ApproveRequest) => {
+    async (_request: ApproveRequest) => {
       try {
         // await axios.post('/api/agtest/approval-action', {
         //   action: 'approve',
@@ -774,7 +753,7 @@ const AgTest = () => {
    * 差し戻し後の追加リクエスト
    */
   const handleAfterReject = useCallback(
-    async (request: RejectRequest) => {
+    async (_request: RejectRequest) => {
       try {
         // await axios.post('/api/agtest/approval-action', {
         //   action: 'reject',
@@ -800,7 +779,7 @@ const AgTest = () => {
    * 再上程後の追加リクエスト
    */
   const handleAfterResubmit = useCallback(
-    async (request: ApprovalRequest) => {
+    async (_request: ApprovalRequest) => {
       try {
         // await axios.post('/api/agtest/approval-action', {
         //   action: 'resubmit',
@@ -825,7 +804,7 @@ const AgTest = () => {
    * 取り戻し後の追加リクエスト
    */
   const handleAfterRecall = useCallback(
-    async (request: RecallRequest) => {
+    async (_request: RecallRequest) => {
       try {
         // await axios.post('/api/agtest/approval-action', {
         //   action: 'recall',

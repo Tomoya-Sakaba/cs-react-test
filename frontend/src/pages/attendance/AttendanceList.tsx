@@ -55,7 +55,7 @@ const AttendanceList = () => {
 
   return (
     <div className="mx-8 flex h-full flex-col">
-      <ContentHeader subtitle="Attendance List" title="勤怠一覧" filters={<YearMonthFilter />} />
+      <ContentHeader subtitle="Attendance List" title="勤怠一覧" filters={<YearMonthFilter availableYearMonths={[]} loading={false} />} />
 
       <div className=" h-full w-full">
         <ul className="flex flex-col gap-2">

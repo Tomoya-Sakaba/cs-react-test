@@ -14,12 +14,12 @@ export interface RawAttendanceData {
 }
 
 export const fetchAttendanceData = async (
-  userId: string,
+  _userId: string,
   year: number, 
   month: number
 ): Promise<RawAttendanceData> => {
   // 実際のAPI呼び出し
-  // const response = await axios.get(`/api/attendance/${userId}/${year}/${month}`);
+  // const response = await axios.get(`/api/attendance/${_userId}/${year}/${month}`);
   // return response.data;
   
   // モック処理

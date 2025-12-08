@@ -2,7 +2,7 @@
  * frontend/src/hooks/useYearMonthParams.ts
  * 年月パラメータのフック
  * ---------------------------------- */
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 type AvailableYearMonth = { year: number; month: number };
@@ -12,14 +12,15 @@ export const useYearMonthParams = (
 ) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // 利用可能な年月のセットを作成（高速な検索のため）
-  const availableSet =
-    availableYearMonths && availableYearMonths.length > 0
+  // 利用可能な年月のセットを作成（高速な検索のため）- メモ化
+  const availableSet = useMemo(() => {
+    return availableYearMonths && availableYearMonths.length > 0
       ? new Set(availableYearMonths.map((ym) => `${ym.year}-${ym.month}`))
       : null;
+  }, [availableYearMonths]);
 
-  // URLパラメータから値を取得、なければデフォルト値
-  const currentYear = (() => {
+  // URLパラメータから値を取得、なければデフォルト値 - メモ化
+  const currentYear = useMemo(() => {
     const yearParam = searchParams.get('year');
     const monthParam = searchParams.get('month');
     const year = Number(yearParam);
@@ -52,9 +53,9 @@ export const useYearMonthParams = (
     return year && year >= currentYear - 3 && year <= currentYear + 3
       ? year
       : currentYear;
-  })();
+  }, [searchParams, availableSet, availableYearMonths]);
 
-  const currentIndexMonth = (() => {
+  const currentIndexMonth = useMemo(() => {
     const yearParam = searchParams.get('year');
     const monthParam = searchParams.get('month');
     const month = Number(monthParam);
@@ -92,7 +93,7 @@ export const useYearMonthParams = (
 
     // デフォルト値（現在の月）
     return now.getMonth();
-  })();
+  }, [searchParams, availableSet, availableYearMonths]);
 
   const setCurrentYear = (year: number) => {
     setSearchParams((prev) => {
