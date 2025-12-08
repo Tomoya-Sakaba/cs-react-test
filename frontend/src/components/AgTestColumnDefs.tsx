@@ -21,16 +21,21 @@ export const getAgTestColumnDefs = (
   companies: Company[],
   onRequestStopEditing: () => void
 ): (ColDef<MapdePlan> | ColGroupDef<MapdePlan>)[] => {
+
+  console.log('AGグリッドカラム定義されました');
+
+  // 🎯 最適化：Setを使った高速フィルタリング + Map化でfindIndexを削減
+  const selectedIdsSet = new Set(selectedIds);
+  const originalIndexMap = new Map(
+    originalList.map((item, index) => [item.contentTypeId, index])
+  );
+
   // 選択されたIDのみをフィルタリングし、オリジナルの順序でソート
   const filteredAndSorted = originalList
-    .filter((type) => selectedIds.includes(type.contentTypeId))
+    .filter((type) => selectedIdsSet.has(type.contentTypeId))
     .sort((a, b) => {
-      const indexA = originalList.findIndex(
-        (t) => t.contentTypeId === a.contentTypeId
-      );
-      const indexB = originalList.findIndex(
-        (t) => t.contentTypeId === b.contentTypeId
-      );
+      const indexA = originalIndexMap.get(a.contentTypeId) ?? 0;
+      const indexB = originalIndexMap.get(b.contentTypeId) ?? 0;
       return indexA - indexB;
     });
 

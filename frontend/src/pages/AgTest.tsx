@@ -9,7 +9,7 @@ import {
 } from '../hooks/usePdfPreview';
 import TestPdf from '../components/TestPdf';
 import PdfPreview from '../components/PdfPreview';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { testApi } from '../api/testApi';
@@ -211,8 +211,11 @@ const AgTest = () => {
   // 利用可能なバージョンを取得
   //---------------------------------------------------------------------------
   useEffect(() => {
+    console.log(`🔔 [バージョン取得] useEffect発火: ${currentYear}年${currentIndexMonth + 1}月 isNewMode=${isNewMode}`);
+    
     // 新規作成モードの場合はバージョン0を設定
     if (isNewMode) {
+      console.log('→ 新規モード: version=0を設定');
       setAvailableVersions([0]);
       setSelectedVersion(0);
       return;
@@ -228,6 +231,7 @@ const AgTest = () => {
         setAvailableVersions(versions);
         // 最新バージョン（最大値）をデフォルト選択（データがない場合も[0]が返ってくる）
         const latestVersion = Math.max(...versions);
+        console.log(`→ バージョン取得完了: versions=${versions} latest=${latestVersion}`);
         setSelectedVersion(latestVersion);
       } catch (error) {
         console.error('利用可能なバージョンの取得に失敗しました:', error);
@@ -297,6 +301,8 @@ const AgTest = () => {
   // 初回レンダリング処理
   //---------------------------------------------------------------------------
   const [isNew, setIsNew] = useState(false);
+  // 初期化完了フラグ（AG Gridのレンダリングを制御）
+  const [isGridReady, setIsGridReady] = useState(false);
 
   // データ取得関数を抽出（再利用可能にする）
   const fetchData = async (skipNewModeCheck = false) => {
@@ -305,23 +311,12 @@ const AgTest = () => {
       return;
     }
 
+    // 🎯 データ取得開始：AG Gridを非表示
+    setIsGridReady(false);
+
     // ヘッダーに設定可能なコンテントタイプを取得
     const resContent = await testApi.fetchContentTypeList();
-    console.log('resContent', resContent);
-
-    // オリジナルの順序を保持
-    setOriginalContentType(resContent);
-
-    // コンテントタイプIDの数字リストを取得
     const contentTypeIdList = getContentTypeIdList(resContent);
-    console.log('contentTypeIdList', contentTypeIdList);
-
-    // 新規作成モードの場合は、isNewをtrueにしてselectedContentTypeIdsを設定
-    // skipNewModeCheckがtrueの場合は、強制的に通常モードとしてデータを取得
-    if (isNewMode && !skipNewModeCheck) {
-      setIsNew(true);
-      setSelectedContentTypeIds([2, 4]);
-    }
 
     // バージョンを決定（新規モードの場合は0、通常モードの場合は選択されたバージョン、nullの場合は0）
     const versionToFetch =
@@ -347,31 +342,100 @@ const AgTest = () => {
       getDefaultRecord,
       contentTypeIdList
     );
-
     console.log('mapData', mapData);
 
+    // 初期表示するcontentTypeIdのリストを決定
+    let initialIds: number[];
+    if (isNewMode && !skipNewModeCheck) {
+      initialIds = [2, 4];
+      setIsNew(true);
+    } else {
+      initialIds = getInitialContentTypeIds(mapData);
+    }
+
+    // 🎯 すべてのstate更新を一度に実行（React 18の自動バッチング）
+    setOriginalContentType(resContent);
+    setSelectedContentTypeIds(initialIds);
     setRowData(mapData);
     setAgRowData(JSON.parse(JSON.stringify(mapData)));
-
-    // 初期表示するcontentTypeIdのリストを決定（新規モードの場合は既に設定済みなのでスキップ）
-    if (!isNewMode || skipNewModeCheck) {
-      const initialIds = getInitialContentTypeIds(mapData);
-      setSelectedContentTypeIds(initialIds);
-    }
+    
+    // 🎯 データ取得完了：AG Gridを表示
+    setIsGridReady(true);
   };
 
   //---------------------------------------------------------------------------
   // 初回レンダリング処理
   //---------------------------------------------------------------------------
+  // 前回の年月を記憶して、実際に変更されたときのみ実行
+  const lastYearMonthMode = useRef<string>('');
+  
   useEffect(() => {
+    const currentYearMonthMode = `${currentYear}-${currentIndexMonth}-${isNewMode}`;
+    console.log(`🔔 [年月変更] useEffect発火: ${currentYear}年${currentIndexMonth + 1}月 isNewMode=${isNewMode} prev=${lastYearMonthMode.current} current=${currentYearMonthMode}`);
+    
+    // 前回と同じ年月・モードの場合はスキップ（useYearMonthParamsの複数回更新を防ぐ）
+    if (lastYearMonthMode.current === currentYearMonthMode) {
+      console.log('⏭️  年月・モード変更なしのためスキップ');
+      return;
+    }
+    
+    lastYearMonthMode.current = currentYearMonthMode;
+    console.log('✅ 年月またはモード変更: fetchData実行');
     fetchData();
   }, [
     currentYear,
     currentIndexMonth,
     isNewMode,
-    showExistingDataDialog,
-    selectedVersion,
+    // showExistingDataDialog と selectedVersion を削除
+    // これらが変更されてもデータ再取得は不要
   ]);
+
+  //---------------------------------------------------------------------------
+  // バージョン選択変更時の処理（ユーザーが手動で変更した場合のみ）
+  //---------------------------------------------------------------------------
+  const prevVersionRef = useRef<number | null>(null);
+  const prevYearMonthRef = useRef<string>('');
+  const hasInitialized = useRef(false);
+  
+  useEffect(() => {
+    const currentYearMonth = `${currentYear}-${currentIndexMonth}`;
+    console.log(`🔔 [バージョン] useEffect発火: selectedVersion=${selectedVersion} prev=${prevVersionRef.current} yearMonth=${currentYearMonth} prevYearMonth=${prevYearMonthRef.current} initialized=${hasInitialized.current}`);
+    
+    // 🎯 初回レンダリング時（prev=null）は必ずスキップ
+    if (prevVersionRef.current === null) {
+      console.log('⏭️  初回レンダリングのためスキップ');
+      prevVersionRef.current = selectedVersion;
+      prevYearMonthRef.current = currentYearMonth;
+      hasInitialized.current = true;
+      return;
+    }
+    
+    // 年月が変更された場合は、バージョン取得useEffectによる自動更新なのでスキップ
+    if (prevYearMonthRef.current !== currentYearMonth) {
+      console.log('⏭️  年月変更によるバージョン自動更新のためスキップ');
+      prevYearMonthRef.current = currentYearMonth;
+      prevVersionRef.current = selectedVersion;
+      return;
+    }
+    
+    // 前回のバージョンと同じ場合はスキップ
+    if (prevVersionRef.current === selectedVersion) {
+      console.log('⏭️  バージョン変更なしのためスキップ');
+      return;
+    }
+    
+    // 新規モードまたはバージョン未設定の場合はスキップ
+    if (isNewMode || selectedVersion === null) {
+      console.log('⏭️  新規モードまたはバージョン未設定のためスキップ');
+      prevVersionRef.current = selectedVersion;
+      return;
+    }
+
+    console.log('✅ ユーザーによるバージョン変更を検知: fetchData実行');
+    prevVersionRef.current = selectedVersion;
+    // ユーザーがバージョンを変更した場合のみ再取得
+    fetchData();
+  }, [selectedVersion, currentYear, currentIndexMonth]);
 
   //---------------------------------------------------------------------------
   // コンテントタイプIDを数字のリストに変換する関数
@@ -417,7 +481,7 @@ const AgTest = () => {
         getDefaultRecord
       );
 
-      console.log('mapData(デフォルト値設定)', mapDataWithDefaults);
+      // console.log('mapData(デフォルト値設定)', mapDataWithDefaults);
       setRowData(mapDataWithDefaults);
       setAgRowData(JSON.parse(JSON.stringify(mapDataWithDefaults)));
 
@@ -482,16 +546,16 @@ const AgTest = () => {
       if (node.data) updatedRows.push(node.data);
     });
 
-    console.log('保存処理：', updatedRows);
+    // console.log('保存処理：', updatedRows);
 
     const reqData = convertPlanData(updatedRows);
-    console.log('コンバート後：', reqData);
+    // console.log('コンバート後：', reqData);
 
     try {
       if (isNew) {
         // --- API呼び出し（あなたのtestApi経由）---
         const res = await testApi.createNewPlan(reqData);
-        console.log('登録成功:', res);
+        // console.log('登録成功:', res);
         alert('新規登録が完了しました。');
 
         setIsNew(false);
@@ -514,7 +578,7 @@ const AgTest = () => {
       } else {
         // --- API呼び出し（あなたのtestApi経由）---
         const res = await testApi.savePlan(reqData);
-        console.log('保存成功:', res);
+        // console.log('保存成功:', res);
         alert('保存が完了しました。');
 
         // 編集モード解除
@@ -547,7 +611,7 @@ const AgTest = () => {
         currentYear,
         currentIndexMonth + 1
       );
-      console.log('バージョン作成成功:', res);
+      // console.log('バージョン作成成功:', res);
       alert('バージョンの作成が完了しました。');
 
       // データを再取得（最新バージョンを指定）
@@ -820,6 +884,78 @@ const AgTest = () => {
   };
 
   //---------------------------------------------------------------------------
+  // AG Grid用の設定をメモ化（パフォーマンス最適化）
+  //---------------------------------------------------------------------------
+  // セルエディタから呼ばれる停止コールバックをメモ化
+  const handleStopEditing = useCallback(() => {
+    gridRef.current?.api.stopEditing();
+  }, []);
+
+  // 🎯 配列の参照を安定化（内容が同じなら同じ参照を返す）
+  const stableSelectedContentTypeIds = useMemo(
+    () => selectedContentTypeIds,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(selectedContentTypeIds)]
+  );
+  
+  const stableOriginalContentType = useMemo(
+    () => originalContentType,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(originalContentType)]
+  );
+  
+  const stableCompanies = useMemo(
+    () => companies,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(companies)]
+  );
+  
+  const stableApprovalStatus = useMemo(
+    () => approvalStatus,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(approvalStatus)]
+  );
+
+  // columnDefsをメモ化（依存する値が変更された時のみ再生成）
+  const columnDefs = useMemo(() => {
+    // 🎯 データが準備できていない場合は空配列を返す
+    if (!isGridReady || stableOriginalContentType.length === 0 || stableCompanies.length === 0) {
+      console.log('⏸️  データ準備中: columnDefs=[]');
+      return [];
+    }
+    
+    console.log('🔨 columnDefs再生成:', {
+      isEditing,
+      canEdit: checkCanEdit(),
+      selectedContentTypeIds: stableSelectedContentTypeIds.length,
+      originalContentType: stableOriginalContentType.length,
+      companies: stableCompanies.length,
+      approvalStatus: stableApprovalStatus.length,
+      isNewMode
+    });
+    return getAgTestColumnDefs(
+      isEditing && checkCanEdit(),
+      stableSelectedContentTypeIds,
+      stableOriginalContentType,
+      stableCompanies,
+      handleStopEditing
+    );
+  }, [isGridReady, isEditing, stableSelectedContentTypeIds, stableOriginalContentType, stableCompanies, stableApprovalStatus, isNewMode]);
+
+  // defaultColDefをメモ化
+  const defaultColDef = useMemo(() => ({
+    resizable: false,
+    singleClickEdit: false,
+    valueFormatter: (params: any) => {
+      const v = params.value;
+      if (v === undefined) {
+        return '-';
+      }
+      return v;
+    },
+  }), []);
+
+  //---------------------------------------------------------------------------
   // 描画JSX
   //---------------------------------------------------------------------------
   return (
@@ -978,36 +1114,25 @@ const AgTest = () => {
         </div>
 
         <div className="flex flex-1">
-          <div className="ag-theme-alpine h-full min-h-0 w-full">
+          {isGridReady ? (
+            <div className="ag-theme-alpine h-full min-h-0 w-full">
               <AgGridReact
-              ref={gridRef}
-              rowData={agRowData}
-              enterNavigatesVertically={true}
-              enterNavigatesVerticallyAfterEdit={true}
-              columnDefs={getAgTestColumnDefs(
-                isEditing && checkCanEdit(), // 編集可能かつ承認対象の場合のみ編集可能
-                selectedContentTypeIds,
-                originalContentType,
-                companies,
-                () => {
-                  // セルエディタ側から呼ばれたときに編集を確定して閉じる
-                  gridRef.current?.api.stopEditing();
-                }
-              )}
-              defaultColDef={{
-                resizable: false,
-                singleClickEdit: false,
-                valueFormatter: (params) => {
-                  const v = params.value;
-                  // undefined / null / 空文字 / 0 は「-」表示
-                  if (v === undefined) {
-                    return '-';
-                  }
-                  return v;
-                },
-              }}
-            />
-          </div>
+                ref={gridRef}
+                rowData={agRowData}
+                enterNavigatesVertically={true}
+                enterNavigatesVerticallyAfterEdit={true}
+                columnDefs={columnDefs}
+                defaultColDef={defaultColDef}
+              />
+            </div>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="text-center">
+                <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
+                <p className="text-gray-600">データを読み込んでいます...</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* PDFプレビューモーダル */}
