@@ -55,6 +55,7 @@ const Home = () => {
           <Button onClick={() => navigate("/attendance")}>勤怠管理</Button>
           <Button onClick={() => navigate("/reports")}>報告書一覧</Button>
           <Button onClick={() => navigate("/new-plan")}>月次計画管理</Button>
+          <Button onClick={() => navigate("/csv-import")}>CSV取り込み</Button>
         </div>
       </div>
     </>

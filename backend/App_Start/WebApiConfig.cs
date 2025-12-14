@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Web.Http;
+using Newtonsoft.Json.Serialization;
 
 namespace backend
 {
@@ -22,10 +23,14 @@ namespace backend
             );
 
             // ✅ XMLを無効化してJSONをデフォルトにする
-            //config.Formatters.Remove(config.Formatters.XmlFormatter);
-            //config.Formatters.JsonFormatter.SupportedMediaTypes.Add(
-            //    new MediaTypeHeaderValue("application/json")
-            //);
+            config.Formatters.Remove(config.Formatters.XmlFormatter);
+            
+            // ✅ JSONのプロパティ名をcamelCaseに設定
+            var jsonFormatter = config.Formatters.JsonFormatter;
+            jsonFormatter.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
+            
+            // ✅ 循環参照を無視
+            jsonFormatter.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
         }
     }
 }

@@ -18,6 +18,7 @@ import Login from "../pages/Login";
 import ReportList from "../pages/ReportList";
 import ReportForm from "../pages/ReportForm";
 import NewPlan from "../pages/NewPlan";
+import CsvImport from "../pages/CsvImport";
 
 const Router = createBrowserRouter(
   createRoutesFromElements(
@@ -44,6 +45,7 @@ const Router = createBrowserRouter(
         <Route path="/reports/edit/:reportNo" element={<ReportForm />} />
 
         <Route path="/new-plan" element={<NewPlan />} />
+        <Route path="/csv-import" element={<CsvImport />} />
       </Route>
     </>
   )
