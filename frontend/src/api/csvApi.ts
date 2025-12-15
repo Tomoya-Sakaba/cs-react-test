@@ -1,8 +1,6 @@
 import axios from 'axios';
 
 export interface CsvImportResult {
-  successCount: number;
-  failureCount: number;
   errors: string[];
   message: string;
 }
@@ -10,6 +8,7 @@ export interface CsvImportResult {
 export interface ResultEntity {
   id: number;
   date: string;
+  time: string | null;
   contentTypeId: number;
   vol: number | null;
   companyId: number | null;
@@ -133,6 +132,36 @@ export const csvApi = {
       await axios.delete('/api/csv/results');
     } catch (error) {
       console.error('結果データ削除エラー:', error);
+      if (axios.isAxiosError(error)) {
+        const message = error.response?.data?.message || error.message;
+        throw new Error(message);
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * t_results用のExcelファイルをアップロード（SqlBulkCopy版）
+   * SQL ServerのネイティブBULK INSERT機能を使用
+   */
+  async importResultsExcel(file: File): Promise<CsvImportResult> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await axios.post<CsvImportResult>(
+        '/api/excel/import/results',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('Excel取り込みエラー:', error);
       if (axios.isAxiosError(error)) {
         const message = error.response?.data?.message || error.message;
         throw new Error(message);

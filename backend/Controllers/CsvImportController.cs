@@ -12,6 +12,7 @@ namespace backend.Controllers
     public class CsvImportController : ApiController
     {
         private readonly CsvImportService _service = new CsvImportService();
+        private readonly ExcelImportService _excelService = new ExcelImportService();
 
         /// <summary>
         /// t_results用のCSVファイルをアップロードして取り込む
@@ -57,15 +58,9 @@ namespace backend.Controllers
                 var result = _service.ImportResultsCsv(file.InputStream, createdUser);
 
                 // 結果を返す
-                if (result.FailureCount == 0)
-                {
-                    return Ok(result);
-                }
-                else
-                {
-                    // 一部失敗がある場合でも200で返す（部分成功）
-                    return Ok(result);
-                }
+
+                // 一部失敗がある場合でも200で返す（部分成功）
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -212,6 +207,59 @@ namespace backend.Controllers
             catch (Exception ex)
             {
                 return InternalServerError(ex);
+            }
+        }
+
+        /// <summary>
+        /// t_results用のExcelファイルをアップロードして取り込む（SqlBulkCopy版）
+        /// POST: api/excel/import/results
+        /// </summary>
+        /// <returns>取り込み結果</returns>
+        [HttpPost]
+        [Route("api/excel/import/results")]
+        public IHttpActionResult ImportResultsExcel()
+        {
+            try
+            {
+                // ファイルが送信されているかチェック
+                if (HttpContext.Current.Request.Files.Count == 0)
+                {
+                    return BadRequest("Excelファイルが送信されていません。");
+                }
+
+                var file = HttpContext.Current.Request.Files[0];
+
+                // ファイルが空でないかチェック
+                if (file == null || file.ContentLength == 0)
+                {
+                    return BadRequest("Excelファイルが空です。");
+                }
+
+                // ファイル拡張子チェック（.xlsx または .xls）
+                if (!file.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) &&
+                    !file.FileName.EndsWith(".xls", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest("Excelファイル（.xlsx または .xls）のみアップロード可能です。");
+                }
+
+                // ファイルサイズチェック（10MB制限）
+                if (file.ContentLength > 10 * 1024 * 1024)
+                {
+                    return BadRequest("ファイルサイズは10MB以下にしてください。");
+                }
+
+                // 作成者（認証実装後はユーザー情報から取得）
+                string createdUser = "System";
+
+                // Excel取り込み実行（SqlBulkCopy版）
+                var result = _excelService.ImportResultsExcelBulkCopy(file.InputStream, createdUser);
+
+                // 結果を返す
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return InternalServerError(new Exception($"Excel取り込み中にエラーが発生しました: {ex.Message}", ex));
             }
         }
     }

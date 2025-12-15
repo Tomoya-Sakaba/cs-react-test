@@ -31,6 +31,7 @@ namespace backend.Models.Repository
                     INSERT INTO [t_results] 
                     (
                         [date],
+                        [time],
                         [content_type_id],
                         [vol],
                         [company_id],
@@ -41,6 +42,7 @@ namespace backend.Models.Repository
                     VALUES
                     (
                         @Date,
+                        @Time,
                         @ContentTypeId,
                         @Vol,
                         @CompanyId,
@@ -69,6 +71,7 @@ namespace backend.Models.Repository
                             INSERT INTO [t_results] 
                             (
                                 [date],
+                                [time],
                                 [content_type_id],
                                 [vol],
                                 [company_id],
@@ -79,6 +82,7 @@ namespace backend.Models.Repository
                             VALUES
                             (
                                 @Date,
+                                @Time,
                                 @ContentTypeId,
                                 @Vol,
                                 @CompanyId,
@@ -110,6 +114,7 @@ namespace backend.Models.Repository
                     SELECT 
                         [id] as Id,
                         [date] as Date,
+                        [time] as Time,
                         [content_type_id] as ContentTypeId,
                         [vol] as Vol,
                         [company_id] as CompanyId,
@@ -117,7 +122,7 @@ namespace backend.Models.Repository
                         [created_at] as CreatedAt,
                         [created_user] as CreatedUser
                     FROM [t_results]
-                    ORDER BY [date] DESC, [id] DESC";
+                    ORDER BY [id] ASC";
 
                 return connection.Query<ResultEntity>(sql).ToList();
             }
@@ -134,6 +139,7 @@ namespace backend.Models.Repository
                     SELECT 
                         [id] as Id,
                         [date] as Date,
+                        [time] as Time,
                         [content_type_id] as ContentTypeId,
                         [vol] as Vol,
                         [company_id] as CompanyId,

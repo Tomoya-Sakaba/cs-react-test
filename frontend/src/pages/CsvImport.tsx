@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { csvApi, type CsvImportResult, type ResultEntity } from '../api/csvApi';
 
+type FileType = 'csv' | 'excel';
+type ImportMethod = 'normal' | 'bulk' | 'bulkcopy' | 'excel';
+
 export const CsvImportPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<CsvImportResult | null>(null);
   const [results, setResults] = useState<ResultEntity[]>([]);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
-  const [insertMode, setInsertMode] = useState<'normal' | 'bulk' | 'bulkcopy'>('bulkcopy'); // デフォルトでSqlBulkCopy
+  const [fileType, setFileType] = useState<FileType>('csv'); // ファイルタイプ（CSV or Excel）
+  const [insertMode, setInsertMode] = useState<ImportMethod>('bulkcopy'); // デフォルトでSqlBulkCopy
 
   // 初回表示時にデータを読み込む
   useEffect(() => {
@@ -21,9 +25,28 @@ export const CsvImportPage: React.FC = () => {
     }
   };
 
+  const handleFileTypeChange = (type: FileType) => {
+    setFileType(type);
+    setFile(null); // ファイル選択をクリア
+    setResult(null);
+    
+    // ファイルタイプに応じてインポート方法を自動設定
+    if (type === 'excel') {
+      setInsertMode('excel');
+    } else {
+      setInsertMode('bulkcopy');
+    }
+    
+    // ファイル入力をクリア
+    const fileInput = document.getElementById('file-input') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
+
   const handleUpload = async () => {
     if (!file) {
-      alert('CSVファイルを選択してください。');
+      alert(`${fileType === 'csv' ? 'CSV' : 'Excel'}ファイルを選択してください。`);
       return;
     }
 
@@ -31,46 +54,52 @@ export const CsvImportPage: React.FC = () => {
     setResult(null);
 
     try {
-      const modeLabel = insertMode === 'bulkcopy' ? 'SqlBulkCopy' : insertMode === 'bulk' ? 'バルク' : '通常';
-      console.log('CSV取り込み開始:', file.name, `(${modeLabel})`);
-      
-      // 挿入モードを選択
       let importResult: CsvImportResult;
-      switch (insertMode) {
-        case 'bulkcopy':
-          importResult = await csvApi.importResultsCsvBulkCopy(file);
-          break;
-        case 'bulk':
-          importResult = await csvApi.importResultsCsvBulk(file);
-          break;
-        default:
-          importResult = await csvApi.importResultsCsv(file);
-          break;
+      
+      if (fileType === 'excel' || insertMode === 'excel') {
+        console.log('Excel取り込み開始:', file.name);
+        importResult = await csvApi.importResultsExcel(file);
+        console.log('Excel取り込み成功:', importResult);
+      } else {
+        const modeLabel = insertMode === 'bulkcopy' ? 'SqlBulkCopy' : insertMode === 'bulk' ? 'バルク' : '通常';
+        console.log('CSV取り込み開始:', file.name, `(${modeLabel})`);
+        
+        // 挿入モードを選択
+        switch (insertMode) {
+          case 'bulkcopy':
+            importResult = await csvApi.importResultsCsvBulkCopy(file);
+            break;
+          case 'bulk':
+            importResult = await csvApi.importResultsCsvBulk(file);
+            break;
+          default:
+            importResult = await csvApi.importResultsCsv(file);
+            break;
+        }
+        
+        console.log('CSV取り込み成功:', importResult);
       }
       
-      console.log('CSV取り込み成功:', importResult);
       setResult(importResult);
       
-      // 成功したらリストを更新
-      if (importResult.successCount > 0) {
+      // エラーがなければリストを更新
+      if (importResult.errors.length === 0) {
         await loadResults();
       }
       
       // ファイル選択をクリア
       setFile(null);
-      const fileInput = document.getElementById('csv-file-input') as HTMLInputElement;
+      const fileInput = document.getElementById('file-input') as HTMLInputElement;
       if (fileInput) {
         fileInput.value = '';
       }
     } catch (error) {
-      console.error('CSV取り込みエラー:', error);
+      console.error('ファイル取り込みエラー:', error);
       const errorMessage = error instanceof Error ? error.message : '不明なエラーが発生しました';
       alert(`エラー: ${errorMessage}`);
       setResult({
-        successCount: 0,
-        failureCount: 0,
         errors: [errorMessage],
-        message: 'CSV取り込みに失敗しました'
+        message: 'ファイル取り込みに失敗しました'
       });
     } finally {
       setIsUploading(false);
@@ -95,20 +124,56 @@ export const CsvImportPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">CSV取り込み（t_results）</h1>
+      <h1 className="text-2xl font-bold mb-6">CSV/Excel取り込み（t_results）</h1>
 
       {/* ファイルアップロード */}
       <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">CSVファイルアップロード</h2>
+        <h2 className="text-lg font-semibold mb-4">ファイルアップロード</h2>
         <div className="space-y-4">
+          {/* ファイルタイプ選択 */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-gray-700">ファイルタイプ:</p>
+            
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="radio"
+                name="fileType"
+                value="csv"
+                checked={fileType === 'csv'}
+                onChange={() => handleFileTypeChange('csv')}
+                className="w-4 h-4 text-blue-600"
+                disabled={isUploading}
+              />
+              <span className="text-sm">
+                <strong>CSV</strong> - カンマ区切りファイル（.csv）
+              </span>
+            </label>
+
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="radio"
+                name="fileType"
+                value="excel"
+                checked={fileType === 'excel'}
+                onChange={() => handleFileTypeChange('excel')}
+                className="w-4 h-4 text-blue-600"
+                disabled={isUploading}
+              />
+              <span className="text-sm">
+                <strong>Excel</strong> - Excelファイル（.xlsx、.xls）
+              </span>
+            </label>
+          </div>
+
+          {/* ファイル選択 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              CSVファイルを選択
+              {fileType === 'csv' ? 'CSVファイル' : 'Excelファイル'}を選択
             </label>
             <input
-              id="csv-file-input"
+              id="file-input"
               type="file"
-              accept=".csv"
+              accept={fileType === 'csv' ? '.csv' : '.xlsx,.xls'}
               onChange={handleFileChange}
               className="block w-full text-sm text-gray-500
                 file:mr-4 file:py-2 file:px-4
@@ -125,71 +190,117 @@ export const CsvImportPage: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-gray-50 p-4 rounded border border-gray-200">
-            <p className="text-sm font-medium text-gray-700 mb-2">CSVフォーマット:</p>
-            <code className="text-xs text-gray-600 block whitespace-pre">
+          {/* フォーマット説明 */}
+          {fileType === 'csv' ? (
+            <div className="bg-gray-50 p-4 rounded border border-gray-200">
+              <p className="text-sm font-medium text-gray-700 mb-2">CSVフォーマット:</p>
+              <code className="text-xs text-gray-600 block whitespace-pre">
 {`ファイルヘッダー
 (空行)
 日付,,コンテンツタイプ,量,企業ID,企業名
 2024-12-01,,1,100.50,1,株式会社サンプル`}
-            </code>
-            <p className="text-xs text-gray-500 mt-2">
-              ※ 1行目: ファイルヘッダー、2行目: 空行、3行目: データヘッダー、4行目以降: データ
-            </p>
-            <p className="text-xs text-gray-500">
-              ※ 2列目は空カラムです（,,で表示）
-            </p>
-          </div>
+              </code>
+              <p className="text-xs text-gray-500 mt-2">
+                ※ 1行目: ファイルヘッダー、2行目: 空行、3行目: データヘッダー、4行目以降: データ
+              </p>
+              <p className="text-xs text-gray-500">
+                ※ 2列目は空カラムです（,,で表示）
+              </p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 p-4 rounded border border-gray-200">
+              <p className="text-sm font-medium text-gray-700 mb-2">Excelフォーマット:</p>
+              <div className="text-xs text-gray-600">
+                <table className="border-collapse border border-gray-300">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="border border-gray-300 px-2 py-1">A</th>
+                      <th className="border border-gray-300 px-2 py-1">B</th>
+                      <th className="border border-gray-300 px-2 py-1">C</th>
+                      <th className="border border-gray-300 px-2 py-1">D</th>
+                      <th className="border border-gray-300 px-2 py-1">E</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border border-gray-300 px-2 py-1">日付</td>
+                      <td className="border border-gray-300 px-2 py-1">コンテンツタイプ</td>
+                      <td className="border border-gray-300 px-2 py-1">量</td>
+                      <td className="border border-gray-300 px-2 py-1">企業ID</td>
+                      <td className="border border-gray-300 px-2 py-1">企業名</td>
+                    </tr>
+                    <tr>
+                      <td className="border border-gray-300 px-2 py-1">2024-12-01</td>
+                      <td className="border border-gray-300 px-2 py-1">1</td>
+                      <td className="border border-gray-300 px-2 py-1">100.50</td>
+                      <td className="border border-gray-300 px-2 py-1">1</td>
+                      <td className="border border-gray-300 px-2 py-1">株式会社サンプル</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                ※ 1行目: データヘッダー、2行目以降: データ
+              </p>
+              <p className="text-xs text-gray-500">
+                ※ 最初のシートのみを読み込みます
+              </p>
+            </div>
+          )}
 
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-gray-700">挿入モード:</p>
-            
-            <label className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="radio"
-                name="insertMode"
-                value="bulkcopy"
-                checked={insertMode === 'bulkcopy'}
-                onChange={(e) => setInsertMode(e.target.value as any)}
-                className="w-4 h-4 text-blue-600"
-                disabled={isUploading}
-              />
-              <span className="text-sm">
-                <strong>SqlBulkCopy（推奨）</strong> - 最速！SQL Serverネイティブ機能（10万件以上に最適）
-              </span>
-            </label>
+          {/* 挿入モード（CSVのみ） */}
+          {fileType === 'csv' && (
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-gray-700">挿入モード:</p>
+              
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="insertMode"
+                  value="bulkcopy"
+                  checked={insertMode === 'bulkcopy'}
+                  onChange={(e) => setInsertMode(e.target.value as ImportMethod)}
+                  className="w-4 h-4 text-blue-600"
+                  disabled={isUploading}
+                />
+                <span className="text-sm">
+                  <strong>SqlBulkCopy（推奨）</strong> - 最速！SQL Serverネイティブ機能（10万件以上に最適）
+                </span>
+              </label>
 
-            <label className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="radio"
-                name="insertMode"
-                value="bulk"
-                checked={insertMode === 'bulk'}
-                onChange={(e) => setInsertMode(e.target.value as any)}
-                className="w-4 h-4 text-blue-600"
-                disabled={isUploading}
-              />
-              <span className="text-sm">
-                <strong>トランザクションバルク</strong> - 高速（1000件〜10万件に適）
-              </span>
-            </label>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="insertMode"
+                  value="bulk"
+                  checked={insertMode === 'bulk'}
+                  onChange={(e) => setInsertMode(e.target.value as ImportMethod)}
+                  className="w-4 h-4 text-blue-600"
+                  disabled={isUploading}
+                />
+                <span className="text-sm">
+                  <strong>トランザクションバルク</strong> - 高速（1000件〜10万件に適）
+                </span>
+              </label>
 
-            <label className="flex items-center space-x-2 cursor-pointer">
-              <input
-                type="radio"
-                name="insertMode"
-                value="normal"
-                checked={insertMode === 'normal'}
-                onChange={(e) => setInsertMode(e.target.value as any)}
-                className="w-4 h-4 text-blue-600"
-                disabled={isUploading}
-              />
-              <span className="text-sm">
-                <strong>通常</strong> - 1行ずつ（エラーがあっても成功分は保存）
-              </span>
-            </label>
-          </div>
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="insertMode"
+                  value="normal"
+                  checked={insertMode === 'normal'}
+                  onChange={(e) => setInsertMode(e.target.value as ImportMethod)}
+                  className="w-4 h-4 text-blue-600"
+                  disabled={isUploading}
+                />
+                <span className="text-sm">
+                  <strong>通常</strong> - 1行ずつ（エラーがあっても成功分は保存）
+                </span>
+              </label>
+            </div>
+          )}
 
+          {/* アップロードボタン */}
           <button
             onClick={handleUpload}
             disabled={!file || isUploading}
@@ -201,11 +312,13 @@ export const CsvImportPage: React.FC = () => {
           >
             {isUploading 
               ? 'アップロード中...' 
-              : `アップロード${
-                  insertMode === 'bulkcopy' ? '（BulkCopy）' : 
-                  insertMode === 'bulk' ? '（バルク）' : 
-                  '（通常）'
-                }`
+              : fileType === 'excel'
+                ? 'アップロード（Excel - BulkCopy）'
+                : `アップロード（CSV - ${
+                    insertMode === 'bulkcopy' ? 'BulkCopy' : 
+                    insertMode === 'bulk' ? 'バルク' : 
+                    '通常'
+                  }）`
             }
           </button>
         </div>
@@ -214,16 +327,10 @@ export const CsvImportPage: React.FC = () => {
       {/* 取り込み結果 */}
       {result && (
         <div className={`shadow rounded-lg p-6 mb-6 ${
-          result.failureCount === 0 ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
+          result.errors.length === 0 ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
         }`}>
           <h2 className="text-lg font-semibold mb-4">取り込み結果</h2>
           <p className="mb-2">{result.message}</p>
-          <div className="space-y-1 text-sm">
-            <p>✅ 成功: <span className="font-semibold">{result.successCount}件</span></p>
-            {result.failureCount > 0 && (
-              <p>❌ 失敗: <span className="font-semibold">{result.failureCount}件</span></p>
-            )}
-          </div>
 
           {result.errors.length > 0 && (
             <div className="mt-4">
@@ -262,10 +369,13 @@ export const CsvImportPage: React.FC = () => {
                 <tr>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">日付</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">時間</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">コンテンツタイプID</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">量</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">企業ID</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">企業名</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">作成日時</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">作成者</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -275,10 +385,13 @@ export const CsvImportPage: React.FC = () => {
                     <td className="px-3 py-2 text-sm">
                       {item.date ? new Date(item.date).toLocaleDateString('ja-JP') : '-'}
                     </td>
+                    <td className="px-3 py-2 text-sm">{item.time ?? '-'}</td>
                     <td className="px-3 py-2 text-sm">{item.contentTypeId ?? '-'}</td>
                     <td className="px-3 py-2 text-sm">{item.vol ?? '-'}</td>
                     <td className="px-3 py-2 text-sm">{item.companyId ?? '-'}</td>
                     <td className="px-3 py-2 text-sm">{item.companyName ?? '-'}</td>
+                    <td className="px-3 py-2 text-sm">{item.createdAt ? new Date(item.createdAt).toLocaleString('ja-JP') : '-'}</td>
+                    <td className="px-3 py-2 text-sm">{item.createdUser ?? '-'}</td>
                   </tr>
                 ))}
               </tbody>

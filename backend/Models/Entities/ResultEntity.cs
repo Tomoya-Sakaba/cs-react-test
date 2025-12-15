@@ -9,6 +9,7 @@ namespace backend.Models.Entities
     {
         public int Id { get; set; }
         public DateTime Date { get; set; }
+        public TimeSpan? Time { get; set; }
         public int ContentTypeId { get; set; }
         public decimal? Vol { get; set; }
         public int? CompanyId { get; set; }

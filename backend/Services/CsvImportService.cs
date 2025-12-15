@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using backend.Helpers;
 using backend.Models.DTOs;
 using backend.Models.Entities;
 using backend.Models.Repository;
@@ -39,8 +40,6 @@ namespace backend.Services
         {
             var result = new CsvImportResultDto
             {
-                SuccessCount = 0,
-                FailureCount = 0,
                 Errors = new List<string>()
             };
 
@@ -67,17 +66,21 @@ namespace backend.Services
                     csv.Read();
                     csv.ReadHeader();
 
-                    int rowNumber = 4; // データは4行目から開始
+                    int successCount = 0;
+                    int failureCount = 0;
 
                     // データ行を1行ずつ処理
                     while (csv.Read())
                     {
+                        // CsvHelperの現在の行番号を取得
+                        int rowNumber = csv.Parser.Row;
+
                         try
                         {
                             // CSV列を順番で取得
-                            // 列の順番: 0=日付, 1=空(スキップ), 2=コンテンツタイプ, 3=量, 4=企業ID, 5=企業名
+                            // 列の順番: 0=日付, 1=時間, 2=コンテンツタイプ, 3=量, 4=企業ID, 5=企業名
                             var dateStr = csv.GetField(0);         // 日付
-                            // csv.GetField(1) は空カラムなのでスキップ
+                            var timeStr = csv.GetField(1);         // 時間
                             var contentTypeIdStr = csv.GetField(2); // コンテンツタイプ
                             var volStr = csv.GetField(3);          // 量
                             var companyIdStr = csv.GetField(4);    // 企業ID
@@ -86,6 +89,7 @@ namespace backend.Services
                             // バリデーション & 変換（必須チェックなし）
                             var entity = ConvertToEntity(
                                 dateStr,
+                                timeStr,
                                 contentTypeIdStr,
                                 volStr,
                                 companyIdStr,
@@ -96,26 +100,38 @@ namespace backend.Services
 
                             // DBに挿入
                             _repository.Insert(entity);
-                            result.SuccessCount++;
+                            successCount++;
+                        }
+                        catch (ArgumentException argEx)
+                        {
+                            // 型変換エラー（ConvertToEntityから）
+                            result.Errors.Add($"行 {rowNumber}: {argEx.Message}");
+                            failureCount++;
+                        }
+                        catch (SqlException sqlEx)
+                        {
+                            // データベースエラー
+                            string errorMessage = GetSqlErrorMessage(sqlEx);
+                            result.Errors.Add($"行 {rowNumber}: {errorMessage}");
+                            failureCount++;
                         }
                         catch (Exception ex)
                         {
-                            result.Errors.Add($"行 {rowNumber}: {ex.Message}");
-                            result.FailureCount++;
+                            result.Errors.Add($"行 {rowNumber}: 予期しないエラーが発生しました（{ex.GetType().Name}: {ex.Message}）");
+                            failureCount++;
                         }
-
-                        rowNumber++;
                     }
-                }
 
-                // 結果メッセージ
-                if (result.FailureCount == 0)
-                {
-                    result.Message = $"CSV取り込みが完了しました。（成功: {result.SuccessCount}件）";
-                }
-                else
-                {
-                    result.Message = $"CSV取り込みが完了しました。（成功: {result.SuccessCount}件、失敗: {result.FailureCount}件）";
+                    // 結果メッセージ
+                    if (failureCount == 0)
+                    {
+                        result.Message = $"CSV取り込みが完了しました。（成功: {successCount}件）";
+                    }
+                    else
+                    {
+                        int totalCount = successCount + failureCount;
+                        result.Message = $"CSV取り込みが完了しました。{totalCount}件中{failureCount}件のエラーです。（成功: {successCount}件）";
+                    }
                 }
             }
             catch (Exception ex)
@@ -128,10 +144,126 @@ namespace backend.Services
         }
 
         /// <summary>
+        /// 日付の変換を試行（バリデーション付き）
+        /// </summary>
+        private DateTime ValidateAndConvertDateTime(string value, string columnName, List<string> errors)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                if (DateTime.TryParse(value, out DateTime result))
+                {
+                    return result;
+                }
+                else
+                {
+                    errors.Add($"「{columnName}」列に不正な文字があります（値: {value}）。日付形式（YYYY-MM-DD または YYYY/MM/DD）で入力してください。");
+                    return DateTime.Now.Date; // デフォルト値
+                }
+            }
+            else
+            {
+                return DateTime.Now.Date; // 空の場合はデフォルト値
+            }
+        }
+
+        /// <summary>
+        /// 整数の変換を試行（バリデーション付き）
+        /// </summary>
+        private int ValidateAndConvertInt(string value, string columnName, List<string> errors, int defaultValue = 0)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                if (int.TryParse(value, out int result))
+                {
+                    return result;
+                }
+                else
+                {
+                    errors.Add($"「{columnName}」列に不正な文字があります（値: {value}）。整数で入力してください。");
+                    return defaultValue;
+                }
+            }
+            else
+            {
+                return defaultValue; // 空の場合はデフォルト値
+            }
+        }
+
+        /// <summary>
+        /// 整数の変換を試行（NULL許可版）
+        /// </summary>
+        private int? ValidateAndConvertNullableInt(string value, string columnName, List<string> errors)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                if (int.TryParse(value, out int result))
+                {
+                    return result;
+                }
+                else
+                {
+                    errors.Add($"「{columnName}」列に不正な文字があります（値: {value}）。整数で入力してください。");
+                    return null;
+                }
+            }
+            else
+            {
+                return null; // 空の場合はNULL
+            }
+        }
+
+        /// <summary>
+        /// 小数の変換を試行（バリデーション付き）
+        /// </summary>
+        private decimal? ValidateAndConvertDecimal(string value, string columnName, List<string> errors)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                if (decimal.TryParse(value, out decimal result))
+                {
+                    return result;
+                }
+                else
+                {
+                    errors.Add($"「{columnName}」列に不正な文字があります（値: {value}）。数値で入力してください。");
+                    return null;
+                }
+            }
+            else
+            {
+                return null; // 空の場合はNULL
+            }
+        }
+
+        /// <summary>
+        /// SQL Serverのエラーコードから分かりやすいメッセージを取得
+        /// </summary>
+        private string GetSqlErrorMessage(SqlException sqlEx)
+        {
+            switch (sqlEx.Number)
+            {
+                case 2627: // 主キー違反
+                case 2601: // 一意制約違反
+                    return "重複するデータが存在します。同じデータが既に登録されている可能性があります。";
+                case 547: // 外部キー制約違反
+                    return "参照整合性エラー。指定されたIDが存在しない、または関連データが削除されています。";
+                case 8152: // 文字列切り捨てエラー
+                    return "データが長すぎます。文字数制限を超えているカラムがあります。";
+                case 515: // NULL制約違反
+                    return "必須項目が空です。NULL値が許可されていないカラムに空のデータがあります。";
+                case -2: // タイムアウト
+                    return "処理がタイムアウトしました。データ量が多すぎる可能性があります。";
+                default:
+                    return $"データベースエラーが発生しました（エラーコード: {sqlEx.Number}）";
+            }
+        }
+
+        /// <summary>
         /// CSV行データをEntityに変換（必須チェックなし）
         /// </summary>
         private ResultEntity ConvertToEntity(
             string dateStr,
+            string timeStr,
             string contentTypeIdStr,
             string volStr,
             string companyIdStr,
@@ -145,77 +277,32 @@ namespace backend.Services
                 CreatedAt = DateTime.Now
             };
 
-            // 日付の変換（空白の場合はデフォルト値）
-            if (!string.IsNullOrWhiteSpace(dateStr))
-            {
-                if (DateTime.TryParse(dateStr, out DateTime date))
-                {
-                    entity.Date = date;
-                }
-                else
-                {
-                    throw new ArgumentException($"日付の形式が不正です: {dateStr}");
-                }
-            }
-            else
-            {
-                // 日付が空の場合は現在日付を使用
-                entity.Date = DateTime.Now.Date;
-            }
+            // ヘルパー関数を使用して変換（エラー時は例外を投げる）
+            var errors = new List<string>();
 
-            // コンテンツタイプIDの変換（空白の場合は0）
-            if (!string.IsNullOrWhiteSpace(contentTypeIdStr))
-            {
-                if (int.TryParse(contentTypeIdStr, out int contentTypeId))
-                {
-                    entity.ContentTypeId = contentTypeId;
-                }
-                else
-                {
-                    throw new ArgumentException($"コンテンツタイプIDが数値ではありません: {contentTypeIdStr}");
-                }
-            }
-            else
-            {
-                entity.ContentTypeId = 0;
-            }
+            // 日付
+            entity.Date = ValidateAndConvertDateTime(dateStr, "日付", errors);
 
-            // 量の変換（オプショナル）
-            if (!string.IsNullOrWhiteSpace(volStr))
-            {
-                if (decimal.TryParse(volStr, out decimal vol))
-                {
-                    entity.Vol = vol;
-                }
-                else
-                {
-                    throw new ArgumentException($"量が数値ではありません: {volStr}");
-                }
-            }
-            else
-            {
-                entity.Vol = null;
-            }
+            // 時間
+            entity.Time = ValidationHelpers.ValidateAndConvertNullableTime(timeStr, "時間", errors);
 
-            // 企業IDの変換（オプショナル）
-            if (!string.IsNullOrWhiteSpace(companyIdStr))
-            {
-                if (int.TryParse(companyIdStr, out int companyId))
-                {
-                    entity.CompanyId = companyId;
-                }
-                else
-                {
-                    throw new ArgumentException($"企業IDが数値ではありません: {companyIdStr}");
-                }
-            }
-            else
-            {
-                entity.CompanyId = null;
-            }
+            // コンテンツタイプID
+            entity.ContentTypeId = ValidateAndConvertInt(contentTypeIdStr, "コンテンツタイプ", errors, defaultValue: 0);
 
-            // 企業名（オプショナル）
+            // 量
+            entity.Vol = ValidateAndConvertDecimal(volStr, "量", errors);
+
+            // 企業ID
+            entity.CompanyId = ValidateAndConvertNullableInt(companyIdStr, "企業ID", errors);
+
+            // 企業名（文字列なので型チェック不要）
             entity.CompanyName = string.IsNullOrWhiteSpace(companyName) ? null : companyName;
+
+            // エラーがあれば例外を投げる
+            if (errors.Count > 0)
+            {
+                throw new ArgumentException(string.Join(" / ", errors));
+            }
 
             return entity;
         }
@@ -232,8 +319,6 @@ namespace backend.Services
         {
             var result = new CsvImportResultDto
             {
-                SuccessCount = 0,
-                FailureCount = 0,
                 Errors = new List<string>()
             };
 
@@ -249,6 +334,7 @@ namespace backend.Services
                 };
 
                 var entitiesToInsert = new List<ResultEntity>();
+                int failureCount = 0;
 
                 // Shift-JIS（ANSI）でファイルを読み込む
                 using (var reader = new StreamReader(fileStream, Encoding.GetEncoding(932)))
@@ -270,9 +356,9 @@ namespace backend.Services
                         try
                         {
                             // CSV列を順番で取得
-                            // 列の順番: 0=日付, 1=空(スキップ), 2=コンテンツタイプ, 3=量, 4=企業ID, 5=企業名
+                            // 列の順番: 0=日付, 1=時間, 2=コンテンツタイプ, 3=量, 4=企業ID, 5=企業名
                             var dateStr = csv.GetField(0);         // 日付
-                            // csv.GetField(1) は空カラムなのでスキップ
+                            var timeStr = csv.GetField(1);         // 時間
                             var contentTypeIdStr = csv.GetField(2); // コンテンツタイプ
                             var volStr = csv.GetField(3);          // 量
                             var companyIdStr = csv.GetField(4);    // 企業ID
@@ -281,6 +367,7 @@ namespace backend.Services
                             // バリデーション & 変換（必須チェックなし）
                             var entity = ConvertToEntity(
                                 dateStr,
+                                timeStr,
                                 contentTypeIdStr,
                                 volStr,
                                 companyIdStr,
@@ -291,10 +378,16 @@ namespace backend.Services
 
                             entitiesToInsert.Add(entity);
                         }
+                        catch (ArgumentException argEx)
+                        {
+                            // 型変換エラー（ConvertToEntityから）
+                            result.Errors.Add($"行 {rowNumber}: {argEx.Message}");
+                            failureCount++;
+                        }
                         catch (Exception ex)
                         {
-                            result.Errors.Add($"行 {rowNumber}: {ex.Message}");
-                            result.FailureCount++;
+                            result.Errors.Add($"行 {rowNumber}: 予期しないエラーが発生しました（{ex.GetType().Name}: {ex.Message}）");
+                            failureCount++;
                         }
 
                         rowNumber++;
@@ -302,9 +395,10 @@ namespace backend.Services
                 }
 
                 // バリデーションエラーがあった場合、挿入は行わない
-                if (result.FailureCount > 0)
+                if (failureCount > 0)
                 {
-                    result.Message = $"CSV読み込み中にエラーが発生しました。（成功: 0件、失敗: {result.FailureCount}件）";
+                    int totalCount = entitiesToInsert.Count + failureCount;
+                    result.Message = $"CSV読み込み中にエラーが発生しました。{totalCount}件中{failureCount}件のエラーです。";
                     return result;
                 }
 
@@ -314,14 +408,20 @@ namespace backend.Services
                     try
                     {
                         _repository.BulkInsert(entitiesToInsert);
-                        result.SuccessCount = entitiesToInsert.Count;
-                        result.Message = $"CSV取り込みが完了しました。（成功: {result.SuccessCount}件）";
+                        int successCount = entitiesToInsert.Count;
+                        result.Message = $"CSV取り込みが完了しました。（成功: {successCount}件）";
+                    }
+                    catch (SqlException sqlEx)
+                    {
+                        string errorMessage = GetSqlErrorMessage(sqlEx);
+                        result.Errors.Add($"{errorMessage}");
+                        result.Errors.Add($"詳細: {sqlEx.Message}");
+                        result.Message = "DBへの一括挿入中にエラーが発生しました。";
                     }
                     catch (Exception ex)
                     {
-                        result.Errors.Add($"バルクインサートエラー: {ex.Message}");
-                        result.FailureCount = entitiesToInsert.Count;
-                        result.SuccessCount = 0;
+                        result.Errors.Add($"予期しないエラーが発生しました: {ex.GetType().Name}");
+                        result.Errors.Add($"詳細: {ex.Message}");
                         result.Message = "DBへの一括挿入中にエラーが発生しました。";
                     }
                 }
@@ -351,8 +451,6 @@ namespace backend.Services
         {
             var result = new CsvImportResultDto
             {
-                SuccessCount = 0,
-                FailureCount = 0,
                 Errors = new List<string>()
             };
 
@@ -370,6 +468,7 @@ namespace backend.Services
                 // DataTableを作成してCSVデータを格納
                 var dataTable = new DataTable();
                 dataTable.Columns.Add("date", typeof(DateTime));
+                dataTable.Columns.Add("time", typeof(TimeSpan));
                 dataTable.Columns.Add("content_type_id", typeof(int));
                 dataTable.Columns.Add("vol", typeof(decimal));
                 dataTable.Columns.Add("company_id", typeof(int));
@@ -377,96 +476,89 @@ namespace backend.Services
                 dataTable.Columns.Add("created_at", typeof(DateTime));
                 dataTable.Columns.Add("created_user", typeof(string));
 
+                int failureCount = 0;
+
                 // CSVを読み込んでDataTableに格納
                 using (var reader = new StreamReader(fileStream, Encoding.GetEncoding(932)))
                 using (var csv = new CsvReader(reader, config))
                 {
                     // 最初の2行をスキップ
-                    csv.Read();
-                    csv.Read();
+                    csv.Read(); // 1行目: ファイルヘッダー
+                    csv.Read(); // 2行目: 空行
                     
                     // 3行目をヘッダーとして読む
-                    csv.Read();
+                    csv.Read(); // 3行目: データヘッダー
                     csv.ReadHeader();
-
-                    int rowNumber = 4;
 
                     while (csv.Read())
                     {
+                        // CsvHelperの現在の行番号を取得（1始まり）
+                        // csv.Parser.Row はヘッダーを除いた実際のCSV行番号
+                        int rowNumber = csv.Parser.Row;
+
                         try
                         {
-                            var dateStr = csv.GetField(0);
-                            var contentTypeIdStr = csv.GetField(2);
-                            var volStr = csv.GetField(3);
-                            var companyIdStr = csv.GetField(4);
-                            var companyName = csv.GetField(5);
+                            // 列の順番: 0=日付, 1=時間, 2=コンテンツタイプ, 3=量, 4=企業ID, 5=企業名
+                            var dateStr = csv.GetField(0);         // 日付
+                            var timeStr = csv.GetField(1);         // 時間
+                            var contentTypeIdStr = csv.GetField(2); // コンテンツタイプ
+                            var volStr = csv.GetField(3);          // 量
+                            var companyIdStr = csv.GetField(4);    // 企業ID
+                            var companyName = csv.GetField(5);     // 企業名
 
                             // データ行を作成
                             var row = dataTable.NewRow();
+                            var rowErrors = new List<string>();
 
                             // 日付
-                            if (!string.IsNullOrWhiteSpace(dateStr) && DateTime.TryParse(dateStr, out DateTime date))
-                            {
-                                row["date"] = date;
-                            }
-                            else
-                            {
-                                row["date"] = DateTime.Now.Date;
-                            }
+                            row["date"] = ValidateAndConvertDateTime(dateStr, "日付", rowErrors);
+
+                            // 時間
+                            var time = ValidationHelpers.ValidateAndConvertNullableTime(timeStr, "時間", rowErrors);
+                            row["time"] = time.HasValue ? (object)time.Value : DBNull.Value;
 
                             // コンテンツタイプID
-                            if (!string.IsNullOrWhiteSpace(contentTypeIdStr) && int.TryParse(contentTypeIdStr, out int contentTypeId))
-                            {
-                                row["content_type_id"] = contentTypeId;
-                            }
-                            else
-                            {
-                                row["content_type_id"] = 0;
-                            }
+                            row["content_type_id"] = ValidateAndConvertInt(contentTypeIdStr, "コンテンツタイプ", rowErrors, defaultValue: 0);
 
                             // 量
-                            if (!string.IsNullOrWhiteSpace(volStr) && decimal.TryParse(volStr, out decimal vol))
-                            {
-                                row["vol"] = vol;
-                            }
-                            else
-                            {
-                                row["vol"] = DBNull.Value;
-                            }
+                            var vol = ValidateAndConvertDecimal(volStr, "量", rowErrors);
+                            row["vol"] = vol.HasValue ? (object)vol.Value : DBNull.Value;
 
                             // 企業ID
-                            if (!string.IsNullOrWhiteSpace(companyIdStr) && int.TryParse(companyIdStr, out int companyId))
-                            {
-                                row["company_id"] = companyId;
-                            }
-                            else
-                            {
-                                row["company_id"] = DBNull.Value;
-                            }
+                            var companyId = ValidateAndConvertNullableInt(companyIdStr, "企業ID", rowErrors);
+                            row["company_id"] = companyId.HasValue ? (object)companyId.Value : DBNull.Value;
 
-                            // 企業名
+                            // 企業名（文字列なので型チェック不要）
                             row["company_name"] = string.IsNullOrWhiteSpace(companyName) ? (object)DBNull.Value : companyName;
 
                             // 作成日時・作成者
                             row["created_at"] = DateTime.Now;
                             row["created_user"] = createdUser;
 
-                            dataTable.Rows.Add(row);
+                            // エラーがあった場合は記録
+                            if (rowErrors.Count > 0)
+                            {
+                                result.Errors.Add($"行 {rowNumber}: {string.Join(" / ", rowErrors)}");
+                                failureCount++;
+                            }
+                            else
+                            {
+                                dataTable.Rows.Add(row); // エラーがない行のみ追加
+                            }
                         }
                         catch (Exception ex)
                         {
-                            result.Errors.Add($"行 {rowNumber}: {ex.Message}");
-                            result.FailureCount++;
+                            result.Errors.Add($"行 {rowNumber}: 予期しないエラーが発生しました（{ex.GetType().Name}: {ex.Message}）");
+                            failureCount++;
                         }
-
-                        rowNumber++;
                     }
                 }
 
                 // バリデーションエラーがあった場合、挿入は行わない
-                if (result.FailureCount > 0)
+                if (failureCount > 0)
                 {
-                    result.Message = $"CSV読み込み中にエラーが発生しました。（成功: 0件、失敗: {result.FailureCount}件）";
+                    int totalCount = dataTable.Rows.Count + failureCount;
+                    result.Message = $"CSV読み込み中にエラーが発生しました。{totalCount}件中{failureCount}件のエラーです。";
                     return result;
                 }
 
@@ -491,6 +583,7 @@ namespace backend.Services
 
                                         // カラムマッピング
                                         bulkCopy.ColumnMappings.Add("date", "date");
+                                        bulkCopy.ColumnMappings.Add("time", "time");
                                         bulkCopy.ColumnMappings.Add("content_type_id", "content_type_id");
                                         bulkCopy.ColumnMappings.Add("vol", "vol");
                                         bulkCopy.ColumnMappings.Add("company_id", "company_id");
@@ -503,15 +596,17 @@ namespace backend.Services
                                     }
 
                                     transaction.Commit();
-                                    result.SuccessCount = dataTable.Rows.Count;
-                                    result.Message = $"CSV取り込みが完了しました。（成功: {result.SuccessCount}件）※SqlBulkCopy使用";
+                                    int successCount = dataTable.Rows.Count;
+                                    result.Message = $"CSV取り込みが完了しました。（成功: {successCount}件）※SqlBulkCopy使用";
                                 }
-                                catch (Exception ex)
+                                catch (SqlException sqlEx)
                                 {
                                     transaction.Rollback();
-                                    result.Errors.Add($"SqlBulkCopyエラー: {ex.Message}");
-                                    result.FailureCount = dataTable.Rows.Count;
-                                    result.SuccessCount = 0;
+                                    
+                                    // SQL Serverエラー（バリデーション漏れ）
+                                    string errorMessage = GetSqlErrorMessage(sqlEx);
+                                    result.Errors.Add($"{errorMessage}");
+                                    result.Errors.Add($"詳細: {sqlEx.Message}");
                                     result.Message = "DBへの一括挿入中にエラーが発生しました。";
                                 }
                             }

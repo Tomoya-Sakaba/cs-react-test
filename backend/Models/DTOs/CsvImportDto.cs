@@ -7,8 +7,6 @@ namespace backend.Models.DTOs
     /// </summary>
     public class CsvImportResultDto
     {
-        public int SuccessCount { get; set; }
-        public int FailureCount { get; set; }
         public List<string> Errors { get; set; }
         public string Message { get; set; }
 
