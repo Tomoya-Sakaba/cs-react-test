@@ -98,60 +98,40 @@ namespace backend.Services
                         {
                             var excelRow = sheet.Rows[i];
 
-                            // 各列のデータを取得（カラム順: 日付, 時間, コンテンツタイプ, 量, 企業ID, 企業名）
-                            var dateValue = excelRow[0];
-                            var timeValue = excelRow[1];
-                            var contentTypeIdValue = excelRow[2];
-                            var volValue = excelRow[3];
-                            var companyIdValue = excelRow[4];
-                            var companyNameValue = excelRow[5];
+                            // 各列のデータを取得（全て文字列に統一して型の不一致を回避）
+                            string dateStr = excelRow[0]?.ToString() ?? "";
+                            string timeStr = excelRow[1]?.ToString() ?? "";
+                            string contentTypeIdStr = excelRow[2]?.ToString() ?? "";
+                            string volStr = excelRow[3]?.ToString() ?? "";
+                            string companyIdStr = excelRow[4]?.ToString() ?? "";
+                            string companyName = excelRow[5]?.ToString() ?? "";
 
                             // 空行チェック（全列が空の場合はスキップ）
-                            if ((dateValue == null || dateValue == DBNull.Value || string.IsNullOrWhiteSpace(dateValue.ToString())) &&
-                                (timeValue == null || timeValue == DBNull.Value || string.IsNullOrWhiteSpace(timeValue.ToString())) &&
-                                (contentTypeIdValue == null || contentTypeIdValue == DBNull.Value || string.IsNullOrWhiteSpace(contentTypeIdValue.ToString())) &&
-                                (volValue == null || volValue == DBNull.Value || string.IsNullOrWhiteSpace(volValue.ToString())) &&
-                                (companyIdValue == null || companyIdValue == DBNull.Value || string.IsNullOrWhiteSpace(companyIdValue.ToString())) &&
-                                (companyNameValue == null || companyNameValue == DBNull.Value || string.IsNullOrWhiteSpace(companyNameValue.ToString())))
+                            if (string.IsNullOrWhiteSpace(dateStr) &&
+                                string.IsNullOrWhiteSpace(timeStr) &&
+                                string.IsNullOrWhiteSpace(contentTypeIdStr) &&
+                                string.IsNullOrWhiteSpace(volStr) &&
+                                string.IsNullOrWhiteSpace(companyIdStr) &&
+                                string.IsNullOrWhiteSpace(companyName))
                             {
                                 continue; // 空行はスキップ
                             }
 
+                            // コンテンツタイプが1のみを取り込む（フィルタリング）
+                            // if (!string.IsNullOrWhiteSpace(contentTypeIdStr) && contentTypeIdStr != "1")
+                            // {
+                            //     continue; // コンテンツタイプが1以外はスキップ
+                            // }
+
                             // DataRowを作成
                             var row = dataTable.NewRow();
 
-                            // 日付の処理（既にDateTime型の場合はそのまま使用）
-                            if (dateValue is DateTime dateTime)
-                            {
-                                row["date"] = dateTime.Date; // 時刻部分を切り捨て
-                            }
-                            else
-                            {
-                                string dateStr = dateValue?.ToString() ?? "";
-                                row["date"] = ValidationHelpers.ValidateAndConvertDateTime(dateStr, "日付", rowErrors);
-                            }
+                            // 日付の処理（バリデーションヘルパーで統一的に処理）
+                            row["date"] = ValidationHelpers.ValidateAndConvertDateTime(dateStr, "日付", rowErrors);
 
-                            // 時間の処理（既にDateTime型の場合は時刻部分を取得）
-                            if (timeValue is DateTime timeDateTime)
-                            {
-                                row["time"] = timeDateTime.TimeOfDay;
-                            }
-                            else if (timeValue is TimeSpan timeSpan)
-                            {
-                                row["time"] = timeSpan;
-                            }
-                            else
-                            {
-                                string timeStr = timeValue?.ToString() ?? "";
-                                var time = ValidationHelpers.ValidateAndConvertNullableTime(timeStr, "時間", rowErrors);
-                                row["time"] = time.HasValue ? (object)time.Value : DBNull.Value;
-                            }
-
-                            // その他のフィールドを文字列に変換してバリデーション
-                            string contentTypeIdStr = contentTypeIdValue?.ToString() ?? "";
-                            string volStr = volValue?.ToString() ?? "";
-                            string companyIdStr = companyIdValue?.ToString() ?? "";
-                            string companyName = companyNameValue?.ToString() ?? "";
+                            // 時間の処理（バリデーションヘルパーで統一的に処理）
+                            var time = ValidationHelpers.ValidateAndConvertNullableTime(timeStr, "時間", rowErrors);
+                            row["time"] = time.HasValue ? (object)time.Value : DBNull.Value;
 
                             row["content_type_id"] = ValidationHelpers.ValidateAndConvertInt(contentTypeIdStr, "コンテンツタイプ", rowErrors, defaultValue: 0);
 
