@@ -19,6 +19,13 @@ import ReportList from "../pages/ReportList";
 import ReportForm from "../pages/ReportForm";
 import NewPlan from "../pages/NewPlan";
 import CsvImport from "../pages/CsvImport";
+// 新しい報告書システム
+import TemplateList from "../pages/TemplateList";
+import TemplateUpload from "../pages/TemplateUpload";
+import TemplateDetail from "../pages/TemplateDetail";
+import ReportCreate from "../pages/ReportCreate";
+import ReportManagementList from "../pages/ReportManagementList";
+import ReportDetail from "../pages/ReportDetail";
 
 const Router = createBrowserRouter(
   createRoutesFromElements(
@@ -40,9 +47,19 @@ const Router = createBrowserRouter(
           element={<AttendanceRecord />}
         />
 
-        <Route path="/reports" element={<ReportList />} />
-        <Route path="/reports/new" element={<ReportForm />} />
-        <Route path="/reports/edit/:reportNo" element={<ReportForm />} />
+        {/* 旧報告書システム（移行中） */}
+        <Route path="/reports-old" element={<ReportList />} />
+        <Route path="/reports-old/new" element={<ReportForm />} />
+        <Route path="/reports-old/edit/:reportNo" element={<ReportForm />} />
+
+        {/* 新しい報告書システム */}
+        <Route path="/reports" element={<ReportManagementList />} />
+        <Route path="/report-system/templates" element={<TemplateList />} />
+        <Route path="/report-system/templates/upload" element={<TemplateUpload />} />
+        <Route path="/report-system/templates/:id" element={<TemplateDetail />} />
+        <Route path="/report-system/reports" element={<ReportManagementList />} />
+        <Route path="/report-system/reports/create" element={<ReportCreate />} />
+        <Route path="/report-system/reports/:id" element={<ReportDetail />} />
 
         <Route path="/new-plan" element={<NewPlan />} />
         <Route path="/csv-import" element={<CsvImport />} />

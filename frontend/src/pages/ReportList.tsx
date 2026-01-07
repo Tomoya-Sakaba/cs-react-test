@@ -1,131 +1,62 @@
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useReport } from '../hooks/useReport';
 
 const ReportList = () => {
   const navigate = useNavigate();
-  const { reports, loading, error, fetchReports, deleteReport } = useReport();
-  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchReports();
-  }, [fetchReports]);
-
-  const handleCreate = () => {
-    navigate('/reports/new');
-  };
-
-  const handleEdit = (reportNo: string) => {
-    navigate(`/reports/edit/${reportNo}`);
-  };
-
-  const handleDelete = async (reportNo: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!window.confirm('この報告書を削除しますか？')) {
-      return;
-    }
-
-    try {
-      setDeleteLoading(reportNo);
-      await deleteReport(reportNo);
-      await fetchReports();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '削除に失敗しました。');
-    } finally {
-      setDeleteLoading(null);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500">読み込み中...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-red-500">エラー: {error}</p>
-      </div>
-    );
-  }
+  // 古い報告書システムは新しいシステムに移行中です
+  // 一時的にこのページを無効化しています
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">報告書一覧</h1>
-        <button
-          onClick={handleCreate}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          新規作成
-        </button>
-      </div>
-
-      {reports.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500">報告書がありません。</p>
-        </div>
-      ) : (
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  報告書No
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  タイトル
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  作成日時
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {reports.map((report) => (
-                <tr
-                  key={report.id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => handleEdit(report.reportNo)}
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-lg">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-6 w-6 text-yellow-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-lg font-medium text-yellow-800">
+                システム移行中
+              </h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p className="mb-3">
+                  この報告書システムは新しいシステムに移行中です。
+                </p>
+                <p className="mb-4">
+                  新しいシステムでは、Excelテンプレートを使用したカスタマイズ可能な報告書作成が可能です。
+                </p>
+                <button
+                  onClick={() => navigate('/report-system/templates')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition-colors"
                 >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {report.reportNo}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {report.title}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(report.createdAt).toLocaleString('ja-JP')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEdit(report.reportNo)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        編集
-                      </button>
-                      <button
-                        onClick={(e) => handleDelete(report.reportNo, e)}
-                        disabled={deleteLoading === report.reportNo}
-                        className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                      >
-                        {deleteLoading === report.reportNo ? '削除中...' : '削除'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  📋 新しい報告書システムへ
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => navigate('/')}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            ← ホームに戻る
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
