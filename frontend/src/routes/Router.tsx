@@ -26,6 +26,13 @@ import TemplateDetail from "../pages/TemplateDetail";
 import ReportCreate from "../pages/ReportCreate";
 import ReportManagementList from "../pages/ReportManagementList";
 import ReportDetail from "../pages/ReportDetail";
+// 柔軟な計画スケジュールシステム
+import FlexibleSchedule from "../pages/FlexibleSchedule";
+// 廃棄物排出計画スケジュールシステム（種別ベース）
+import WasteSchedule from "../pages/WasteSchedule";
+// DHTMLX Grid テスト
+import DhtmlxGridTest from "../pages/DhtmlxGridTest";
+import DhtmlxAgTest from "../pages/DhtmlxAgTest";
 
 const Router = createBrowserRouter(
   createRoutesFromElements(
@@ -33,6 +40,10 @@ const Router = createBrowserRouter(
       <Route path="/login" element={<Login />} />
       <Route element={<Layout />}>
         <Route path="/ag-test" element={<AgTest />} />
+        <Route path="/dhtmlx-test" element={<DhtmlxGridTest />} />
+        <Route path="/dhtmlx-ag-test" element={<DhtmlxAgTest />} />
+        <Route path="/flexible-schedule" element={<FlexibleSchedule />} />
+        <Route path="/waste-schedule" element={<WasteSchedule />} />
         <Route path="/" element={<Home />} />
         <Route path="/hello" element={<Hello />} />
         <Route path="/user/create" element={<CreateUser />} />

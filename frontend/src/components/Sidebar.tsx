@@ -41,6 +41,18 @@ const Sidebar = ({ isHovered, setIsHovered }: Props) => {
               name="勤怠管理"
               isHovered={isHovered}
             />
+            <NavigationItem
+              icon="i-mdi-grid"
+              href="/dhtmlx-test"
+              name="DHTMLX Grid"
+              isHovered={isHovered}
+            />
+            <NavigationItem
+              icon="i-mdi-table-large"
+              href="/dhtmlx-ag-test"
+              name="DHTMLX AgTest"
+              isHovered={isHovered}
+            />
           </div>
         </div>
 

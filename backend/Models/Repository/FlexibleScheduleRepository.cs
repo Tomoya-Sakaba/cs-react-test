@@ -16,6 +16,11 @@ namespace backend.Models.Repository
     ///   - year, month, version, date, scheduleOrder, wasteType
     ///   - companyId, vol, plannedTime, note
     ///   - UNIQUE(year, month, version, date, scheduleOrder, wasteType)
+    /// 
+    /// 【外部キー制約】
+    /// - 外部キー制約は設定していません（テーブル変更の柔軟性確保）
+    /// - データ整合性はアプリケーション層で管理
+    /// - 必要に応じて、INSERT/UPDATE前にマスタデータの存在チェックを実施
     /// </summary>
     public class FlexibleScheduleRepository
     {

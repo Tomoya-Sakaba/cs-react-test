@@ -66,6 +66,11 @@ namespace backend.Controllers
 
         /// <summary>
         /// 月次計画スケジュールを保存
+        /// 
+        /// 【データ整合性チェック】
+        /// 外部キー制約がないため、アプリケーション層でチェックを実施します。
+        /// - companyId: 会社マスタに存在するか
+        /// - wasteType: 種別マスタに存在するか
         /// </summary>
         [HttpPost]
         [Route("save")]
@@ -78,6 +83,12 @@ namespace backend.Controllers
 
             try
             {
+                // TODO: データ整合性チェック（オプション）
+                // 1. companyIdが m_company に存在するかチェック
+                // 2. wasteTypeが m_waste_type に存在するかチェック
+                // var invalidItems = requests.Where(r => !IsValidCompanyId(r.CompanyId)).ToList();
+                // if (invalidItems.Any()) { return BadRequest("無効な会社IDが含まれています。"); }
+                
                 var year = requests.First().Year;
                 var month = requests.First().Month;
                 

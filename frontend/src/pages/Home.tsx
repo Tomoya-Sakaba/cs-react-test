@@ -57,6 +57,7 @@ const Home = () => {
           <Button onClick={() => navigate("/report-system/templates")}>📋 テンプレート管理</Button>
           <Button onClick={() => navigate("/new-plan")}>月次計画管理</Button>
           <Button onClick={() => navigate("/csv-import")}>CSV取り込み</Button>
+          <Button onClick={() => navigate("/flexible-schedule")}>柔軟な計画スケジュール</Button>
         </div>
       </div>
     </>

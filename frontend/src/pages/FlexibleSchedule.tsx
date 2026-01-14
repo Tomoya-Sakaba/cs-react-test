@@ -1,8 +1,7 @@
 import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import type { AgGridReact as AgGridReactType } from 'ag-grid-react';
 import YearMonthFilter from '../components/YearMonthFilter';
 import { useYearMonthParams } from '../hooks/useYearMonthParams';
@@ -60,12 +59,10 @@ export type WasteTypeMaster = {
 };
 
 const FlexibleSchedule = () => {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const isNewMode = searchParams.get('mode') === 'new';
+  const isNewMode = false; // 新規モードは後で実装
 
   // 年月関連
-  const [availableYearMonths, setAvailableYearMonths] = useState<
+  const [availableYearMonths] = useState<
     { year: number; month: number }[]
   >([]);
   const [loadingYearMonths, setLoadingYearMonths] = useState(true);
@@ -372,7 +369,6 @@ const FlexibleSchedule = () => {
     });
 
     try {
-      // TODO: API呼び出し
       // データを1レコード = 1セル形式に変換してから送信
       const flattenedData = updatedRows.flatMap(day => 
         day.schedules.map((schedule, index) => ({
@@ -387,6 +383,26 @@ const FlexibleSchedule = () => {
           month: currentIndexMonth + 1,
         }))
       ).filter(item => item.wasteType !== null); // 種別が未入力のものは除外
+
+      // 【データ整合性チェック】（外部キー制約がないため、アプリケーション側でチェック）
+      // TODO: 必要に応じて実装
+      // 1. companyIdが存在するかチェック
+      const invalidCompany = flattenedData.find(item => 
+        item.companyId && !companies.some(c => c.companyId === item.companyId)
+      );
+      if (invalidCompany) {
+        alert('無効な会社が選択されています。');
+        return;
+      }
+      
+      // 2. wasteTypeが存在するかチェック
+      const invalidWasteType = flattenedData.find(item => 
+        item.wasteType && !wasteTypes.some(wt => wt.wasteTypeName === item.wasteType)
+      );
+      if (invalidWasteType) {
+        alert('無効な種別が選択されています。');
+        return;
+      }
 
       console.log('保存データ:', flattenedData);
       
@@ -427,29 +443,29 @@ const FlexibleSchedule = () => {
   };
 
   //---------------------------------------------------------------------------
-  // 特定の日だけ排出回数を追加
+  // 特定の日だけ排出回数を追加（将来的な機能）
   //---------------------------------------------------------------------------
-  const handleAddScheduleForDay = (date: string) => {
-    const updatedData = agRowData.map(day => {
-      if (day.date === date) {
-        return {
-          ...day,
-          schedules: [
-            ...day.schedules,
-            {
-              wasteType: null,
-              companyId: null,
-              vol: null,
-              plannedTime: null,
-            }
-          ]
-        };
-      }
-      return day;
-    });
-    
-    setAgRowData(updatedData);
-  };
+  // const handleAddScheduleForDay = (date: string) => {
+  //   const updatedData = agRowData.map(day => {
+  //     if (day.date === date) {
+  //       return {
+  //         ...day,
+  //         schedules: [
+  //           ...day.schedules,
+  //           {
+  //             wasteType: null,
+  //             companyId: null,
+  //             vol: null,
+  //             plannedTime: null,
+  //           }
+  //         ]
+  //       };
+  //     }
+  //     return day;
+  //   });
+  //   
+  //   setAgRowData(updatedData);
+  // };
 
   const defaultColDef = useMemo(() => ({
     resizable: true,
@@ -494,7 +510,7 @@ const FlexibleSchedule = () => {
         />
       </div>
 
-      <div className="mb-4 rounded-lg bg-blue-50 p-4">
+      {/* <div className="mb-4 rounded-lg bg-blue-50 p-4">
         <h3 className="mb-2 font-bold text-blue-900">設計方針</h3>
         <ul className="list-inside list-disc space-y-1 text-sm text-blue-800">
           <li>横軸：時間順（1回目、2回目、3回目...）- 日によって列数が変更可能</li>
@@ -503,7 +519,7 @@ const FlexibleSchedule = () => {
           <li>実績との紐付け：日付 + 時刻 + 種別 で自動マッチング</li>
           <li>特殊な日（5回排出など）も柔軟に対応可能</li>
         </ul>
-      </div>
+      </div> */}
 
       <div className="flex flex-1">
         {isGridReady ? (

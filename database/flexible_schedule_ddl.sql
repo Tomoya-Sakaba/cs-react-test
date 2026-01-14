@@ -7,15 +7,31 @@
 -- 2. 横軸：時間順（1回目、2回目、3回目...）- 日によって異なる
 -- 3. 縦軸：日付
 -- 4. 実績との紐付け：date + time + wasteType で自動マッチング
+-- 5. 外部キー制約なし：将来的なテーブル変更の柔軟性を確保
+--    - データ整合性はアプリケーション層で管理
+--    - テーブル変更時のロックやカスケード問題を回避
 -- 
 -- 【既存システムとの違い】
 -- - 旧：固定的なヘッダー（contentTypeId 1,2,3,4）→ 柔軟性がない
 -- - 新：動的なスケジュール（scheduleOrder 1,2,3...N）→ 日によって変更可能
 -- 
+-- 【参照関係】（外部キー制約なし、論理的な関連のみ）
+-- - t_plan_schedule_v2.companyId → m_company.companyId (既存テーブル)
+-- - t_plan_schedule_v2.wasteType → m_waste_type.wasteTypeName (マスタ参照)
+-- - t_actual_result.companyId → m_company.companyId (既存テーブル)
+-- - t_actual_result.wasteType → m_waste_type.wasteTypeName (マスタ参照)
+-- ※ アプリケーション側で整合性をチェックすること
+-- 
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
 -- 1. 計画スケジュールテーブル（メインテーブル）
+-- ----------------------------------------------------------------------------
+-- 【外部キー制約】なし
+-- 【参照関係】
+--   - companyId は m_company.companyId を論理的に参照（外部キーなし）
+--   - wasteType は m_waste_type.wasteTypeName を論理的に参照（外部キーなし）
+-- 【理由】テーブル変更の柔軟性確保、アプリケーション層で整合性管理
 -- ----------------------------------------------------------------------------
 CREATE TABLE t_plan_schedule_v2 (
     scheduleId INT PRIMARY KEY IDENTITY(1,1),
@@ -25,7 +41,7 @@ CREATE TABLE t_plan_schedule_v2 (
     date DATE NOT NULL,
     scheduleOrder INT NOT NULL,  -- その日の何回目の排出か（1,2,3...）
     wasteType NVARCHAR(50) NOT NULL,  -- 種別：'廃プラ', '汚泥' など
-    companyId INT,
+    companyId INT,  -- m_company.companyId を参照（外部キー制約なし）
     vol DECIMAL(10,2),
     plannedTime TIME,  -- 予定時刻
     note NVARCHAR(500),
@@ -45,12 +61,18 @@ COMMENT ON COLUMN t_plan_schedule_v2.version IS 'バージョン管理。0=最�
 -- ----------------------------------------------------------------------------
 -- 2. 実績テーブル（参考：既存システムに合わせる）
 -- ----------------------------------------------------------------------------
+-- 【外部キー制約】なし
+-- 【参照関係】
+--   - companyId は m_company.companyId を論理的に参照（外部キーなし）
+--   - wasteType は m_waste_type.wasteTypeName を論理的に参照（外部キーなし）
+-- 【理由】テーブル変更の柔軟性確保、アプリケーション層で整合性管理
+-- ----------------------------------------------------------------------------
 CREATE TABLE t_actual_result (
     resultId INT PRIMARY KEY IDENTITY(1,1),
     date DATE NOT NULL,
     actualTime TIME NOT NULL,
     wasteType NVARCHAR(50) NOT NULL,  -- 種別：'廃プラ', '汚泥' など
-    companyId INT,
+    companyId INT,  -- m_company.companyId を参照（外部キー制約なし）
     vol DECIMAL(10,2),
     note NVARCHAR(500),
     createdAt DATETIME DEFAULT GETDATE()
