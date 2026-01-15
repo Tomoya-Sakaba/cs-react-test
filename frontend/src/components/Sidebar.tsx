@@ -53,6 +53,12 @@ const Sidebar = ({ isHovered, setIsHovered }: Props) => {
               name="DHTMLX AgTest"
               isHovered={isHovered}
             />
+            <NavigationItem
+              icon="i-mdi-view-grid-plus"
+              href="/dhtmlx-grid-dataview"
+              name="Grid+DataView"
+              isHovered={isHovered}
+            />
           </div>
         </div>
 

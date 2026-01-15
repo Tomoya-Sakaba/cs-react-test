@@ -402,7 +402,7 @@ const DhtmlxAgTest = () => {
           // 上に表示（セルの真上に配置）
           yPos = rect.top - popupHeight;
         } else {
-          // どちらも足りない場合は、画面中央に表示
+          // どちらも足りない場合は、画面中央に表示　
           yPos = Math.max(10, (windowHeight - popupHeight) / 2);
         }
         

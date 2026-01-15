@@ -33,6 +33,7 @@ import WasteSchedule from "../pages/WasteSchedule";
 // DHTMLX Grid テスト
 import DhtmlxGridTest from "../pages/DhtmlxGridTest";
 import DhtmlxAgTest from "../pages/DhtmlxAgTest";
+import DhtmlxGridDataView from "../pages/DhtmlxGridDataView";
 
 const Router = createBrowserRouter(
   createRoutesFromElements(
@@ -42,6 +43,7 @@ const Router = createBrowserRouter(
         <Route path="/ag-test" element={<AgTest />} />
         <Route path="/dhtmlx-test" element={<DhtmlxGridTest />} />
         <Route path="/dhtmlx-ag-test" element={<DhtmlxAgTest />} />
+        <Route path="/dhtmlx-grid-dataview" element={<DhtmlxGridDataView />} />
         <Route path="/flexible-schedule" element={<FlexibleSchedule />} />
         <Route path="/waste-schedule" element={<WasteSchedule />} />
         <Route path="/" element={<Home />} />
