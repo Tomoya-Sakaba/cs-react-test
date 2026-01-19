@@ -1,3 +1,25 @@
+/**
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * DHTMLX Grid + DataView サンプルページ
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * 
+ * 【重要】スクロール位置を保持する実装方法:
+ * 
+ * 1. データにIDを明示的に設定
+ *    → grid.data.update(id, data) が正しく動作する
+ * 
+ * 2. カスタムセル選択時は grid.data.update() を直接呼ぶ
+ *    → Grid全体を再構築せず、該当行のみ更新
+ *    → スクロール位置が保持される
+ * 
+ * 3. useEffectを2つに分離
+ *    ① Grid初期化: タブ切り替え・編集モード切り替え時のみ
+ *    ② データ更新: grid.data.update() で個別更新
+ * 
+ * 参考: https://snippet.dhtmlx.com/7b2vb9mu?text=grid&mode=wide
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ */
+
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import YearMonthFilter from '../components/YearMonthFilter';
@@ -242,11 +264,10 @@ const DhtmlxGridDataView = () => {
   }, [isEditing]);
 
   //---------------------------------------------------------------------------
-  // DHTMLX Grid初期化
+  // DHTMLX Grid初期化・更新
   //---------------------------------------------------------------------------
   useEffect(() => {
     if (!gridContainerRef.current || !isGridReady) return;
-
     if (typeof window.dhx === 'undefined') {
       console.error('DHTMLX Suite is not loaded');
       return;
@@ -267,16 +288,23 @@ const DhtmlxGridDataView = () => {
       resizable: true,
     });
 
-    // 選択されたタブのデータのみ表示
-    const filteredData = rowData.filter((row) => row.contentType === selectedTab);
+    // ✅ 【重要】データにIDを明示的に設定
+    // 理由: grid.data.update(id, data) でデータを更新するため、
+    //       各行にIDが必要。これがないとupdateが動作しない。
+    //       公式サンプルでも必ずIDを設定している。
+    const filteredData = rowData
+      .filter((row) => row.contentType === selectedTab)
+      .map((row) => ({ ...row, id: row.date })); // row.dateをIDとして使用
     grid.data.parse(filteredData);
 
     // resultTimeクリックイベント（DataView表示）
     grid.events.on('cellClick', (row: any, column: any, event: MouseEvent) => {
-      if (column.id === 'resultTime' && isEditing) {
-        // 編集モードの時のみ
-        const rowData = filteredData.find((r) => r.date === row.date);
-        if (rowData) {
+      if (column.id === 'resultTime') {
+        // 編集モードかどうかをGridの設定から確認
+        if (!grid.config.editable) return;
+        
+        const foundRow = grid.data.getItem(row.id);
+        if (foundRow) {
           // セルの位置を取得
           const target = event.target as HTMLElement;
           const cell = target.closest('.dhx_grid-cell');
@@ -323,15 +351,18 @@ const DhtmlxGridDataView = () => {
             });
           }
           
-          setSelectedRowData(rowData);
+          setSelectedRowData(foundRow);
           setDataViewVisible(true);
         }
       }
       
       // outsaideResultTimeクリックイベント（Grid表示）
-      if (column.id === 'outsaideResultTime' && isEditing) {
-        const rowData = filteredData.find((r) => r.date === row.date);
-        if (rowData) {
+      if (column.id === 'outsaideResultTime') {
+        // 編集モードかどうかをGridの設定から確認
+        if (!grid.config.editable) return;
+        
+        const foundRow = grid.data.getItem(row.id);
+        if (foundRow) {
           // セルの位置を取得
           const target = event.target as HTMLElement;
           const cell = target.closest('.dhx_grid-cell');
@@ -375,7 +406,7 @@ const DhtmlxGridDataView = () => {
             });
           }
           
-          setSelectedRowDataForGrid(rowData);
+          setSelectedRowDataForGrid(foundRow);
           setGridPopupVisible(true);
         }
       }
@@ -383,13 +414,38 @@ const DhtmlxGridDataView = () => {
 
     gridInstanceRef.current = grid;
 
+    // クリーンアップ
     return () => {
       if (gridInstanceRef.current) {
         gridInstanceRef.current.destructor();
         gridInstanceRef.current = null;
       }
     };
-  }, [isGridReady, rowData, selectedTab, getColumns, isEditing]);
+  }, [isGridReady, selectedTab, isEditing]); 
+  // ✅ 依存配列: タブ切り替えと編集モード切り替え時のみ再構築
+  //    rowDataは含めない → データ更新時にGridを再構築しない
+
+  //---------------------------------------------------------------------------
+  // ✅ データ更新（スクロール位置を保持）
+  // 【重要】Grid全体を再構築せず、個別の行のみを更新することで
+  //        スクロール位置を保持する。公式サンプルと同じ方法。
+  //---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!gridInstanceRef.current) return;
+
+    // rowDataから現在のタブのデータのみ抽出
+    const filteredData = rowData.filter((row) => row.contentType === selectedTab);
+    
+    // ✅ grid.data.update() を使って個別に行を更新
+    //    → Grid全体が再構築されない → スクロール位置が保持される
+    filteredData.forEach((row) => {
+      try {
+        gridInstanceRef.current!.data.update(row.date, { ...row, id: row.date });
+      } catch (e) {
+        // 行が存在しない場合は無視（初回など）
+      }
+    });
+  }, [rowData, selectedTab]);
 
   //---------------------------------------------------------------------------
   // DHTMLX DataView初期化
@@ -458,14 +514,24 @@ const DhtmlxGridDataView = () => {
       const item = dataView.data.getItem(id);
       
       if (selectedRowData && gridInstanceRef.current) {
-        // Gridのデータを時間と量、resultIdを同時に更新
-        gridInstanceRef.current.data.update(selectedRowData.date, {
+        // ✅ 【重要】スクロール位置を保持する方法
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 1. grid.data.update() を直接呼ぶ
+        //    → 該当行のみが更新される（Grid全体は再構築されない）
+        //    → スクロール位置が保持される
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        const updatedRow = {
+          ...selectedRowData,
           resultId: item.id,
           resultTime: item.time,
           resultVol: item.volume,
-        });
+          id: selectedRowData.date, // IDを明示的に設定（重要）
+        };
+        gridInstanceRef.current.data.update(selectedRowData.date, updatedRow);
         
-        // rowDataも更新
+        // 2. React stateも更新（データの一貫性を保つため）
+        //    注: この更新で別のuseEffectが発火するが、
+        //    grid.data.update()を使っているのでスクロール位置は保持される
         setRowData((prev) =>
           prev.map((row) =>
             row.date === selectedRowData.date && row.contentType === selectedTab
@@ -540,14 +606,21 @@ const DhtmlxGridDataView = () => {
     // 行クリックイベント
     popupGrid.events.on('cellClick', (row: any) => {
       if (selectedRowDataForGrid && gridInstanceRef.current) {
-        // 元のGridのデータを更新
-        gridInstanceRef.current.data.update(selectedRowDataForGrid.date, {
+        // ✅ 【重要】スクロール位置を保持する方法（resultTimeと同じ）
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 1. grid.data.update() を直接呼ぶ
+        //    → 該当行のみが更新される → スクロール位置が保持される
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        const updatedRow = {
+          ...selectedRowDataForGrid,
           outsaideResultId: row.id,
           outsaideResultTime: row.time,
           outsaideResultVol: parseInt(row.volume.replace('t', ''), 10),
-        });
+          id: selectedRowDataForGrid.date, // IDを明示的に設定（重要）
+        };
+        gridInstanceRef.current.data.update(selectedRowDataForGrid.date, updatedRow);
         
-        // rowDataも更新
+        // 2. React stateも更新（データの一貫性を保つため）
         setRowData((prev) =>
           prev.map((r) =>
             r.date === selectedRowDataForGrid.date && r.contentType === selectedTab
@@ -587,13 +660,11 @@ const DhtmlxGridDataView = () => {
       );
       if (confirmDiscard) {
         setIsEditing(false);
-        setIsGridReady(false);
-        setTimeout(() => setIsGridReady(true), 0);
+        // useEffectでGridが再構築される（カラム定義が変わるため）
       }
     } else {
       setIsEditing(true);
-      setIsGridReady(false);
-      setTimeout(() => setIsGridReady(true), 0);
+      // useEffectでGridが再構築される（カラム定義が変わるため）
     }
   };
 
@@ -602,8 +673,7 @@ const DhtmlxGridDataView = () => {
   //---------------------------------------------------------------------------
   const handleTabChange = (tab: 'pla' | 'mud') => {
     setSelectedTab(tab);
-    setIsGridReady(false);
-    setTimeout(() => setIsGridReady(true), 0);
+    // useEffectでGridが再構築される（データが変わるため）
   };
 
   //---------------------------------------------------------------------------
