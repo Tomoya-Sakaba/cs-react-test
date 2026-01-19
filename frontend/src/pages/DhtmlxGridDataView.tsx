@@ -230,7 +230,13 @@ const DhtmlxGridDataView = () => {
         htmlEnable: true,
         template: (text: string) => {
           if (isEditing) {
-            return `${text} ▼`;
+            // ✅ テキストの有無に関わらず、▼を右端に固定配置
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 100%; padding-right: 4px;">
+                <span>${text || ''}</span>
+                <span style="color: #6b7280; font-size: 12px;">▼</span>
+              </div>
+            `;
           }
           return text;
         },
@@ -249,7 +255,13 @@ const DhtmlxGridDataView = () => {
         htmlEnable: true,
         template: (text: string) => {
           if (isEditing) {
-            return `${text} ▼`;
+            // ✅ テキストの有無に関わらず、▼を右端に固定配置
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; height: 100%; padding-right: 4px;">
+                <span>${text || ''}</span>
+                <span style="color: #6b7280; font-size: 12px;">▼</span>
+              </div>
+            `;
           }
           return text;
         },
