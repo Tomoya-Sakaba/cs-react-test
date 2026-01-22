@@ -26,7 +26,7 @@
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useBlocker } from 'react-router-dom';
 import YearMonthFilter from '../components/YearMonthFilter';
 import { useYearMonthParams } from '../hooks/useYearMonthParams';
@@ -64,6 +64,7 @@ const DhtmlxGridDataView = () => {
   const dataViewContainerRef = useRef<HTMLDivElement>(null);
   const gridInstanceRef = useRef<any>(null);
   const dataViewInstanceRef = useRef<any>(null);
+  const companyDropdownRef = useRef<HTMLDivElement>(null);
 
   // 状態管理
   const [availableYearMonths] = useState<{ year: number; month: number }[]>([
@@ -79,6 +80,12 @@ const DhtmlxGridDataView = () => {
   const [rowData, setRowData] = useState<testType[]>([]);
   const [isGridReady, setIsGridReady] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'pla' | 'mud'>('pla');
+
+  // フィルター状態
+  const [dateFilterStart, setDateFilterStart] = useState<string>('');
+  const [dateFilterEnd, setDateFilterEnd] = useState<string>('');
+  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
+  const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
 
   // DataView表示制御
   const [dataViewVisible, setDataViewVisible] = useState(false);
@@ -230,6 +237,66 @@ const DhtmlxGridDataView = () => {
   }, [fetchData]);
 
   //---------------------------------------------------------------------------
+  // 企業ドロップダウン外クリックで閉じる
+  //---------------------------------------------------------------------------
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (companyDropdownRef.current && !companyDropdownRef.current.contains(event.target as Node)) {
+        setIsCompanyDropdownOpen(false);
+      }
+    };
+
+    if (isCompanyDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isCompanyDropdownOpen]);
+
+  //---------------------------------------------------------------------------
+  // ユニークな企業リストを取得
+  //---------------------------------------------------------------------------
+  const uniqueCompanies = useMemo(() => {
+    const companySet = new Set<string>();
+    rowData.forEach((row) => {
+      if (row.conmanyName) {
+        companySet.add(row.conmanyName);
+      }
+    });
+    return Array.from(companySet).sort();
+  }, [rowData]);
+
+  //---------------------------------------------------------------------------
+  // フィルタリング済みデータ
+  //---------------------------------------------------------------------------
+  const filteredRowData = useMemo(() => {
+    let filtered = rowData;
+
+    // 日付範囲でフィルタリング
+    if (dateFilterStart && !dateFilterEnd) {
+      // 開始日のみ指定 → その日付のみを表示
+      filtered = filtered.filter((row) => row.date === dateFilterStart);
+    } else if (dateFilterStart && dateFilterEnd) {
+      // 開始日と終了日両方指定 → その範囲でフィルター
+      filtered = filtered.filter((row) => row.date >= dateFilterStart && row.date <= dateFilterEnd);
+    } else if (!dateFilterStart && dateFilterEnd) {
+      // 終了日のみ指定 → 終了日以前
+      filtered = filtered.filter((row) => row.date <= dateFilterEnd);
+    }
+
+    // 企業でフィルタリング
+    if (selectedCompanies.length > 0) {
+      filtered = filtered.filter((row) => 
+        selectedCompanies.includes(row.conmanyName)
+      );
+    }
+
+    return filtered;
+  }, [rowData, dateFilterStart, dateFilterEnd, selectedCompanies]);
+
+  //---------------------------------------------------------------------------
   // 編集モード時のページ遷移・ブラウザ閉じる警告
   //---------------------------------------------------------------------------
   // 1. ブラウザを閉じる・リロード時の警告
@@ -279,8 +346,10 @@ const DhtmlxGridDataView = () => {
       return;
     }
 
-    // 既存のGridがあれば破棄
+    // ✅ スクロール位置を保存（フィルター変更やデータ更新の前に）
+    let savedScrollState = { x: 0, y: 0 };
     if (gridInstanceRef.current) {
+      savedScrollState = gridInstanceRef.current.getScrollState();
       gridInstanceRef.current.destructor();
     }
 
@@ -289,7 +358,7 @@ const DhtmlxGridDataView = () => {
     //       各行にIDが必要。これがないとupdateが動作しない。
     //       公式サンプルでも必ずIDを設定している。
     // DB上では date + contentType で一意になるため、IDも同様に設定
-    const filteredData = rowData
+    const filteredData = filteredRowData
       .filter((row) => row.emissionType === selectedTab)
       .map((row) => ({ ...row, id: `${row.date}_${row.contentType}` })); // date + contentType を ID として使用
 
@@ -422,6 +491,13 @@ const DhtmlxGridDataView = () => {
       }
     });
 
+    // ✅ スクロール位置を復元（データパース後）
+    setTimeout(() => {
+      if (gridInstanceRef.current) {
+        gridInstanceRef.current.scrollTo(savedScrollState.x, savedScrollState.y);
+      }
+    }, 0);
+
     // resultTimeクリックイベント（DataView表示）
     grid.events.on('cellClick', (row: any, column: any, event: MouseEvent) => {
       if (column.id === 'resultTime') {
@@ -546,33 +622,9 @@ const DhtmlxGridDataView = () => {
         gridInstanceRef.current = null;
       }
     };
-  }, [isGridReady, selectedTab, isEditing]); 
-  // ✅ 依存配列: タブ切り替えと編集モード切り替え時のみ再構築
-  //    rowDataは含めない → データ更新時にGridを再構築しない
-
-  //---------------------------------------------------------------------------
-  // ✅ データ更新（スクロール位置を保持）
-  // 【重要】Grid全体を再構築せず、個別の行のみを更新することで
-  //        スクロール位置を保持する。公式サンプルと同じ方法。
-  //---------------------------------------------------------------------------
-  useEffect(() => {
-    if (!gridInstanceRef.current) return;
-
-    // rowDataから現在のタブ（emissionType）のデータのみ抽出
-    const filteredData = rowData.filter((row) => row.emissionType === selectedTab);
-    
-    // ✅ grid.data.update() を使って個別に行を更新
-    //    → Grid全体が再構築されない → スクロール位置が保持される
-    //    DB上では date + contentType で一意なので、IDも同様に設定
-    filteredData.forEach((row) => {
-      const rowId = `${row.date}_${row.contentType}`;
-      try {
-        gridInstanceRef.current!.data.update(rowId, { ...row, id: rowId });
-      } catch (e) {
-        // 行が存在しない場合は無視（初回など）
-      }
-    });
-  }, [rowData, selectedTab]);
+  }, [isGridReady, selectedTab, isEditing, filteredRowData]); 
+  // ✅ 依存配列: タブ切り替え、編集モード切り替え、データ変更、フィルタリング時に再構築
+  // 注: スクロール位置の保存/復元を実装しているため、Grid再初期化時もスクロール位置は保持される
 
   //---------------------------------------------------------------------------
   // DHTMLX DataView初期化
@@ -866,6 +918,139 @@ const DhtmlxGridDataView = () => {
           >
             MUD
           </button>
+        </div>
+
+        {/* フィルター */}
+        <div className="mb-4 rounded-lg border border-gray-300 bg-gray-50 p-4">
+          <div className="flex flex-wrap gap-4 items-end">
+            {/* 日付範囲フィルター */}
+            <div className="flex gap-2 items-end">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  開始日
+                </label>
+                <input
+                  type="date"
+                  value={dateFilterStart}
+                  onChange={(e) => setDateFilterStart(e.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <span className="text-gray-500 pb-2">〜</span>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  終了日
+                </label>
+                <input
+                  type="date"
+                  value={dateFilterEnd}
+                  onChange={(e) => setDateFilterEnd(e.target.value)}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* 企業フィルター（マルチセレクトドロップダウン） */}
+            <div className="flex-1 min-w-[300px] relative" ref={companyDropdownRef}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                企業
+              </label>
+              <div
+                onClick={() => setIsCompanyDropdownOpen(!isCompanyDropdownOpen)}
+                className="w-full min-h-[38px] rounded-md border border-gray-300 bg-white px-2 py-1.5 text-left text-sm focus:border-blue-500 focus:outline-none cursor-pointer"
+              >
+                {selectedCompanies.length === 0 ? (
+                  <span className="text-gray-400">すべて</span>
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {selectedCompanies.map((company) => (
+                      <span
+                        key={company}
+                        className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700"
+                      >
+                        {company}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCompanies((prev) =>
+                              prev.filter((c) => c !== company)
+                            );
+                          }}
+                          className="hover:text-blue-900"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* ドロップダウンメニュー */}
+              {isCompanyDropdownOpen && (
+                <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-300 bg-white shadow-lg max-h-60 overflow-auto">
+                  {/* すべて選択/解除 */}
+                  <div className="sticky top-0 bg-gray-50 border-b border-gray-200 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedCompanies.length === uniqueCompanies.length) {
+                          setSelectedCompanies([]);
+                        } else {
+                          setSelectedCompanies([...uniqueCompanies]);
+                        }
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      {selectedCompanies.length === uniqueCompanies.length
+                        ? 'すべて解除'
+                        : 'すべて選択'}
+                    </button>
+                  </div>
+                  
+                  {/* 企業リスト */}
+                  {uniqueCompanies.map((company) => (
+                    <label
+                      key={company}
+                      className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCompanies.includes(company)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCompanies((prev) => [...prev, company]);
+                          } else {
+                            setSelectedCompanies((prev) =>
+                              prev.filter((c) => c !== company)
+                            );
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">{company}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* フィルタークリアボタン */}
+            {(dateFilterStart || dateFilterEnd || selectedCompanies.length > 0) && (
+              <button
+                onClick={() => {
+                  setDateFilterStart('');
+                  setDateFilterEnd('');
+                  setSelectedCompanies([]);
+                  setIsCompanyDropdownOpen(false);
+                }}
+                className="rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
+              >
+                フィルタークリア
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Grid */}
