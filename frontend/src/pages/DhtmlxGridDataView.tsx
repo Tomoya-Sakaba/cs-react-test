@@ -5,8 +5,9 @@
  * 
  * 【重要】スクロール位置を保持する実装方法:
  * 
- * 1. データにIDを明示的に設定
+ * 1. データにIDを明示的に設定（date + contentType で一意）
  *    → grid.data.update(id, data) が正しく動作する
+ *    → DB上でも date + contentType で一意になっている
  * 
  * 2. カスタムセル選択時は grid.data.update() を直接呼ぶ
  *    → Grid全体を再構築せず、該当行のみ更新
@@ -16,18 +17,24 @@
  *    ① Grid初期化: タブ切り替え・編集モード切り替え時のみ
  *    ② データ更新: grid.data.update() で個別更新
  * 
+ * 4. タブはemissionType（'pla' / 'mud'）で切り替え
+ *    contentTypeは数値（1,2,3,4）でヘッダーIDとして使用
+ *    - contentType 1, 2 → emissionType 'pla'
+ *    - contentType 3, 4 → emissionType 'mud'
+ * 
  * 参考: https://snippet.dhtmlx.com/7b2vb9mu?text=grid&mode=wide
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useBlocker } from 'react-router-dom';
 import YearMonthFilter from '../components/YearMonthFilter';
 import { useYearMonthParams } from '../hooks/useYearMonthParams';
 import Toggle from '../components/Toggle';
 import type { testType } from '../types/dhtmlxTest';
 import { format, getDaysInMonth, getDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
+import './DhtmlxGridDataView.css';
 
 // DHTMLX Suiteのグローバル型定義
 declare global {
@@ -101,50 +108,100 @@ const DhtmlxGridDataView = () => {
       const dayLabel = format(date, 'd日(E)', { locale: ja });
       const dateStr = format(date, 'yyyy-MM-dd');
 
-      // plaタイプ
-      const plaTimeOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
-      const plaResultOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
-      const plaOutsaideOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      // contentType 1 (emissionType: pla)
+      const ct1TimeOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      const ct1ResultOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      const ct1OutsaideOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
       mockData.push({
         date: dateStr,
         dayLabel,
         isHoliday,
         isSturday: isSaturday,
-        contentType: 'pla',
+        contentType: 1,
+        emissionType: 'pla',
         company: Math.floor(Math.random() * 3) + 1,
         conmanyName: ['A社', 'B社', 'C社'][Math.floor(Math.random() * 3)],
         companyBgColor: ['#ff6b6b', '#4ecdc4', '#45b7d1'][Math.floor(Math.random() * 3)],
-        planVol: plaTimeOption.vol,
-        planTime: plaTimeOption.time,
-        resultId: plaResultOption.timeId,
-        resultVol: plaResultOption.vol,
-        resultTime: plaResultOption.time,
-        outsaideResultId: plaOutsaideOption.timeId,
-        outsaideResultVol: plaOutsaideOption.vol,
-        outsaideResultTime: plaOutsaideOption.time,
+        planVol: ct1TimeOption.vol,
+        planTime: ct1TimeOption.time,
+        resultId: ct1ResultOption.timeId,
+        resultVol: ct1ResultOption.vol,
+        resultTime: ct1ResultOption.time,
+        outsaideResultId: ct1OutsaideOption.timeId,
+        outsaideResultVol: ct1OutsaideOption.vol,
+        outsaideResultTime: ct1OutsaideOption.time,
       });
 
-      // mudタイプ
-      const mudTimeOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
-      const mudResultOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
-      const mudOutsaideOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      // contentType 2 (emissionType: pla)
+      const ct2TimeOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      const ct2ResultOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      const ct2OutsaideOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
       mockData.push({
         date: dateStr,
         dayLabel,
         isHoliday,
         isSturday: isSaturday,
-        contentType: 'mud',
+        contentType: 2,
+        emissionType: 'pla',
+        company: Math.floor(Math.random() * 3) + 1,
+        conmanyName: ['D社', 'E社', 'F社'][Math.floor(Math.random() * 3)],
+        companyBgColor: ['#feca57', '#ff9ff3', '#54a0ff'][Math.floor(Math.random() * 3)],
+        planVol: ct2TimeOption.vol,
+        planTime: ct2TimeOption.time,
+        resultId: ct2ResultOption.timeId,
+        resultVol: ct2ResultOption.vol,
+        resultTime: ct2ResultOption.time,
+        outsaideResultId: ct2OutsaideOption.timeId,
+        outsaideResultVol: ct2OutsaideOption.vol,
+        outsaideResultTime: ct2OutsaideOption.time,
+      });
+
+      // contentType 3 (emissionType: mud)
+      const ct3TimeOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      const ct3ResultOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      const ct3OutsaideOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      mockData.push({
+        date: dateStr,
+        dayLabel,
+        isHoliday,
+        isSturday: isSaturday,
+        contentType: 3,
+        emissionType: 'mud',
         company: Math.floor(Math.random() * 3) + 1,
         conmanyName: ['X社', 'Y社', 'Z社'][Math.floor(Math.random() * 3)],
         companyBgColor: ['#95e1d3', '#f38181', '#aa96da'][Math.floor(Math.random() * 3)],
-        planVol: mudTimeOption.vol,
-        planTime: mudTimeOption.time,
-        resultId: mudResultOption.timeId,
-        resultVol: mudResultOption.vol,
-        resultTime: mudResultOption.time,
-        outsaideResultId: mudOutsaideOption.timeId,
-        outsaideResultVol: mudOutsaideOption.vol,
-        outsaideResultTime: mudOutsaideOption.time,
+        planVol: ct3TimeOption.vol,
+        planTime: ct3TimeOption.time,
+        resultId: ct3ResultOption.timeId,
+        resultVol: ct3ResultOption.vol,
+        resultTime: ct3ResultOption.time,
+        outsaideResultId: ct3OutsaideOption.timeId,
+        outsaideResultVol: ct3OutsaideOption.vol,
+        outsaideResultTime: ct3OutsaideOption.time,
+      });
+
+      // contentType 4 (emissionType: mud)
+      const ct4TimeOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      const ct4ResultOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      const ct4OutsaideOption = timeOptions[Math.floor(Math.random() * timeOptions.length)];
+      mockData.push({
+        date: dateStr,
+        dayLabel,
+        isHoliday,
+        isSturday: isSaturday,
+        contentType: 4,
+        emissionType: 'mud',
+        company: Math.floor(Math.random() * 3) + 1,
+        conmanyName: ['P社', 'Q社', 'R社'][Math.floor(Math.random() * 3)],
+        companyBgColor: ['#48dbfb', '#ff6348', '#1dd1a1'][Math.floor(Math.random() * 3)],
+        planVol: ct4TimeOption.vol,
+        planTime: ct4TimeOption.time,
+        resultId: ct4ResultOption.timeId,
+        resultVol: ct4ResultOption.vol,
+        resultTime: ct4ResultOption.time,
+        outsaideResultId: ct4OutsaideOption.timeId,
+        outsaideResultVol: ct4OutsaideOption.vol,
+        outsaideResultTime: ct4OutsaideOption.time,
       });
     }
 
@@ -159,6 +216,7 @@ const DhtmlxGridDataView = () => {
     
     // モックデータ生成
     const mockData = generateMockData(currentYear, currentIndexMonth);
+    console.log('mockData', mockData);
     
     setRowData(mockData);
     setIsGridReady(true);
@@ -172,13 +230,74 @@ const DhtmlxGridDataView = () => {
   }, [fetchData]);
 
   //---------------------------------------------------------------------------
-  // DHTMLX Gridのカラム定義
+  // 編集モード時のページ遷移・ブラウザ閉じる警告
   //---------------------------------------------------------------------------
-  const getColumns = useCallback(() => {
-    return [
+  // 1. ブラウザを閉じる・リロード時の警告
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isEditing) {
+        // ブラウザによって異なるメッセージが表示される
+        e.preventDefault();
+        e.returnValue = ''; // Chrome等では空文字でも警告が出る
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isEditing]);
+
+  // 2. React Router内でのページ遷移をブロック
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isEditing && currentLocation.pathname !== nextLocation.pathname
+  );
+
+  // ブロック時の確認ダイアログ処理
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const shouldLeave = window.confirm(
+        '編集中のデータがあります。このページを離れますか？\n変更内容は保存されません。'
+      );
+      if (shouldLeave) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+      }
+    }
+  }, [blocker]);
+
+  //---------------------------------------------------------------------------
+  // DHTMLX Grid初期化・更新
+  //---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!gridContainerRef.current || !isGridReady) return;
+    if (typeof window.dhx === 'undefined') {
+      console.error('DHTMLX Suite is not loaded');
+      return;
+    }
+
+    // 既存のGridがあれば破棄
+    if (gridInstanceRef.current) {
+      gridInstanceRef.current.destructor();
+    }
+
+    // ✅ 【重要】データにIDを明示的に設定
+    // 理由: grid.data.update(id, data) でデータを更新するため、
+    //       各行にIDが必要。これがないとupdateが動作しない。
+    //       公式サンプルでも必ずIDを設定している。
+    // DB上では date + contentType で一意になるため、IDも同様に設定
+    const filteredData = rowData
+      .filter((row) => row.emissionType === selectedTab)
+      .map((row) => ({ ...row, id: `${row.date}_${row.contentType}` })); // date + contentType を ID として使用
+
+    // カラム定義
+    const allColumns = [
       {
         id: 'dayLabel',
-        header: [{ text: '日付' }],
+        header: [{ text: '日付', rowSpan: 2 }],
         width: 100,
         editable: false,
         htmlEnable: true,
@@ -243,7 +362,8 @@ const DhtmlxGridDataView = () => {
       },
       {
         id: 'resultVol',
-        header: [{ text: '量' }],
+        // ✅ 編集モードの時は独立したヘッダーを表示、それ以外は空（colspanで統合されるため）
+        header: [{ text: isEditing ? '結果 - 量' : '量' }],
         width: 80,
         editable: false,
       },
@@ -268,30 +388,19 @@ const DhtmlxGridDataView = () => {
       },
       {
         id: 'outsaideResultVol',
-        header: [{ text: '量' }],
+        // ✅ 編集モードの時は独立したヘッダーを表示、それ以外は空（colspanで統合されるため）
+        header: [{ text: isEditing ? '外作 - 量' : '量' }],
         width: 80,
         editable: false,
       },
     ];
-  }, [isEditing]);
 
-  //---------------------------------------------------------------------------
-  // DHTMLX Grid初期化・更新
-  //---------------------------------------------------------------------------
-  useEffect(() => {
-    if (!gridContainerRef.current || !isGridReady) return;
-    if (typeof window.dhx === 'undefined') {
-      console.error('DHTMLX Suite is not loaded');
-      return;
-    }
-
-    // 既存のGridがあれば破棄
-    if (gridInstanceRef.current) {
-      gridInstanceRef.current.destructor();
-    }
+    // ✅ 編集モードがオンの時は「結果 - 時間」と「外作 - 時間」を非表示
+    const columns = isEditing 
+      ? allColumns.filter((col) => col.id !== 'resultTime' && col.id !== 'outsaideResultTime')
+      : allColumns;
 
     // Gridの初期化
-    const columns = getColumns();
     const grid = new window.dhx.Grid(gridContainerRef.current, {
       columns,
       autoWidth: false,
@@ -300,14 +409,18 @@ const DhtmlxGridDataView = () => {
       resizable: true,
     });
 
-    // ✅ 【重要】データにIDを明示的に設定
-    // 理由: grid.data.update(id, data) でデータを更新するため、
-    //       各行にIDが必要。これがないとupdateが動作しない。
-    //       公式サンプルでも必ずIDを設定している。
-    const filteredData = rowData
-      .filter((row) => row.contentType === selectedTab)
-      .map((row) => ({ ...row, id: row.date })); // row.dateをIDとして使用
     grid.data.parse(filteredData);
+
+    // ✅ データパース後に日付ごとに太い罫線を追加
+    // データを配列として取得し、日付境界を判定
+    const allRows = filteredData;
+    allRows.forEach((row, index) => {
+      const nextRow = allRows[index + 1];
+      // 次の行が存在し、日付が異なる場合に太い境界線を追加
+      if (nextRow && nextRow.date !== row.date) {
+        grid.addRowCss(row.id, 'date-boundary');
+      }
+    });
 
     // resultTimeクリックイベント（DataView表示）
     grid.events.on('cellClick', (row: any, column: any, event: MouseEvent) => {
@@ -445,14 +558,16 @@ const DhtmlxGridDataView = () => {
   useEffect(() => {
     if (!gridInstanceRef.current) return;
 
-    // rowDataから現在のタブのデータのみ抽出
-    const filteredData = rowData.filter((row) => row.contentType === selectedTab);
+    // rowDataから現在のタブ（emissionType）のデータのみ抽出
+    const filteredData = rowData.filter((row) => row.emissionType === selectedTab);
     
     // ✅ grid.data.update() を使って個別に行を更新
     //    → Grid全体が再構築されない → スクロール位置が保持される
+    //    DB上では date + contentType で一意なので、IDも同様に設定
     filteredData.forEach((row) => {
+      const rowId = `${row.date}_${row.contentType}`;
       try {
-        gridInstanceRef.current!.data.update(row.date, { ...row, id: row.date });
+        gridInstanceRef.current!.data.update(rowId, { ...row, id: rowId });
       } catch (e) {
         // 行が存在しない場合は無視（初回など）
       }
@@ -532,21 +647,23 @@ const DhtmlxGridDataView = () => {
         //    → 該当行のみが更新される（Grid全体は再構築されない）
         //    → スクロール位置が保持される
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // DB上では date + contentType で一意なので、IDも同様に設定
+        const rowId = `${selectedRowData.date}_${selectedRowData.contentType}`;
         const updatedRow = {
           ...selectedRowData,
           resultId: item.id,
           resultTime: item.time,
           resultVol: item.volume,
-          id: selectedRowData.date, // IDを明示的に設定（重要）
+          id: rowId, // IDを明示的に設定（重要）
         };
-        gridInstanceRef.current.data.update(selectedRowData.date, updatedRow);
+        gridInstanceRef.current.data.update(rowId, updatedRow);
         
         // 2. React stateも更新（データの一貫性を保つため）
         //    注: この更新で別のuseEffectが発火するが、
         //    grid.data.update()を使っているのでスクロール位置は保持される
         setRowData((prev) =>
           prev.map((row) =>
-            row.date === selectedRowData.date && row.contentType === selectedTab
+            row.date === selectedRowData.date && row.contentType === selectedRowData.contentType
               ? { ...row, resultId: item.id, resultTime: item.time, resultVol: item.volume }
               : row
           )
@@ -623,19 +740,21 @@ const DhtmlxGridDataView = () => {
         // 1. grid.data.update() を直接呼ぶ
         //    → 該当行のみが更新される → スクロール位置が保持される
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // DB上では date + contentType で一意なので、IDも同様に設定
+        const rowId = `${selectedRowDataForGrid.date}_${selectedRowDataForGrid.contentType}`;
         const updatedRow = {
           ...selectedRowDataForGrid,
           outsaideResultId: row.id,
           outsaideResultTime: row.time,
           outsaideResultVol: parseInt(row.volume.replace('t', ''), 10),
-          id: selectedRowDataForGrid.date, // IDを明示的に設定（重要）
+          id: rowId, // IDを明示的に設定（重要）
         };
-        gridInstanceRef.current.data.update(selectedRowDataForGrid.date, updatedRow);
+        gridInstanceRef.current.data.update(rowId, updatedRow);
         
         // 2. React stateも更新（データの一貫性を保つため）
         setRowData((prev) =>
           prev.map((r) =>
-            r.date === selectedRowDataForGrid.date && r.contentType === selectedTab
+            r.date === selectedRowDataForGrid.date && r.contentType === selectedRowDataForGrid.contentType
               ? { 
                   ...r, 
                   outsaideResultId: row.id, 
@@ -698,152 +817,152 @@ const DhtmlxGridDataView = () => {
 
   return (
     <div className="mx-5 flex h-full flex-col">
-      <div className="flex w-full justify-between">
-        <div className="flex items-center gap-4">
-          <div className="rounded-lg bg-green-100 px-4 py-2 text-sm font-semibold text-green-700">
-            Grid + DataView
+        <div className="flex w-full justify-between">
+          <div className="flex items-center gap-4">
+            <div className="rounded-lg bg-green-100 px-4 py-2 text-sm font-semibold text-green-700">
+              Grid + DataView
+            </div>
+            <button
+              className="h-full w-24 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
+              onClick={handleSave}
+            >
+              保存
+            </button>
           </div>
+
+          <div>
+            <p className="mb-2 text-xl">編集モード</p>
+            <Toggle value={isEditing} onChange={toggleEditMode} />
+          </div>
+        </div>
+
+        <div className="my-5 flex gap-4">
+          <YearMonthFilter
+            availableYearMonths={availableYearMonths}
+            loading={loadingYearMonths}
+            allowAllMonths={isNewMode}
+          />
+        </div>
+
+        {/* タブ */}
+        <div className="mb-4 flex gap-2">
           <button
-            className="h-full w-24 rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
-            onClick={handleSave}
+            onClick={() => handleTabChange('pla')}
+            className={`rounded-lg px-6 py-2 font-semibold transition-colors ${
+              selectedTab === 'pla'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
           >
-            保存
+            PLA
+          </button>
+          <button
+            onClick={() => handleTabChange('mud')}
+            className={`rounded-lg px-6 py-2 font-semibold transition-colors ${
+              selectedTab === 'mud'
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            MUD
           </button>
         </div>
 
-        <div>
-          <p className="mb-2 text-xl">編集モード</p>
-          <Toggle value={isEditing} onChange={toggleEditMode} />
-        </div>
-      </div>
-
-      <div className="my-5 flex gap-4">
-        <YearMonthFilter
-          availableYearMonths={availableYearMonths}
-          loading={loadingYearMonths}
-          allowAllMonths={isNewMode}
-        />
-      </div>
-
-      {/* タブ */}
-      <div className="mb-4 flex gap-2">
-        <button
-          onClick={() => handleTabChange('pla')}
-          className={`rounded-lg px-6 py-2 font-semibold transition-colors ${
-            selectedTab === 'pla'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          PLA
-        </button>
-        <button
-          onClick={() => handleTabChange('mud')}
-          className={`rounded-lg px-6 py-2 font-semibold transition-colors ${
-            selectedTab === 'mud'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          MUD
-        </button>
-      </div>
-
-      {/* Grid */}
-      <div className="flex flex-1 flex-col">
-        {isGridReady ? (
-          <div
-            ref={gridContainerRef}
-            style={{ width: '100%', height: '100%' }}
-            className="rounded-lg border border-gray-300 bg-white shadow mb-4"
-          />
-        ) : (
-          <div className="flex h-60 w-full items-center justify-center">
-            <div className="text-center">
-              <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
-              <p className="text-gray-600">データを読み込んでいます...</p>
-            </div>
-          </div>
-        )}
-
-        {/* ポップアップGrid（outsaide用） */}
-        {gridPopupVisible && (
-          <>
-            {/* 背景オーバーレイ（クリックで閉じる） */}
+        {/* Grid */}
+        <div className="flex flex-1 flex-col">
+          {isGridReady ? (
             <div
-              className="fixed inset-0 z-40"
-              onClick={() => {
-                setGridPopupVisible(false);
-                setSelectedRowDataForGrid(null);
-              }}
+              ref={gridContainerRef}
+              style={{ width: '100%', height: '100%' }}
+              className="rounded-lg border border-gray-300 bg-white shadow mb-4"
             />
-            {/* Grid本体（シンプル表示） */}
-            <div
-              className="fixed z-50 bg-white shadow-lg"
-              style={{
-                left: `${gridPopupPosition.x}px`,
-                top: `${gridPopupPosition.y}px`,
-                width: '165px', // 列幅の合計(80+80) + スクロールバー等の余裕
-                height: '115px', // ヘッダー(約40px) + 行2つ(35px×2) + 余裕
-                border: '1px solid #d1d5db',
-              }}
-            >
+          ) : (
+            <div className="flex h-60 w-full items-center justify-center">
+              <div className="text-center">
+                <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
+                <p className="text-gray-600">データを読み込んでいます...</p>
+              </div>
+            </div>
+          )}
+
+          {/* ポップアップGrid（outsaide用） */}
+          {gridPopupVisible && (
+            <>
+              {/* 背景オーバーレイ（クリックで閉じる） */}
               <div
-                ref={popupGridContainerRef}
-                style={{ 
-                  width: '100%', 
-                  height: '100%',
+                className="fixed inset-0 z-40"
+                onClick={() => {
+                  setGridPopupVisible(false);
+                  setSelectedRowDataForGrid(null);
                 }}
               />
-            </div>
-          </>
-        )}
-
-        {/* DataView（セル直下に表示） */}
-        {dataViewVisible && (
-          <>
-            {/* 背景オーバーレイ */}
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => {
-                setDataViewVisible(false);
-                setSelectedRowData(null);
-              }}
-            />
-            {/* DataView本体 */}
-            <div
-              className="fixed z-50 rounded-lg border-2 border-blue-500 bg-white shadow-2xl"
-              style={{
-                left: `${dataViewPosition.x}px`,
-                top: `${dataViewPosition.y}px`,
-                width: '480px',
-                maxHeight: `${Math.min(450, window.innerHeight - 20)}px`,
-              }}
-            >
-              <div className="bg-blue-500 px-3 py-2 text-white text-sm font-semibold rounded-t-lg flex items-center justify-between">
-                <span>結果を選択 - {selectedRowData?.dayLabel}</span>
-                <button
-                  onClick={() => {
-                    setDataViewVisible(false);
-                    setSelectedRowData(null);
-                  }}
-                  className="text-white hover:text-gray-200 font-bold text-lg"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="p-3">
+              {/* Grid本体（シンプル表示） */}
+              <div
+                className="fixed z-50 bg-white shadow-lg"
+                style={{
+                  left: `${gridPopupPosition.x}px`,
+                  top: `${gridPopupPosition.y}px`,
+                  width: '165px', // 列幅の合計(80+80) + スクロールバー等の余裕
+                  height: '115px', // ヘッダー(約40px) + 行2つ(35px×2) + 余裕
+                  border: '1px solid #d1d5db',
+                }}
+              >
                 <div
-                  ref={dataViewContainerRef}
+                  ref={popupGridContainerRef}
                   style={{ 
                     width: '100%', 
-                    maxHeight: `${Math.min(370, window.innerHeight - 80)}px`,
-                    overflowY: 'auto',
+                    height: '100%',
                   }}
                 />
               </div>
-            </div>
-          </>
+            </>
+          )}
+
+          {/* DataView（セル直下に表示） */}
+          {dataViewVisible && (
+            <>
+              {/* 背景オーバーレイ */}
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => {
+                  setDataViewVisible(false);
+                  setSelectedRowData(null);
+                }}
+              />
+              {/* DataView本体 */}
+              <div
+                className="fixed z-50 rounded-lg border-2 border-blue-500 bg-white shadow-2xl"
+                style={{
+                  left: `${dataViewPosition.x}px`,
+                  top: `${dataViewPosition.y}px`,
+                  width: '480px',
+                  maxHeight: `${Math.min(450, window.innerHeight - 20)}px`,
+                }}
+              >
+                <div className="bg-blue-500 px-3 py-2 text-white text-sm font-semibold rounded-t-lg flex items-center justify-between">
+                  <span>結果を選択 - {selectedRowData?.dayLabel}</span>
+                  <button
+                    onClick={() => {
+                      setDataViewVisible(false);
+                      setSelectedRowData(null);
+                    }}
+                    className="text-white hover:text-gray-200 font-bold text-lg"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="p-3">
+                  <div
+                    ref={dataViewContainerRef}
+                    style={{ 
+                      width: '100%', 
+                      maxHeight: `${Math.min(370, window.innerHeight - 80)}px`,
+                      overflowY: 'auto',
+                    }}
+                  />
+                </div>
+              </div>
+            </>
         )}
       </div>
     </div>

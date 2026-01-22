@@ -1,6 +1,7 @@
 export type fetchTestType = {
     date: string;
-    contentType: string; // pla or mud
+    contentType: number; // 1, 2, 3, 4 (ヘッダーID)
+    emissionType: string; // pla or mud
     company: number;
     conmanyName: string;
     companyBgColor: string;
@@ -18,7 +19,8 @@ export type testType = {
     dayLabel: string;
     isHoliday: boolean;
     isSturday: boolean;
-    contentType: string; // pla or mud
+    contentType: number; // 1, 2, 3, 4 (ヘッダーID)
+    emissionType: string; // pla or mud
     company: number;
     conmanyName: string;
     companyBgColor: string;

@@ -1,0 +1,16 @@
+/* 標準の罫線を点線に */
+.dhx_grid-cell {
+  border-right: 1px dashed #e5e7eb !important;
+  border-bottom: 1px dashed #e5e7eb !important;
+}
+
+/* 日付ごとに太い罫線を追加 */
+.dhx_grid-row.date-boundary {
+  border-bottom: 3px solid #2563eb !important;
+}
+
+/* 日付境界の行のセルも下線を太くする */
+.dhx_grid-row.date-boundary .dhx_grid-cell {
+  border-bottom: 3px solid #2563eb !important;
+}
+
