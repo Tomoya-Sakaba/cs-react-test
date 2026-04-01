@@ -1,0 +1,230 @@
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { equipmentApi, type Equipment } from "../../api/equipmentApi";
+import PdfPreview from "../../components/PdfPreview";
+import { printApi } from "../../api/printApi";
+
+const EquipmentDetail = () => {
+  const navigate = useNavigate();
+  const { equipmentId } = useParams();
+
+  const id = Number(equipmentId);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [equipment, setEquipment] = useState<Equipment | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfFileName, setPdfFileName] = useState<string>("");
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const pageCode = "equipment_master";
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    equipmentApi
+      .get(id)
+      .then((data) => {
+        if (!cancelled) setEquipment(data);
+        if (!data && !cancelled) setError("機器が見つかりません");
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const printEnabled = !!equipment && !loading;
+
+  const handleSave = async () => {
+    if (!equipment) return;
+    setSaving(true);
+    try {
+      const saved = await equipmentApi.update(equipment.equipmentId, {
+        equipmentName: equipment.equipmentName,
+        category: equipment.category,
+        manufacturer: equipment.manufacturer,
+        model: equipment.model,
+        location: equipment.location,
+        note: equipment.note,
+      });
+      setEquipment(saved);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (Number.isNaN(id)) {
+    return (
+      <div className="p-6">
+        <div className="text-red-600">不正なIDです</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <button
+            className="text-sm text-blue-700 hover:underline"
+            onClick={() => navigate("/equipment")}
+          >
+            ← 一覧へ戻る
+          </button>
+          <h1 className="text-xl font-bold mt-1">機器詳細</h1>
+          <div className="text-sm text-gray-600">
+            {equipment ? `${equipment.equipmentCode} / ${equipment.equipmentName}` : ""}
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            disabled={!printEnabled}
+            className="px-4 py-2 rounded-md bg-gray-800 text-white disabled:opacity-50"
+            onClick={async () => {
+              if (!equipment) return;
+              setPdfLoading(true);
+              setPdfError(null);
+              try {
+                const fileName = `機器台帳_${equipment.equipmentCode}.pdf`;
+                const blob = await printApi.generatePdfByPage(pageCode, {
+                  fileName,
+                  equipmentId: equipment.equipmentId,
+                });
+                setPdfBlob(blob);
+                setPdfFileName(fileName);
+              } catch (e) {
+                console.error(e);
+                setPdfError("PDFの生成に失敗しました");
+              } finally {
+                setPdfLoading(false);
+              }
+            }}
+          >
+            印刷（PDF）
+          </button>
+          <button
+            className="px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50"
+            onClick={() => navigate("/report-system/templates")}
+          >
+            テンプレ設定
+          </button>
+          <button
+            disabled={!equipment || saving}
+            className="px-4 py-2 rounded-md bg-blue-600 text-white disabled:opacity-50"
+            onClick={handleSave}
+          >
+            保存
+          </button>
+        </div>
+      </div>
+
+      {loading && <div className="text-gray-600">読み込み中...</div>}
+      {error && <div className="text-red-600 mb-3">{error}</div>}
+      {pdfError && <div className="text-red-600 mb-3">{pdfError}</div>}
+
+      {equipment && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4 max-w-3xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-gray-600">機器コード</label>
+              <div className="font-mono">{equipment.equipmentCode}</div>
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">更新日時</label>
+              <div>{equipment.updatedAt}</div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="text-sm text-gray-600">機器名</label>
+              <input
+                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                value={equipment.equipmentName}
+                onChange={(e) =>
+                  setEquipment((prev) => (prev ? { ...prev, equipmentName: e.target.value } : prev))
+                }
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600">カテゴリ</label>
+              <input
+                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                value={equipment.category}
+                onChange={(e) =>
+                  setEquipment((prev) => (prev ? { ...prev, category: e.target.value } : prev))
+                }
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">メーカー</label>
+              <input
+                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                value={equipment.manufacturer ?? ""}
+                onChange={(e) =>
+                  setEquipment((prev) =>
+                    prev ? { ...prev, manufacturer: e.target.value } : prev
+                  )
+                }
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">型式</label>
+              <input
+                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                value={equipment.model ?? ""}
+                onChange={(e) =>
+                  setEquipment((prev) => (prev ? { ...prev, model: e.target.value } : prev))
+                }
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">設置場所</label>
+              <input
+                className="border border-gray-300 rounded-md px-3 py-2 w-full"
+                value={equipment.location ?? ""}
+                onChange={(e) =>
+                  setEquipment((prev) => (prev ? { ...prev, location: e.target.value } : prev))
+                }
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-sm text-gray-600">備考</label>
+              <textarea
+                className="border border-gray-300 rounded-md px-3 py-2 w-full min-h-24"
+                value={equipment.note ?? ""}
+                onChange={(e) =>
+                  setEquipment((prev) => (prev ? { ...prev, note: e.target.value } : prev))
+                }
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pdfBlob && (
+        <PdfPreview
+          pdfBlob={pdfBlob}
+          fileName={pdfFileName}
+          onClose={() => setPdfBlob(null)}
+          loading={pdfLoading}
+          error={pdfError}
+        />
+      )}
+    </div>
+  );
+};
+
+export default EquipmentDetail;
+

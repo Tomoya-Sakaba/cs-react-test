@@ -177,3 +177,24 @@ CREATE TABLE [dbo].[m_company] (
 -- 完了
 -- =============================================
 
+-- =============================================
+-- 12. m_equipment テーブル（機器マスタ）
+-- =============================================
+CREATE TABLE [dbo].[m_equipment] (
+  [equipment_id] int identity not null,
+  [equipment_code] nvarchar(50) not null,
+  [equipment_name] nvarchar(200) not null,
+  [category] nvarchar(100) not null,
+  [manufacturer] nvarchar(200) null,
+  [model] nvarchar(200) null,
+  [location] nvarchar(200) null,
+  [note] nvarchar(1000) null,
+  [is_active] bit default 1 not null,
+  [created_at] datetime default getdate() not null,
+  [updated_at] datetime default getdate() not null,
+  primary key ([equipment_id])
+);
+
+CREATE UNIQUE INDEX [IX_m_equipment_equipment_code] ON [dbo].[m_equipment]([equipment_code]);
+CREATE INDEX [IX_m_equipment_is_active] ON [dbo].[m_equipment]([is_active]);
+

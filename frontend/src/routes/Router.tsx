@@ -30,10 +30,12 @@ import ReportDetail from "../pages/ReportDetail";
 import FlexibleSchedule from "../pages/FlexibleSchedule";
 // 廃棄物排出計画スケジュールシステム（種別ベース）
 import WasteSchedule from "../pages/WasteSchedule";
-// DHTMLX Grid テスト
-import DhtmlxGridTest from "../pages/DhtmlxGridTest";
-import DhtmlxAgTest from "../pages/DhtmlxAgTest";
-import DhtmlxGridDataView from "../pages/DhtmlxGridDataView";
+// 予算計画（テーブル定義前のモック）
+import BudgetPlanMock from "../pages/BudgetPlanMock";
+import EquipmentList from "../pages/equipment/EquipmentList";
+import EquipmentDetail from "../pages/equipment/EquipmentDetail";
+import PrintTemplateSettings from "../pages/settings/PrintTemplateSettings";
+// DHTMLX（ライセンス影響回避のため導線/読み込みを停止）
 
 const Router = createBrowserRouter(
   createRoutesFromElements(
@@ -41,11 +43,12 @@ const Router = createBrowserRouter(
       <Route path="/login" element={<Login />} />
       <Route element={<Layout />}>
         <Route path="/ag-test" element={<AgTest />} />
-        <Route path="/dhtmlx-test" element={<DhtmlxGridTest />} />
-        <Route path="/dhtmlx-ag-test" element={<DhtmlxAgTest />} />
-        <Route path="/dhtmlx-grid-dataview" element={<DhtmlxGridDataView />} />
         <Route path="/flexible-schedule" element={<FlexibleSchedule />} />
         <Route path="/waste-schedule" element={<WasteSchedule />} />
+        <Route path="/budget-plan-mock" element={<BudgetPlanMock />} />
+        <Route path="/equipment" element={<EquipmentList />} />
+        <Route path="/equipment/:equipmentId" element={<EquipmentDetail />} />
+        <Route path="/settings/print-templates" element={<PrintTemplateSettings />} />
         <Route path="/" element={<Home />} />
         <Route path="/hello" element={<Hello />} />
         <Route path="/user/create" element={<CreateUser />} />

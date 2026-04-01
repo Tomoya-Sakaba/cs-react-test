@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="..\packages\SixLabors.ImageSharp.3.1.12\build\SixLabors.ImageSharp.props" Condition="Exists('..\packages\SixLabors.ImageSharp.3.1.12\build\SixLabors.ImageSharp.props')" />
   <Import Project="..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.2.0.1\build\net46\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props" Condition="Exists('..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.2.0.1\build\net46\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props')" />
@@ -225,10 +225,14 @@
     <Compile Include="Controllers\ApprovalController.cs" />
     <Compile Include="Controllers\CompanyController.cs" />
     <Compile Include="Controllers\CsvImportController.cs" />
+    <Compile Include="Controllers\EquipmentController.cs" />
     <Compile Include="Controllers\HelloController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Controllers\PdfController.cs" />
     <Compile Include="Controllers\PlanController.cs" />
+    <Compile Include="Controllers\PrintController.cs" />
+    <Compile Include="Controllers\PrintMappingController.cs" />
+    <Compile Include="Controllers\PrintSettingsController.cs" />
     <Compile Include="Controllers\ReportManagementController.cs" />
     <Compile Include="Controllers\TemplateController.cs" />
     <Compile Include="Controllers\UsersController.cs" />
@@ -244,9 +248,14 @@
     <Compile Include="Models\DTOs\ContentTypeDto.cs" />
     <Compile Include="Models\DTOs\ContentTypeListDto.cs" />
     <Compile Include="Models\DTOs\CsvImportDto.cs" />
+    <Compile Include="Models\DTOs\EquipmentDto.cs" />
+    <Compile Include="Models\DTOs\GeneratePdfRequestDto.cs" />
+    <Compile Include="Models\DTOs\PrintTemplateSettingDto.cs" />
+    <Compile Include="Models\DTOs\PrintFieldMappingDto.cs" />
     <Compile Include="Models\DTOs\PlanHistoryDto.cs" />
     <Compile Include="Models\DTOs\PlanRecordDto.cs" />
     <Compile Include="Models\DTOs\PlanVersionSnapshotDto.cs" />
+    <Compile Include="Models\DTOs\UpdateEquipmentRequestDto.cs" />
     <Compile Include="Models\DTOs\ReportDto.cs" />
     <Compile Include="Models\DTOs\ReportTemplateDto.cs" />
     <Compile Include="Models\DTOs\TestItem.cs" />
@@ -257,15 +266,19 @@
     <Compile Include="Models\DTOs\UserResponse.cs" />
     <Compile Include="Models\Entities\ApprovalEntity.cs" />
     <Compile Include="Models\Entities\CompanyEntity.cs" />
+    <Compile Include="Models\Entities\EquipmentEntity.cs" />
     <Compile Include="Models\Entities\PlanEntity.cs" />
     <Compile Include="Models\Entities\PlanVersionSnapshotEntity.cs" />
     <Compile Include="Models\Entities\ResultEntity.cs" />
     <Compile Include="Models\Entities\UsersEntity.cs" />
     <Compile Include="Models\Repository\ApprovalRepository.cs" />
     <Compile Include="Models\Repository\CompanyRepository.cs" />
+    <Compile Include="Models\Repository\EquipmentRepository.cs" />
+    <Compile Include="Models\Repository\PrintFieldMappingRepository.cs" />
     <Compile Include="Models\Repository\PlanRepository.cs" />
     <Compile Include="Models\Repository\ReportRepository.cs" />
     <Compile Include="Models\Repository\ResultRepository.cs" />
+    <Compile Include="Models\Repository\PrintSettingsRepository.cs" />
     <Compile Include="Models\Repository\TemplateRepository.cs" />
     <Compile Include="Models\Repository\UsersRepository.cs" />
     <Compile Include="Models\DTOs\CreateUserRequest.cs" />
@@ -273,6 +286,7 @@
     <Compile Include="Helpers\ValidationHelpers.cs" />
     <Compile Include="Services\ApprovalService.cs" />
     <Compile Include="Services\CompanyService.cs" />
+    <Compile Include="Services\EquipmentService.cs" />
     <Compile Include="Services\CsvImportService.cs" />
     <Compile Include="Services\ExcelImportService.cs" />
     <Compile Include="Services\PdfGenerationService.cs" />

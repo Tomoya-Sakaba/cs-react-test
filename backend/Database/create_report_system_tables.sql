@@ -149,6 +149,68 @@ GO
 -- 3. インデックス作成
 -- ========================================
 
+-- ========================================
+-- 4. 印刷設定（ページ→テンプレ割当）
+-- ========================================
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='t_print_template_settings' AND xtype='U')
+BEGIN
+    CREATE TABLE t_print_template_settings (
+        page_code NVARCHAR(100) NOT NULL PRIMARY KEY,  -- 例: equipment_master
+        template_id INT NOT NULL,                      -- t_report_templates.template_id
+        updated_at DATETIME DEFAULT GETDATE(),
+        updated_user NVARCHAR(100)
+        -- FOREIGN KEY (template_id) REFERENCES t_report_templates(template_id)
+        -- 開発中のため外部キー制約は無効化
+    );
+    PRINT 't_print_template_settings テーブルを作成しました';
+END
+ELSE
+BEGIN
+    PRINT 't_print_template_settings テーブルは既に存在します';
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='idx_print_settings_template_id')
+BEGIN
+    CREATE INDEX idx_print_settings_template_id ON t_print_template_settings(template_id);
+    PRINT 'インデックス idx_print_settings_template_id を作成しました';
+END
+GO
+
+-- ========================================
+-- 5. フィールドマッピング（テンプレフィールド → データソース）
+-- ========================================
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='t_print_field_mappings' AND xtype='U')
+BEGIN
+    CREATE TABLE t_print_field_mappings (
+        mapping_id INT PRIMARY KEY IDENTITY(1,1),
+        page_code NVARCHAR(100) NOT NULL,
+        template_id INT NOT NULL,
+        field_name NVARCHAR(100) NOT NULL,     -- 例: equipment_code / items.date
+        source_key NVARCHAR(200) NOT NULL,     -- 例: equipment.equipmentCode / history.date
+        created_at DATETIME DEFAULT GETDATE(),
+        created_user NVARCHAR(100),
+        updated_at DATETIME,
+        updated_user NVARCHAR(100)
+    );
+    PRINT 't_print_field_mappings テーブルを作成しました';
+END
+ELSE
+BEGIN
+    PRINT 't_print_field_mappings テーブルは既に存在します';
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='UX_print_field_mappings_unique')
+BEGIN
+    CREATE UNIQUE INDEX UX_print_field_mappings_unique
+    ON t_print_field_mappings(page_code, template_id, field_name);
+    PRINT 'インデックス UX_print_field_mappings_unique を作成しました';
+END
+GO
+
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='idx_reports_created_user')
 BEGIN
     CREATE INDEX idx_reports_created_user ON t_reports(created_user);

@@ -43,20 +43,20 @@ const Sidebar = ({ isHovered, setIsHovered }: Props) => {
             />
             <NavigationItem
               icon="i-mdi-grid"
-              href="/dhtmlx-test"
-              name="DHTMLX Grid"
+              href="/budget-plan-mock"
+              name="予算計画（モック）"
               isHovered={isHovered}
             />
             <NavigationItem
-              icon="i-mdi-table-large"
-              href="/dhtmlx-ag-test"
-              name="DHTMLX AgTest"
+              icon="i-mdi-tools"
+              href="/equipment"
+              name="機器マスタ"
               isHovered={isHovered}
             />
             <NavigationItem
-              icon="i-mdi-view-grid-plus"
-              href="/dhtmlx-grid-dataview"
-              name="Grid+DataView"
+              icon="i-mdi-printer-settings"
+              href="/settings/print-templates"
+              name="印刷テンプレ設定"
               isHovered={isHovered}
             />
           </div>

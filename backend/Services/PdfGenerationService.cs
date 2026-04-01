@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using Spire.Xls;
@@ -71,6 +72,12 @@ namespace backend.Services
                 // プレースホルダーを値に置換
                 var regex = new Regex(@"\{\{(.+?)(?::(.+?))?(?::(.+?))?\}\}");
 
+                // 明細テーブル展開（Excel側に行テンプレを置く方式）
+                // - 例: A10セルに {{table:items}} を置く（この行が「テンプレ行」）
+                // - その同じ行に {{items.name}} / {{items.qty}} のように書いておく
+                // - data["items"] に List<Dictionary<string, object>> を渡すと、その件数分行を複製して埋める
+                ExpandTableRegions(worksheet, data);
+
                 foreach (var cell in worksheet.CellsUsed())
                 {
                     var cellValue = cell.Value.ToString();
@@ -106,6 +113,125 @@ namespace backend.Services
                 }
 
                 workbook.Save();
+            }
+        }
+
+        private void ExpandTableRegions(IXLWorksheet worksheet, Dictionary<string, object> data)
+        {
+            // テーブル開始マーカー: {{table:items}}
+            var tableStartRegex = new Regex(@"\{\{\s*table\s*:\s*([a-zA-Z0-9_]+)\s*\}\}");
+
+            // 対象セル（行）を上から順に処理（行挿入でズレるため、都度再探索しつつも安全側に動く）
+            var startCells = worksheet.CellsUsed().Cast<IXLCell>()
+                .Where(c => tableStartRegex.IsMatch(c.GetString()))
+                .OrderBy(c => c.Address.RowNumber)
+                .ToList();
+
+            foreach (var startCell in startCells)
+            {
+                var match = tableStartRegex.Match(startCell.GetString());
+                if (!match.Success) continue;
+
+                var tableKey = match.Groups[1].Value.Trim();
+                if (!data.ContainsKey(tableKey)) { startCell.Value = ""; continue; }
+
+                var rowsObj = data[tableKey];
+                var rows = rowsObj as IEnumerable<Dictionary<string, object>>;
+                if (rows == null) { startCell.Value = ""; continue; }
+
+                var tableRows = rows.ToList();
+                var templateRowNumber = startCell.Address.RowNumber;
+
+                // 行テンプレを含む「使用範囲の列幅」を推定して、その範囲のセルを複製対象にする
+                // ※ CellsUsed はその時点のシート全体なので、同じ行の使用セルに限定する
+                var templateRowCells = worksheet.Row(templateRowNumber).CellsUsed().Cast<IXLCell>().ToList();
+                if (templateRowCells.Count == 0) { startCell.Value = ""; continue; }
+
+                int minCol = templateRowCells.Min(c => c.Address.ColumnNumber);
+                int maxCol = templateRowCells.Max(c => c.Address.ColumnNumber);
+
+                // マーカー自体は出力しない
+                startCell.Value = "";
+
+                // 0件ならテンプレ行を空に（ヘッダだけ残す想定）
+                if (tableRows.Count == 0)
+                {
+                    ClearRowPlaceholders(worksheet, templateRowNumber, minCol, maxCol, tableKey);
+                    continue;
+                }
+
+                // 1件目はテンプレ行に埋める、2件目以降は行を挿入してテンプレを複製
+                for (int i = 0; i < tableRows.Count; i++)
+                {
+                    var targetRowNumber = templateRowNumber + i;
+
+                    if (i > 0)
+                    {
+                        worksheet.Row(targetRowNumber).InsertRowsAbove(1);
+                        // スタイル/数式/結合を含めた複製（ClosedXMLのCopyToで行複製）
+                        worksheet.Row(templateRowNumber).CopyTo(worksheet.Row(targetRowNumber));
+                    }
+
+                    FillTableRow(
+                        worksheet,
+                        targetRowNumber,
+                        minCol,
+                        maxCol,
+                        tableKey,
+                        tableRows[i]
+                    );
+                }
+
+                // 元テンプレ行が最後に残っている場合があるので、最終行以降のテンプレ行は削除しない（設計次第）
+                // ここでは「テンプレ行を1件目として使う」方針のため、追加の削除は不要。
+            }
+        }
+
+        private void FillTableRow(
+            IXLWorksheet worksheet,
+            int rowNumber,
+            int minCol,
+            int maxCol,
+            string tableKey,
+            Dictionary<string, object> rowData
+        )
+        {
+            // 行内で {{items.xxx}} を rowData["xxx"] で置換
+            var regex = new Regex(@"\{\{\s*" + Regex.Escape(tableKey) + @"\.([a-zA-Z0-9_]+)\s*\}\}");
+
+            for (int col = minCol; col <= maxCol; col++)
+            {
+                var cell = worksheet.Cell(rowNumber, col);
+                var cellValue = cell.GetString();
+                if (string.IsNullOrWhiteSpace(cellValue)) continue;
+
+                var newValue = regex.Replace(cellValue, m =>
+                {
+                    var key = m.Groups[1].Value.Trim();
+                    if (rowData != null && rowData.ContainsKey(key))
+                    {
+                        return FormatValue(rowData[key]);
+                    }
+                    return "";
+                });
+
+                if (newValue != cellValue)
+                {
+                    cell.Value = newValue;
+                }
+            }
+        }
+
+        private void ClearRowPlaceholders(IXLWorksheet worksheet, int rowNumber, int minCol, int maxCol, string tableKey)
+        {
+            var regex = new Regex(@"\{\{\s*" + Regex.Escape(tableKey) + @"\.[a-zA-Z0-9_]+\s*\}\}");
+            for (int col = minCol; col <= maxCol; col++)
+            {
+                var cell = worksheet.Cell(rowNumber, col);
+                var cellValue = cell.GetString();
+                if (string.IsNullOrWhiteSpace(cellValue)) continue;
+                var newValue = regex.Replace(cellValue, "");
+                if (newValue != cellValue) cell.Value = newValue;
             }
         }
 
