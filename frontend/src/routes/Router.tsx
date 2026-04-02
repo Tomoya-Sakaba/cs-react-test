@@ -34,7 +34,6 @@ import WasteSchedule from "../pages/WasteSchedule";
 import BudgetPlanMock from "../pages/BudgetPlanMock";
 import EquipmentList from "../pages/equipment/EquipmentList";
 import EquipmentDetail from "../pages/equipment/EquipmentDetail";
-import PrintTemplateSettings from "../pages/settings/PrintTemplateSettings";
 // DHTMLX（ライセンス影響回避のため導線/読み込みを停止）
 
 const Router = createBrowserRouter(
@@ -48,7 +47,6 @@ const Router = createBrowserRouter(
         <Route path="/budget-plan-mock" element={<BudgetPlanMock />} />
         <Route path="/equipment" element={<EquipmentList />} />
         <Route path="/equipment/:equipmentId" element={<EquipmentDetail />} />
-        <Route path="/settings/print-templates" element={<PrintTemplateSettings />} />
         <Route path="/" element={<Home />} />
         <Route path="/hello" element={<Hello />} />
         <Route path="/user/create" element={<CreateUser />} />

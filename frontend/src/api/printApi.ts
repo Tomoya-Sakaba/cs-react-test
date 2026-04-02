@@ -36,5 +36,25 @@ export const printApi = {
     );
     return res.data;
   },
+
+  async generatePdfByPageGemBox(
+    pageCode: string,
+    args: { fileName?: string; equipmentId?: number }
+  ): Promise<Blob> {
+    if (args.equipmentId == null) {
+      throw new Error("equipmentId is required");
+    }
+    const res = await axios.get(
+      `/api/print-gembox/equipment/${encodeURIComponent(String(args.equipmentId))}/pdf`,
+      {
+        responseType: "blob",
+        timeout: 60000,
+        headers: {
+          Accept: "application/pdf",
+        },
+      }
+    );
+    return res.data;
+  },
 };
 

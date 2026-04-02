@@ -197,4 +197,3 @@ CREATE TABLE [dbo].[m_equipment] (
 
 CREATE UNIQUE INDEX [IX_m_equipment_equipment_code] ON [dbo].[m_equipment]([equipment_code]);
 CREATE INDEX [IX_m_equipment_is_active] ON [dbo].[m_equipment]([is_active]);
-

@@ -181,9 +181,6 @@ namespace backend.Services
                         tableRows[i]
                     );
                 }
-
-                // 元テンプレ行が最後に残っている場合があるので、最終行以降のテンプレ行は削除しない（設計次第）
-                // ここでは「テンプレ行を1件目として使う」方針のため、追加の削除は不要。
             }
         }
 
@@ -265,7 +262,7 @@ namespace backend.Services
                 {
                     if (File.Exists(image.FilePath))
                     {
-                        var picture = worksheet.AddPicture(image.FilePath)
+                        worksheet.AddPicture(image.FilePath)
                             .MoveTo(worksheet.Cell(startRow, 1))
                             .Scale(0.4); // 40%サイズ
 
@@ -304,18 +301,14 @@ namespace backend.Services
         }
 
         /// <summary>
-        /// Excel → PDF 変換
+        /// Excel → PDF 変換（Spire）
         /// </summary>
         private void ConvertExcelToPdf(string excelPath, string pdfPath)
         {
-            // Spire.XLS を使用した変換
             var workbook = new Workbook();
             workbook.LoadFromFile(excelPath);
 
-            // PDF設定
             workbook.ConverterSetting.SheetFitToPage = true;
-
-            // PDF保存
             workbook.SaveToFile(pdfPath, FileFormat.PDF);
         }
 

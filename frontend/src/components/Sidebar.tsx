@@ -53,12 +53,6 @@ const Sidebar = ({ isHovered, setIsHovered }: Props) => {
               name="機器マスタ"
               isHovered={isHovered}
             />
-            <NavigationItem
-              icon="i-mdi-printer-settings"
-              href="/settings/print-templates"
-              name="印刷テンプレ設定"
-              isHovered={isHovered}
-            />
           </div>
         </div>
 

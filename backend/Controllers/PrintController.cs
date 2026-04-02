@@ -34,64 +34,6 @@ namespace backend.Controllers
         }
 
         /// <summary>
-        /// テンプレートIDとデータからPDFを直接生成して返す
-        /// POST /api/print/pdf
-        /// </summary>
-        [HttpPost]
-        [Route("pdf")]
-        public HttpResponseMessage GeneratePdf([FromBody] GeneratePdfRequestDto request)
-        {
-            try
-            {
-                if (request == null)
-                {
-                    return Request.CreateErrorResponse(HttpStatusCode.BadRequest, "リクエストが不正です。");
-                }
-
-                if (request.TemplateId <= 0)
-                {
-                    return Request.CreateErrorResponse(HttpStatusCode.BadRequest, "templateId は必須です。");
-                }
-
-                if (request.Data == null)
-                {
-                    return Request.CreateErrorResponse(HttpStatusCode.BadRequest, "data は必須です。");
-                }
-
-                var template = _templateRepository.GetTemplateById(request.TemplateId);
-                if (template == null)
-                {
-                    return Request.CreateErrorResponse(HttpStatusCode.NotFound, "テンプレートが見つかりません。");
-                }
-
-                if (string.IsNullOrEmpty(template.FilePath) || !File.Exists(template.FilePath))
-                {
-                    return Request.CreateErrorResponse(HttpStatusCode.NotFound, "テンプレートファイルが見つかりません。");
-                }
-
-                Stream pdfStream = _pdfService.GeneratePdf(template.FilePath, request.Data, null);
-
-                var response = new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StreamContent(pdfStream)
-                };
-
-                response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-                response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
-                {
-                    FileName = string.IsNullOrWhiteSpace(request.FileName) ? "report.pdf" : request.FileName
-                };
-
-                return response;
-            }
-            catch (Exception ex)
-            {
-                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError,
-                    $"PDFの生成に失敗しました: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// ページコードに紐づくテンプレートでPDF生成（テンプレIDはサーバ側で解決）
         /// POST /api/print/pages/{pageCode}/pdf
         /// </summary>
@@ -146,7 +88,6 @@ namespace backend.Controllers
                 }
                 else
                 {
-                    // 後方互換: data を渡している場合はそれを使う
                     if (request.Data == null)
                     {
                         return Request.CreateErrorResponse(HttpStatusCode.BadRequest, "data は必須です。");
@@ -176,21 +117,21 @@ namespace backend.Controllers
             }
         }
 
-        private Dictionary<string, object> BuildEquipmentPrintData(backend.Models.Entities.EquipmentEntity equipment, System.Collections.Generic.Dictionary<string, string> mappings)
+        private Dictionary<string, object> BuildEquipmentPrintData(backend.Models.Entities.EquipmentEntity equipment, Dictionary<string, string> mappings)
         {
             var now = DateTime.Now;
             var printDate = now.ToString("yyyy/MM/dd");
 
             // 明細（例）: 本来は点検履歴テーブル等から取得。現時点はサンプル。
-            var history = new System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, object>>
+            var history = new List<Dictionary<string, object>>
             {
-                new System.Collections.Generic.Dictionary<string, object>
+                new Dictionary<string, object>
                 {
                     { "date", "2026/03/01" },
                     { "action", "点検" },
                     { "note", "外観確認" },
                 },
-                new System.Collections.Generic.Dictionary<string, object>
+                new Dictionary<string, object>
                 {
                     { "date", "2026/03/20" },
                     { "action", "交換" },
@@ -201,7 +142,6 @@ namespace backend.Controllers
             object Resolve(string sourceKey)
             {
                 if (string.IsNullOrWhiteSpace(sourceKey)) return "";
-
                 switch (sourceKey)
                 {
                     case "equipment.equipmentId": return equipment.EquipmentId;
@@ -214,34 +154,24 @@ namespace backend.Controllers
                     case "equipment.note": return equipment.Note ?? "";
                     case "equipment.updatedAt": return equipment.UpdatedAt.ToString("yyyy/MM/dd HH:mm");
                     case "system.printDate": return printDate;
-                    default:
-                        return "";
+                    default: return "";
                 }
             }
 
-            var data = new System.Collections.Generic.Dictionary<string, object>
+            var data = new Dictionary<string, object>
             {
-                // テーブル展開用の固定キー（テンプレ側で {{table:history}} / {{history.date}} を使う）
                 { "history", history }
             };
 
-            // mapping: field_name（テンプレ内 {{field_name}}） → source_key（equipment.xxx / system.xxx）
             foreach (var kv in mappings)
             {
                 var fieldName = kv.Key;
                 var sourceKey = kv.Value;
-
-                // 明細列（history.*）はテンプレ行側で {{history.date}} のように記述するので、
-                // ここで個別の scalar 埋めは不要（historyは上で渡している）
                 if (fieldName != null && fieldName.StartsWith("history.", StringComparison.OrdinalIgnoreCase))
-                {
                     continue;
-                }
-
                 data[fieldName] = Resolve(sourceKey);
             }
 
-            // 便利: マッピングが無くても最低限は埋まるようにデフォルトも入れる
             if (!data.ContainsKey("equipment_code")) data["equipment_code"] = equipment.EquipmentCode ?? "";
             if (!data.ContainsKey("equipment_name")) data["equipment_name"] = equipment.EquipmentName ?? "";
             if (!data.ContainsKey("print_date")) data["print_date"] = printDate;

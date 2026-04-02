@@ -90,12 +90,13 @@ const EquipmentDetail = () => {
 
         <div className="flex gap-2">
           <button
-            disabled={!printEnabled}
+            disabled={!printEnabled || pdfLoading}
             className="px-4 py-2 rounded-md bg-gray-800 text-white disabled:opacity-50"
             onClick={async () => {
               if (!equipment) return;
               setPdfLoading(true);
               setPdfError(null);
+              setPdfBlob(null);
               try {
                 const fileName = `機器台帳_${equipment.equipmentCode}.pdf`;
                 const blob = await printApi.generatePdfByPage(pageCode, {
@@ -112,13 +113,33 @@ const EquipmentDetail = () => {
               }
             }}
           >
-            印刷（PDF）
+            {pdfLoading ? "生成中..." : "印刷（PDF）"}
           </button>
           <button
-            className="px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50"
-            onClick={() => navigate("/report-system/templates")}
+            disabled={!printEnabled || pdfLoading}
+            className="px-4 py-2 rounded-md bg-emerald-600 text-white disabled:opacity-50"
+            onClick={async () => {
+              if (!equipment) return;
+              setPdfLoading(true);
+              setPdfError(null);
+              setPdfBlob(null);
+              try {
+                const fileName = `機器台帳_${equipment.equipmentCode}_GemBox.pdf`;
+                const blob = await printApi.generatePdfByPageGemBox(pageCode, {
+                  fileName,
+                  equipmentId: equipment.equipmentId,
+                });
+                setPdfBlob(blob);
+                setPdfFileName(fileName);
+              } catch (e) {
+                console.error(e);
+                setPdfError("PDF（GemBox）の生成に失敗しました");
+              } finally {
+                setPdfLoading(false);
+              }
+            }}
           >
-            テンプレ設定
+            {pdfLoading ? "生成中..." : "印刷（PDF/GemBox）"}
           </button>
           <button
             disabled={!equipment || saving}
@@ -132,6 +153,7 @@ const EquipmentDetail = () => {
 
       {loading && <div className="text-gray-600">読み込み中...</div>}
       {error && <div className="text-red-600 mb-3">{error}</div>}
+      {pdfLoading && <div className="text-gray-600 mb-3">PDFを生成しています...</div>}
       {pdfError && <div className="text-red-600 mb-3">{pdfError}</div>}
 
       {equipment && (
