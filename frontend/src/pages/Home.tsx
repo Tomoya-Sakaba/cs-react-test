@@ -1,4 +1,4 @@
-﻿import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import { testApi } from "../api/testApi";
 
@@ -58,6 +58,7 @@ const Home = () => {
           <Button onClick={() => navigate("/new-plan")}>月次計画管理</Button>
           <Button onClick={() => navigate("/csv-import")}>CSV取り込み</Button>
           <Button onClick={() => navigate("/flexible-schedule")}>柔軟な計画スケジュール</Button>
+          <Button onClick={() => navigate("/photo-comments")}>写真コメント</Button>
         </div>
       </div>
     </>

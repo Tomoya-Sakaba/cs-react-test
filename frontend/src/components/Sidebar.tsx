@@ -53,6 +53,12 @@ const Sidebar = ({ isHovered, setIsHovered }: Props) => {
               name="機器マスタ"
               isHovered={isHovered}
             />
+            <NavigationItem
+              icon="i-mdi-image-multiple"
+              href="/photo-comments"
+              name="写真コメント"
+              isHovered={isHovered}
+            />
           </div>
         </div>
 
