@@ -1148,12 +1148,12 @@ video {
   max-width: 80rem;
 }
 
-.max-w-md {
-  max-width: 28rem;
-}
-
 .max-w-\[92vw\] {
   max-width: 92vw;
+}
+
+.max-w-md {
+  max-width: 28rem;
 }
 
 .flex-1 {
