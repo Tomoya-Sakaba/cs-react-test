@@ -251,6 +251,7 @@
     <Compile Include="Controllers\PlanController.cs" />
     <Compile Include="Controllers\PrintController.cs" />
     <Compile Include="Controllers\PrintGemBoxProxyController.cs" />
+    <Compile Include="Controllers\PrintHelloProxyController.cs" />
     <Compile Include="Controllers\PrintMappingController.cs" />
     <Compile Include="Controllers\PrintSettingsController.cs" />
     <Compile Include="Controllers\ReportManagementController.cs" />
@@ -323,6 +324,7 @@
     <Compile Include="Services\TemplateParserService.cs" />
     <Compile Include="Services\TestService.cs" />
     <Compile Include="Services\PhotoCommentService.cs" />
+    <Compile Include="Services\PrintServiceHttpProxyService.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Areas\HelpPage\HelpPage.css" />
