@@ -46,7 +46,15 @@ namespace backend.Controllers
 
         private async Task<HttpResponseMessage> ForwardGemBoxPrintAsync(GemBoxPrintRequestDto request)
         {
-            var baseUrl = ResolvePrintServiceBaseUrl();
+            string baseUrl;
+            try
+            {
+                baseUrl = PrintServiceHttpProxyService.ResolvePrintServiceBaseUrl(Request);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, ex.Message);
+            }
             var timeoutSeconds = int.TryParse(ConfigurationManager.AppSettings["PrintServiceTimeoutSeconds"], out var s) ? s : 60;
 
             var target = new Uri(new Uri(baseUrl, UriKind.Absolute), "api/print/gembox/pdf");
@@ -88,28 +96,5 @@ namespace backend.Controllers
             }
         }
 
-        private string ResolvePrintServiceBaseUrl()
-        {
-            var configured = (ConfigurationManager.AppSettings["PrintServiceBaseUrl"] ?? "").Trim();
-            if (!string.IsNullOrWhiteSpace(configured))
-                return EnsureTrailingSlash(configured);
-
-            var host = Request?.RequestUri?.Host ?? "";
-            if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase))
-            {
-                var local = (ConfigurationManager.AppSettings["PrintServiceLocalDebugBaseUrl"] ?? "").Trim();
-                if (!string.IsNullOrWhiteSpace(local))
-                    return EnsureTrailingSlash(local);
-            }
-
-            var origin = Request?.RequestUri?.GetLeftPart(UriPartial.Authority) ?? "http://localhost";
-            return EnsureTrailingSlash(origin) + "print/";
-        }
-
-        private static string EnsureTrailingSlash(string url)
-        {
-            return url.EndsWith("/", StringComparison.Ordinal) ? url : url + "/";
-        }
     }
 }
