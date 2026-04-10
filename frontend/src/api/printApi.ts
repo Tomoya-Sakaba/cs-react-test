@@ -56,5 +56,15 @@ export const printApi = {
     );
     return res.data;
   },
+
+  /** GemBox デモ: Web.config のテンプレ名に対応する xlsx を backend-print で PDF 化 */
+  async fetchDemoGemBoxPdf(): Promise<Blob> {
+    const res = await axios.get("/api/print-gembox/demo/pdf", {
+      responseType: "blob",
+      timeout: 120_000,
+      headers: { Accept: "application/pdf" },
+    });
+    return res.data;
+  },
 };
 

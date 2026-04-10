@@ -1,14 +1,10 @@
 using System;
-using System.Configuration;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
 using backend.Models.DTOs;
 using backend.Services;
-using Newtonsoft.Json;
 
 namespace backend.Controllers
 {
@@ -17,84 +13,71 @@ namespace backend.Controllers
     /// DB取得・データ整形は backend（GemBoxPrintPayloadService）で行い、JSONで渡す。
     ///
     /// GET /api/print-gembox/equipment/{equipmentId}/pdf
-    ///   → 機器台帳PDF（内部で backend-print POST /api/print/gembox/pdf）
+    /// GET /api/print-gembox/demo/pdf
+    ///   → 内部で backend-print POST /api/print/gembox/pdf（PrintServiceHttpProxyService）
     /// </summary>
     [RoutePrefix("api/print-gembox")]
     public class PrintGemBoxProxyController : ApiController
     {
         private readonly GemBoxPrintPayloadService _payloadService = new GemBoxPrintPayloadService();
+        private readonly PrintServiceHttpProxyService _printProxy = new PrintServiceHttpProxyService();
 
         [HttpGet]
         [Route("equipment/{equipmentId:int}/pdf")]
         public async Task<HttpResponseMessage> GenerateEquipmentPdf(int equipmentId)
         {
-            GemBoxPrintRequestDto request;
+            GemBoxPrintRequestDto gemBoxPrintRequest;
             try
             {
-                request = _payloadService.BuildEquipmentMasterPdfRequest(equipmentId);
+                gemBoxPrintRequest = _payloadService.BuildEquipmentMasterPdfRequest(equipmentId);
             }
             catch (InvalidOperationException ex)
             {
                 return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, ex.Message);
             }
 
-            if (request == null)
+            if (gemBoxPrintRequest == null)
                 return Request.CreateErrorResponse(HttpStatusCode.NotFound, "機器が見つかりません。");
 
-            return await ForwardGemBoxPrintAsync(request);
+            return await ForwardGemBoxPrintAsync(gemBoxPrintRequest);
         }
 
-        private async Task<HttpResponseMessage> ForwardGemBoxPrintAsync(GemBoxPrintRequestDto request)
+        /// <summary>
+        /// デモ用 PDF（Web.config の GemBoxDemoTemplateFileName）。テンプレは backend-print のテンプレフォルダに配置。
+        /// </summary>
+        [HttpGet]
+        [Route("demo/pdf")]
+        public async Task<HttpResponseMessage> DemoGemBoxPdf()
         {
-            string baseUrl;
+            GemBoxPrintRequestDto gemBoxPrintRequest;
             try
             {
-                baseUrl = PrintServiceHttpProxyService.ResolvePrintServiceBaseUrl(Request);
+                gemBoxPrintRequest = _payloadService.BuildDemoGemBoxPdfRequest();
             }
             catch (InvalidOperationException ex)
             {
                 return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, ex.Message);
             }
-            var timeoutSeconds = int.TryParse(ConfigurationManager.AppSettings["PrintServiceTimeoutSeconds"], out var s) ? s : 60;
 
-            var target = new Uri(new Uri(baseUrl, UriKind.Absolute), "api/print/gembox/pdf");
-
-            var json = JsonConvert.SerializeObject(request);
-            using (var http = new HttpClient { Timeout = TimeSpan.FromSeconds(timeoutSeconds) })
-            using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
-            using (var upstream = await http.PostAsync(target, content))
-            {
-                if (!upstream.IsSuccessStatusCode)
-                {
-                    var body = await upstream.Content.ReadAsStringAsync();
-                    return Request.CreateErrorResponse(upstream.StatusCode, body);
-                }
-
-                var bytes = await upstream.Content.ReadAsByteArrayAsync();
-
-                var response = new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new ByteArrayContent(bytes)
-                };
-
-                response.Content.Headers.ContentType = upstream.Content.Headers.ContentType ?? new MediaTypeHeaderValue("application/pdf");
-
-                if (upstream.Content.Headers.ContentDisposition != null)
-                    response.Content.Headers.ContentDisposition = upstream.Content.Headers.ContentDisposition;
-                else if (!string.IsNullOrWhiteSpace(request.DownloadFileName))
-                    response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
-                    {
-                        FileName = request.DownloadFileName
-                    };
-                else
-                    response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
-                    {
-                        FileName = "document.pdf"
-                    };
-
-                return response;
-            }
+            return await ForwardGemBoxPrintAsync(gemBoxPrintRequest);
         }
 
+        /// <summary>
+        /// backend-print へ転送。<c>Request</c> は <see cref="ApiController.Request"/>（フレームワークが付与する現在の HTTP リクエスト）。
+        /// </summary>
+        private async Task<HttpResponseMessage> ForwardGemBoxPrintAsync(GemBoxPrintRequestDto gemBoxPrintRequest)
+        {
+            try
+            {
+                // ApiController.Request の名前は変えられないため、意味が分かる名前でローカルに取る
+                HttpRequestMessage incomingHttpRequest = Request;
+                return await _printProxy.ForwardGemBoxPdfPostAsync(gemBoxPrintRequest, incomingHttpRequest)
+                    .ConfigureAwait(false);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, ex.Message);
+            }
+        }
     }
 }

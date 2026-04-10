@@ -1,10 +1,13 @@
 using System;
 using System.Configuration;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using backend.Models.DTOs;
+using Newtonsoft.Json;
 
 namespace backend.Services
 {
@@ -102,6 +105,73 @@ namespace backend.Services
             // ボディを StringContent に包み、JSON として送る（中身の検証はしない）
             var content = new StringContent(jsonBody ?? "{}", Encoding.UTF8, "application/json");
             return ForwardPostAsync(relativePath, content, incomingRequest);
+        }
+
+        /// <summary>
+        /// GemBox 印刷: backend-print の <c>POST /api/print/gembox/pdf</c> に JSON を送り、成功時は PDF をバイナリで返す。
+        /// </summary>
+        /// <remarks>
+        /// ForwardPostAsync とは別メソッドにしている。PDF はバイナリのため <see cref="ReadAsStringAsync"/> で透過すると破損する。
+        /// </remarks>
+        /// <param name="gemBoxPrintRequest">テンプレ名・data/tables・ダウンロード名など（backend が組み立てた DTO）</param>
+        /// <param name="incomingRequest">現在の API リクエスト（ベース URL 解決に使用）</param>
+        public async Task<HttpResponseMessage> ForwardGemBoxPdfPostAsync(
+            GemBoxPrintRequestDto gemBoxPrintRequest,
+            HttpRequestMessage incomingRequest)
+        {
+            // backend-print のルート（末尾 /）と GemBox 用 API パスを結合した絶対 URI
+            var baseUrl = ResolvePrintServiceBaseUrl(incomingRequest);
+            var target = new Uri(new Uri(baseUrl, UriKind.Absolute), "api/print/gembox/pdf");
+
+            // 他メソッドと同じ秒数。長い PDF 生成でもここで打ち切れるようにする
+            var timeoutSec = int.TryParse(ConfigurationManager.AppSettings["PrintServiceTimeoutSeconds"], out var s)
+                ? s
+                : 60;
+
+            // backend-print が期待する JSON（templateFileName / data / tables / downloadFileName）
+            var json = JsonConvert.SerializeObject(gemBoxPrintRequest);
+
+            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSec)))
+            using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
+            using (var upstream = await Client.PostAsync(target, content, cts.Token).ConfigureAwait(false))
+            {
+                // 失敗時は本文がテキスト（エラーメッセージ）のことが多いので文字列で返す
+                if (!upstream.IsSuccessStatusCode)
+                {
+                    var err = await upstream.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    return new HttpResponseMessage(upstream.StatusCode)
+                    {
+                        Content = new StringContent(err, Encoding.UTF8, "text/plain"),
+                    };
+                }
+
+                // 成功時は PDF のバイト列。ReadAsStringAsync は使わない（エンコーディングで壊れる）
+                var bytes = await upstream.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+                var response = new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(bytes),
+                };
+
+                // ブラウザや axios が application/pdf と認識できるようにする
+                response.Content.Headers.ContentType =
+                    upstream.Content.Headers.ContentType ?? new MediaTypeHeaderValue("application/pdf");
+
+                // ダウンロード名: 上流が付けていればそのまま、なければ DTO のファイル名、なければ既定名
+                if (upstream.Content.Headers.ContentDisposition != null)
+                    response.Content.Headers.ContentDisposition = upstream.Content.Headers.ContentDisposition;
+                else if (!string.IsNullOrWhiteSpace(gemBoxPrintRequest.DownloadFileName))
+                    response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
+                    {
+                        FileName = gemBoxPrintRequest.DownloadFileName,
+                    };
+                else
+                    response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
+                    {
+                        FileName = "document.pdf",
+                    };
+
+                return response;
+            }
         }
 
         /// <summary>

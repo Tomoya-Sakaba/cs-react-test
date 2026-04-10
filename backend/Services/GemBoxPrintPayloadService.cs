@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Configuration;
 using backend.Models.DTOs;
 using backend.Models.Repository;
 
@@ -32,6 +34,34 @@ namespace backend.Services
             }
 
             return GemBoxPrintMappingEngine.BuildEquipmentRequest(e, def);
+        }
+
+        /// <summary>
+        /// 疎通・デモ用: Web.config のテンプレートファイル名と固定データで GemBox 印刷リクエストを組み立てる。
+        /// テンプレは backend-print 側の <c>BReportTemplateBasePath</c> 配下に配置する。
+        /// </summary>
+        public GemBoxPrintRequestDto BuildDemoGemBoxPdfRequest()
+        {
+            var template = (ConfigurationManager.AppSettings["GemBoxDemoTemplateFileName"] ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                throw new InvalidOperationException(
+                    "GemBoxDemoTemplateFileName を Web.config に設定してください（例: demo_gembox.xlsx）。backend-print のテンプレフォルダに同名ファイルを置きます。");
+            }
+
+            var download = (ConfigurationManager.AppSettings["GemBoxDemoDownloadFileName"] ?? "demo-gembox.pdf").Trim();
+
+            return new GemBoxPrintRequestDto
+            {
+                TemplateFileName = template,
+                Data = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                {
+                    { "title", "GemBox demo" },
+                    { "generatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") },
+                },
+                Tables = new Dictionary<string, List<Dictionary<string, object>>>(StringComparer.OrdinalIgnoreCase),
+                DownloadFileName = download,
+            };
         }
     }
 }
