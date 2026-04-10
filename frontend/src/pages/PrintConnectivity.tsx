@@ -1,6 +1,6 @@
-import axios from "axios";
 import Button from "../components/Button";
 import { printApi } from "../api/printApi";
+import { httpClient } from "../api/httpClient";
 
 /**
  * backend ↔ backend-print 疎通確認用（Hello/Test/Echo）と GemBox デモ PDF。
@@ -12,7 +12,7 @@ const PrintConnectivity = () => {
 
   const handleHelloThroughPrint = async () => {
     try {
-      const res = await axios.get("/api/print-gembox/hello", {
+      const res = await httpClient.get("/api/print-gembox/hello", {
         headers: { Accept: "application/json" },
       });
       showAxiosData(res.data);
@@ -24,7 +24,7 @@ const PrintConnectivity = () => {
 
   const handleTestThroughPrint = async () => {
     try {
-      const res = await axios.get("/api/print-gembox/test", {
+      const res = await httpClient.get("/api/print-gembox/test", {
         headers: { Accept: "application/json" },
       });
       showAxiosData(res.data);
@@ -36,7 +36,7 @@ const PrintConnectivity = () => {
 
   const handleEchoPostThroughPrint = async () => {
     try {
-      const res = await axios.post(
+      const res = await httpClient.post(
         "/api/print-gembox/echo",
         {
           message: "疎通ページからの POST テスト",

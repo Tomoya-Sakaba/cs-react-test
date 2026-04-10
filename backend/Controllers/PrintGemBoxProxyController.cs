@@ -19,7 +19,14 @@ namespace backend.Controllers
     [RoutePrefix("api/print-gembox")]
     public class PrintGemBoxProxyController : ApiController
     {
+        /// <summary>
+        /// テンプレートのエクセルファイル名や中身のデータを構成するサービスクラス
+        /// </summary>
         private readonly GemBoxPrintPayloadService _payloadService = new GemBoxPrintPayloadService();
+
+        /// <summary>
+        /// backend-print へ転送するためのサービスクラス
+        /// </summary>
         private readonly PrintServiceHttpProxyService _printProxy = new PrintServiceHttpProxyService();
 
         [HttpGet]

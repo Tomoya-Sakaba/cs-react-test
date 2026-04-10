@@ -49,7 +49,11 @@ namespace backend.Services
                     "GemBoxDemoTemplateFileName を Web.config に設定してください（例: demo_gembox.xlsx）。backend-print のテンプレフォルダに同名ファイルを置きます。");
             }
 
-            var download = (ConfigurationManager.AppSettings["GemBoxDemoDownloadFileName"] ?? "demo-gembox.pdf").Trim();
+            // デモ用 DTO の DownloadFileName（Web.config の GemBoxDemoPdfFileName）。JSON で backend-print に送り、返ってきた PDF には gateway が同じ名前で Content-Disposition を付ける
+            var download = (ConfigurationManager.AppSettings["GemBoxDemoPdfFileName"] ?? "document.pdf")
+                .Trim();
+            if (string.IsNullOrEmpty(download))
+                download = "document.pdf";
 
             return new GemBoxPrintRequestDto
             {

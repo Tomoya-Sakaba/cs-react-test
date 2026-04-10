@@ -130,20 +130,33 @@ namespace backend.Services
 
             // backend-print が期待する JSON（templateFileName / data / tables / downloadFileName）
             var json = JsonConvert.SerializeObject(gemBoxPrintRequest);
+            var correlationId = Guid.NewGuid().ToString("N");
 
             using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSec)))
             using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
-            using (var upstream = await Client.PostAsync(target, content, cts.Token).ConfigureAwait(false))
+            using (var req = new HttpRequestMessage(HttpMethod.Post, target) { Content = content })
             {
-                // 失敗時は本文がテキスト（エラーメッセージ）のことが多いので文字列で返す
-                if (!upstream.IsSuccessStatusCode)
+                req.Headers.TryAddWithoutValidation("X-Correlation-Id", correlationId);
+                using (var upstream = await Client.SendAsync(req, cts.Token).ConfigureAwait(false))
                 {
-                    var err = await upstream.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    return new HttpResponseMessage(upstream.StatusCode)
+
+                    // 失敗時は本文がテキスト（エラーメッセージ）のことが多いので文字列で返す
+                    if (!upstream.IsSuccessStatusCode)
                     {
-                        Content = new StringContent(err, Encoding.UTF8, "text/plain"),
-                    };
-                }
+                        var err = await upstream.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        LogProxy(
+                            $"GemBox upstream error. correlationId={correlationId}, status={(int)upstream.StatusCode} {upstream.ReasonPhrase}, " +
+                            $"target='{target}', contentType='{upstream.Content?.Headers?.ContentType}', errLen={err?.Length ?? 0}");
+                        return new HttpResponseMessage(upstream.StatusCode)
+                        {
+                            Content = new StringContent(
+                                string.IsNullOrWhiteSpace(err)
+                                    ? $"Upstream returned {(int)upstream.StatusCode} {upstream.ReasonPhrase}. correlationId={correlationId}"
+                                    : err,
+                                Encoding.UTF8,
+                                "text/plain"),
+                        };
+                    }
 
                 // 成功時は PDF のバイト列。ReadAsStringAsync は使わない（エンコーディングで壊れる）
                 var bytes = await upstream.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
@@ -156,22 +169,21 @@ namespace backend.Services
                 response.Content.Headers.ContentType =
                     upstream.Content.Headers.ContentType ?? new MediaTypeHeaderValue("application/pdf");
 
-                // ダウンロード名: 上流が付けていればそのまま、なければ DTO のファイル名、なければ既定名
-                if (upstream.Content.Headers.ContentDisposition != null)
-                    response.Content.Headers.ContentDisposition = upstream.Content.Headers.ContentDisposition;
-                else if (!string.IsNullOrWhiteSpace(gemBoxPrintRequest.DownloadFileName))
-                    response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
-                    {
-                        FileName = gemBoxPrintRequest.DownloadFileName,
-                    };
-                else
-                    response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
-                    {
-                        FileName = "document.pdf",
-                    };
+                // クライアント向け名は backend が組み立てた DTO の DownloadFileName（上流の Content-Disposition は使わない）
+                response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
+                {
+                    FileName = gemBoxPrintRequest.DownloadFileName.Trim(),
+                };
 
-                return response;
+                    return response;
+                }
             }
+        }
+
+        private static void LogProxy(string message)
+        {
+            var path = (ConfigurationManager.AppSettings["PrintProxyLogFilePath"] ?? "").Trim();
+            SimpleFileLogger.Log(path, message);
         }
 
         /// <summary>
