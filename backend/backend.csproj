@@ -314,6 +314,7 @@
     <Compile Include="Services\ApprovalService.cs" />
     <Compile Include="Services\CompanyService.cs" />
     <Compile Include="Services\EquipmentService.cs" />
+    <Compile Include="Services\EquipmentDetailGemBoxTestData.cs" />
     <Compile Include="Services\GemBoxPrintPayloadService.cs" />
     <Compile Include="Services\GemBoxPrintMappingEngine.cs" />
     <Compile Include="Services\CsvImportService.cs" />
@@ -345,6 +346,9 @@
     <Content Include="Content\bootstrap.rtl.css" />
     <Content Include="Content\bootstrap.rtl.min.css" />
     <Content Include="common\print-mappings\equipment_gembox.json" />
+    <Content Include="common\print-mappings\equipment_list_gembox.json" />
+    <Content Include="common\print-mappings\equipment_detail_gembox.json" />
+    <Content Include="common\print-mappings\equipment_master_detail_layout.txt" />
     <Content Include="favicon.ico" />
     <Content Include="Global.asax" />
     <Content Include="Scripts\bootstrap.bundle.js" />

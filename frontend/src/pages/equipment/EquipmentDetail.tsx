@@ -3,6 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { equipmentApi, type Equipment } from "../../api/equipmentApi";
 import PdfPreview from "../../components/PdfPreview";
 import { printApi } from "../../api/printApi";
+import {
+  getTestLinkedEquipmentForEquipment,
+  getTestPartsForEquipment,
+} from "./equipmentDetailTestData";
 
 const EquipmentDetail = () => {
   const navigate = useNavigate();
@@ -142,6 +146,31 @@ const EquipmentDetail = () => {
             {pdfLoading ? "生成中..." : "印刷（PDF/GemBox）"}
           </button>
           <button
+            disabled={!printEnabled || pdfLoading}
+            className="px-4 py-2 rounded-md bg-teal-700 text-white disabled:opacity-50"
+            onClick={async () => {
+              if (!equipment) return;
+              setPdfLoading(true);
+              setPdfError(null);
+              setPdfBlob(null);
+              try {
+                const fileName = `機器詳細_部品関連_${equipment.equipmentCode}_GemBox.pdf`;
+                const blob = await printApi.generateEquipmentDetailListsGemBox(equipment.equipmentId);
+                setPdfBlob(blob);
+                setPdfFileName(fileName);
+              } catch (e) {
+                console.error(e);
+                setPdfError(
+                  "PDF（部品・関連機器/GemBox）の生成に失敗しました（equipment_master_detail.xlsx を配置してください）"
+                );
+              } finally {
+                setPdfLoading(false);
+              }
+            }}
+          >
+            {pdfLoading ? "生成中..." : "PDF（部品・関連機器）"}
+          </button>
+          <button
             disabled={!equipment || saving}
             className="px-4 py-2 rounded-md bg-blue-600 text-white disabled:opacity-50"
             onClick={handleSave}
@@ -230,6 +259,56 @@ const EquipmentDetail = () => {
                   setEquipment((prev) => (prev ? { ...prev, note: e.target.value } : prev))
                 }
               />
+            </div>
+          </div>
+
+          <div className="mt-8 space-y-6 max-w-4xl">
+            <div>
+              <h2 className="text-lg font-semibold mb-2">部品リスト（テストデータ）</h2>
+              <div className="overflow-x-auto border border-gray-200 rounded-md">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="text-left px-3 py-2">品番</th>
+                      <th className="text-right px-3 py-2 w-24">数量</th>
+                      <th className="text-left px-3 py-2">備考</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getTestPartsForEquipment(equipment.equipmentId).map((row) => (
+                      <tr key={row.partCode} className="border-t border-gray-100">
+                        <td className="px-3 py-2 font-mono">{row.partCode}</td>
+                        <td className="px-3 py-2 text-right">{row.qty}</td>
+                        <td className="px-3 py-2">{row.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold mb-2">紐づく機器（テストデータ）</h2>
+              <div className="overflow-x-auto border border-gray-200 rounded-md">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="text-left px-3 py-2">機器コード</th>
+                      <th className="text-left px-3 py-2">機器名</th>
+                      <th className="text-left px-3 py-2">関係</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getTestLinkedEquipmentForEquipment(equipment.equipmentId).map((row) => (
+                      <tr key={row.equipmentCode} className="border-t border-gray-100">
+                        <td className="px-3 py-2 font-mono">{row.equipmentCode}</td>
+                        <td className="px-3 py-2">{row.equipmentName}</td>
+                        <td className="px-3 py-2">{row.relation}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

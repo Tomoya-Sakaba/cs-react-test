@@ -4,6 +4,8 @@ import { ModuleRegistry, AllCommunityModule, type ColDef } from "ag-grid-communi
 import { useNavigate } from "react-router-dom";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { equipmentApi, type Equipment } from "../../api/equipmentApi";
+import { printApi } from "../../api/printApi";
+import PdfPreview from "../../components/PdfPreview";
 import type { AgGridReact as AgGridReactType } from "ag-grid-react";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -15,6 +17,10 @@ const EquipmentList = () => {
   const [rowData, setRowData] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [quickFilter, setQuickFilter] = useState("");
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [pdfFileName, setPdfFileName] = useState("equipment_list_gembox.pdf");
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +62,28 @@ const EquipmentList = () => {
           <p className="text-sm text-gray-600">行をダブルクリックすると詳細を開きます。</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={loading || pdfLoading}
+            className="px-3 py-2 rounded-md bg-emerald-600 text-white text-sm disabled:opacity-50 whitespace-nowrap"
+            onClick={async () => {
+              setPdfLoading(true);
+              setPdfError(null);
+              setPdfBlob(null);
+              try {
+                const blob = await printApi.generateEquipmentListPdfGemBox();
+                setPdfBlob(blob);
+                setPdfFileName("equipment_list_gembox.pdf");
+              } catch (e) {
+                console.error(e);
+                setPdfError("一覧PDFの生成に失敗しました（テンプレ equipment_list.xlsx・backend-print を確認）");
+              } finally {
+                setPdfLoading(false);
+              }
+            }}
+          >
+            {pdfLoading ? "PDF生成中..." : "一覧PDF（GemBox）"}
+          </button>
           <input
             value={quickFilter}
             onChange={(e) => {
@@ -68,6 +96,9 @@ const EquipmentList = () => {
           />
         </div>
       </div>
+
+      {pdfError && <div className="text-red-600 text-sm mb-2">{pdfError}</div>}
+      {pdfLoading && <div className="text-gray-600 text-sm mb-2">PDFを生成しています...</div>}
 
       <div className="ag-theme-alpine" style={{ height: "calc(100vh - 12rem)" }}>
         <AgGridReact<Equipment>
@@ -85,6 +116,16 @@ const EquipmentList = () => {
           loading={loading}
         />
       </div>
+
+      {pdfBlob && (
+        <PdfPreview
+          pdfBlob={pdfBlob}
+          fileName={pdfFileName}
+          onClose={() => setPdfBlob(null)}
+          loading={pdfLoading}
+          error={pdfError}
+        />
+      )}
     </div>
   );
 };

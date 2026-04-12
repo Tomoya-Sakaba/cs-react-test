@@ -1,0 +1,34 @@
+{
+  "description": "機器詳細＋部品テーブル(parts)＋関連機器(linked)＋履歴(history)。テンプレ equipment_master_detail.xlsx を BReportTemplateBasePath に置く。テーブルは上から history → parts → linked の順で行を配置（先行テーブル展開後に下へずれるため）。各 {{table:xxx}} と {{xxx.col}} は同一行。",
+  "templateFileName": "equipment_master_detail.xlsx",
+  "downloadFileNamePattern": "equipment_{equipment_code}_detail_gembox.pdf",
+  "scalars": [
+    { "excelKey": "print_date", "source": "now", "format": "yyyy/MM/dd" },
+    { "excelKey": "equipment_id", "source": "entity", "dbColumn": "equipment_id" },
+    { "excelKey": "equipment_code", "source": "entity", "dbColumn": "equipment_code" },
+    { "excelKey": "equipment_name", "source": "entity", "dbColumn": "equipment_name" },
+    { "excelKey": "category", "source": "entity", "dbColumn": "category" },
+    { "excelKey": "manufacturer", "source": "entity", "dbColumn": "manufacturer" },
+    { "excelKey": "model", "source": "entity", "dbColumn": "model" },
+    { "excelKey": "location", "source": "entity", "dbColumn": "location" },
+    { "excelKey": "note", "source": "entity", "dbColumn": "note" },
+    { "excelKey": "updated_at", "source": "entity", "dbColumn": "updated_at", "format": "yyyy/MM/dd HH:mm" }
+  ],
+  "tables": [
+    {
+      "tableKey": "history",
+      "rows": [
+        { "date": "2026/03/01", "action": "点検", "note": "外観確認" },
+        { "date": "2026/03/20", "action": "交換", "note": "フィルタ交換" }
+      ]
+    },
+    {
+      "tableKey": "parts",
+      "rows": []
+    },
+    {
+      "tableKey": "linked",
+      "rows": []
+    }
+  ]
+}

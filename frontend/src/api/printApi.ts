@@ -59,6 +59,29 @@ export const printApi = {
     return res.data;
   },
 
+  /** 機器詳細＋部品(parts)＋関連機器(linked)。テンプレ equipment_master_detail.xlsx を backend-print に配置。 */
+  async generateEquipmentDetailListsGemBox(equipmentId: number): Promise<Blob> {
+    const res = await httpClient.get(
+      `/api/print-gembox/equipment/${encodeURIComponent(String(equipmentId))}/detail-lists/pdf`,
+      {
+        responseType: "blob",
+        timeout: 120_000,
+        headers: { Accept: "application/pdf" },
+      }
+    );
+    return res.data;
+  },
+
+  /** 機器マスタ一覧（全件）を GemBox テンプレで PDF 化。テンプレ equipment_list.xlsx を backend-print 側に配置。 */
+  async generateEquipmentListPdfGemBox(): Promise<Blob> {
+    const res = await httpClient.get("/api/print-gembox/equipment-list/pdf", {
+      responseType: "blob",
+      timeout: 120_000,
+      headers: { Accept: "application/pdf" },
+    });
+    return res.data;
+  },
+
   /** GemBox デモ: Web.config のテンプレ名に対応する xlsx を backend-print で PDF 化 */
   async fetchDemoGemBoxPdf(): Promise<Blob> {
     const res = await httpClient.get("/api/print-gembox/demo/pdf", {

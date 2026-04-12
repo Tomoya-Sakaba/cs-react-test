@@ -118,49 +118,77 @@ namespace backend.Services
 
         private void ExpandTableRegions(IXLWorksheet worksheet, Dictionary<string, object> data)
         {
-            // テーブル開始マーカー: {{table:items}}
+            // テーブル開始マーカー: {{table:items}}（同一シートに複数可。上から順に展開し、挿入行分のオフセットを累積）
             var tableStartRegex = new Regex(@"\{\{\s*table\s*:\s*([a-zA-Z0-9_]+)\s*\}\}");
 
-            // 対象セル（行）を上から順に処理（行挿入でズレるため、都度再探索しつつも安全側に動く）
-            var startCells = worksheet.CellsUsed().Cast<IXLCell>()
-                .Where(c => tableStartRegex.IsMatch(c.GetString()))
-                .OrderBy(c => c.Address.RowNumber)
-                .ToList();
-
-            foreach (var startCell in startCells)
+            var markerList = new List<(int Row, int Col, string Key)>();
+            foreach (var c in worksheet.CellsUsed().Cast<IXLCell>())
             {
+                if (!c.Value.IsText) continue;
+                var s = c.GetString();
+                if (string.IsNullOrWhiteSpace(s)) continue;
+                var m = tableStartRegex.Match(s);
+                if (!m.Success) continue;
+                markerList.Add((c.Address.RowNumber, c.Address.ColumnNumber, m.Groups[1].Value.Trim()));
+            }
+
+            markerList.Sort((a, b) => a.Row != b.Row ? a.Row.CompareTo(b.Row) : a.Col.CompareTo(b.Col));
+
+            // 同一行に複数マーカーは先頭列のみ
+            var seenRows = new HashSet<int>();
+            var ordered = new List<(int Row, int Col, string Key)>();
+            foreach (var mk in markerList)
+            {
+                if (seenRows.Contains(mk.Row)) continue;
+                seenRows.Add(mk.Row);
+                ordered.Add(mk);
+            }
+
+            var rowOffset = 0;
+            foreach (var mk in ordered)
+            {
+                var templateRowNumber = mk.Row + rowOffset;
+                var startCell = worksheet.Cell(templateRowNumber, mk.Col);
+                if (!startCell.Value.IsText) continue;
+
                 var match = tableStartRegex.Match(startCell.GetString());
                 if (!match.Success) continue;
 
                 var tableKey = match.Groups[1].Value.Trim();
-                if (!data.ContainsKey(tableKey)) { startCell.Value = ""; continue; }
+                if (!data.ContainsKey(tableKey))
+                {
+                    startCell.Value = "";
+                    continue;
+                }
 
                 var rowsObj = data[tableKey];
                 var rows = rowsObj as IEnumerable<Dictionary<string, object>>;
-                if (rows == null) { startCell.Value = ""; continue; }
+                if (rows == null)
+                {
+                    startCell.Value = "";
+                    continue;
+                }
 
                 var tableRows = rows.ToList();
-                var templateRowNumber = startCell.Address.RowNumber;
 
-                // 行テンプレを含む「使用範囲の列幅」を推定して、その範囲のセルを複製対象にする
-                // ※ CellsUsed はその時点のシート全体なので、同じ行の使用セルに限定する
                 var templateRowCells = worksheet.Row(templateRowNumber).CellsUsed().Cast<IXLCell>().ToList();
-                if (templateRowCells.Count == 0) { startCell.Value = ""; continue; }
+                if (templateRowCells.Count == 0)
+                {
+                    startCell.Value = "";
+                    continue;
+                }
 
                 int minCol = templateRowCells.Min(c => c.Address.ColumnNumber);
                 int maxCol = templateRowCells.Max(c => c.Address.ColumnNumber);
 
-                // マーカー自体は出力しない
                 startCell.Value = "";
 
-                // 0件ならテンプレ行を空に（ヘッダだけ残す想定）
                 if (tableRows.Count == 0)
                 {
                     ClearRowPlaceholders(worksheet, templateRowNumber, minCol, maxCol, tableKey);
                     continue;
                 }
 
-                // 1件目はテンプレ行に埋める、2件目以降は行を挿入してテンプレを複製
                 for (int i = 0; i < tableRows.Count; i++)
                 {
                     var targetRowNumber = templateRowNumber + i;
@@ -168,7 +196,6 @@ namespace backend.Services
                     if (i > 0)
                     {
                         worksheet.Row(targetRowNumber).InsertRowsAbove(1);
-                        // スタイル/数式/結合を含めた複製（ClosedXMLのCopyToで行複製）
                         worksheet.Row(templateRowNumber).CopyTo(worksheet.Row(targetRowNumber));
                     }
 
@@ -181,6 +208,9 @@ namespace backend.Services
                         tableRows[i]
                     );
                 }
+
+                if (tableRows.Count > 1)
+                    rowOffset += tableRows.Count - 1;
             }
         }
 

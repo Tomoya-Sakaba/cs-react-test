@@ -37,6 +37,53 @@ namespace backend.Services
         }
 
         /// <summary>
+        /// 機器詳細＋部品(parts)＋関連機器(linked) の GemBox 用テンプレ（equipment_detail_gembox.json / equipment_master_detail.xlsx）。
+        /// parts / linked はテストデータ（<see cref="EquipmentDetailGemBoxTestData"/>）。
+        /// </summary>
+        public GemBoxPrintRequestDto BuildEquipmentDetailListsPdfRequest(int equipmentId)
+        {
+            var e = _repository.GetById(equipmentId);
+            if (e == null) return null;
+
+            var path = GemBoxPrintMappingEngine.ResolveEquipmentDetailMappingFilePath();
+            var def = GemBoxPrintMappingEngine.LoadDefinition(path);
+            if (def == null)
+            {
+                throw new InvalidOperationException(
+                    "機器詳細用 GemBox マッピングJSONを読み込めません。Web.config の GemBoxEquipmentDetailMappingFile と、" +
+                    "サイト配下の common/print-mappings/equipment_detail_gembox.json の配置を確認してください。解決パス: " +
+                    path);
+            }
+
+            var dto = GemBoxPrintMappingEngine.BuildEquipmentRequest(e, def);
+            if (dto?.Tables == null)
+                return dto;
+
+            dto.Tables["parts"] = EquipmentDetailGemBoxTestData.GetPartsRows(equipmentId);
+            dto.Tables["linked"] = EquipmentDetailGemBoxTestData.GetLinkedEquipmentRows(equipmentId);
+            return dto;
+        }
+
+        /// <summary>
+        /// 機器マスタ一覧（全件）を GemBox テンプレに流し込むリクエストを組み立てる。
+        /// </summary>
+        public GemBoxPrintRequestDto BuildEquipmentListPdfRequest()
+        {
+            var path = GemBoxPrintMappingEngine.ResolveEquipmentListMappingFilePath();
+            var def = GemBoxPrintMappingEngine.LoadDefinition(path);
+            if (def == null)
+            {
+                throw new InvalidOperationException(
+                    "一覧用 GemBox マッピングJSONを読み込めません。Web.config の GemBoxEquipmentListMappingFile と、" +
+                    "サイト配下の common/print-mappings/equipment_list_gembox.json の配置を確認してください。解決パス: " +
+                    path);
+            }
+
+            var list = _repository.GetAll();
+            return GemBoxPrintMappingEngine.BuildEquipmentListRequest(list, def);
+        }
+
+        /// <summary>
         /// 疎通・デモ用: Web.config のテンプレートファイル名と固定データで GemBox 印刷リクエストを組み立てる。
         /// テンプレは backend-print 側の <c>BReportTemplateBasePath</c> 配下に配置する。
         /// </summary>

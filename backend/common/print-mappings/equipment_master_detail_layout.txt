@@ -1,0 +1,23 @@
+equipment_master_detail.xlsx の例（1シート目）
+※セルは「文字列」として入力。{{ }} は半角。
+
+【単票】
+A1: 機器台帳（部品・関連機器）
+B2: 印刷日 {{print_date}}
+A3: 機器コード {{equipment_code}}   B3: 機器名 {{equipment_name}}
+（必要に応じて equipment_id, category, manufacturer, model, location, note, updated_at を配置）
+
+【テーブル1: 履歴 history】上から先に処理される想定で、このブロックを上に置く
+見出し行: 履歴 / 日付 / 内容 / メモ
+データ行（テンプレ）: 同じ行に
+  {{table:history}}  {{history.date}}  {{history.action}}  {{history.note}}
+
+【テーブル2: 部品 parts】
+見出し行: 部品 / 品番 / 数量 / 備考
+データ行:
+  {{table:parts}}  {{parts.part_code}}  {{parts.qty}}  {{parts.note}}
+
+【テーブル3: 関連機器 linked】
+見出し行: 関連機器 / コード / 名称 / 関係
+データ行:
+  {{table:linked}}  {{linked.equipment_code}}  {{linked.equipment_name}}  {{linked.relation}}

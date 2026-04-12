@@ -13,6 +13,8 @@ namespace backend.Controllers
     /// DB取得・データ整形は backend（GemBoxPrintPayloadService）で行い、JSONで渡す。
     ///
     /// GET /api/print-gembox/equipment/{equipmentId}/pdf
+    /// GET /api/print-gembox/equipment/{equipmentId}/detail-lists/pdf
+    /// GET /api/print-gembox/equipment-list/pdf
     /// GET /api/print-gembox/demo/pdf
     ///   → 内部で backend-print POST /api/print/gembox/pdf（PrintServiceHttpProxyService）
     /// </summary>
@@ -45,6 +47,52 @@ namespace backend.Controllers
 
             if (gemBoxPrintRequest == null)
                 return Request.CreateErrorResponse(HttpStatusCode.NotFound, "機器が見つかりません。");
+
+            return await ForwardGemBoxPrintAsync(gemBoxPrintRequest);
+        }
+
+        /// <summary>
+        /// 機器詳細＋部品(parts)＋関連機器(linked) の GemBox PDF。テンプレ <c>equipment_master_detail.xlsx</c>（equipment_detail_gembox.json）。
+        /// </summary>
+        [HttpGet]
+        [Route("equipment/{equipmentId:int}/detail-lists/pdf")]
+        public async Task<HttpResponseMessage> GenerateEquipmentDetailListsPdf(int equipmentId)
+        {
+            GemBoxPrintRequestDto gemBoxPrintRequest;
+            try
+            {
+                gemBoxPrintRequest = _payloadService.BuildEquipmentDetailListsPdfRequest(equipmentId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, ex.Message);
+            }
+
+            if (gemBoxPrintRequest == null)
+                return Request.CreateErrorResponse(HttpStatusCode.NotFound, "機器が見つかりません。");
+
+            return await ForwardGemBoxPrintAsync(gemBoxPrintRequest);
+        }
+
+        /// <summary>
+        /// 機器マスタ一覧 PDF（全件）。テンプレは <c>equipment_list_gembox.json</c> の templateFileName（既定: equipment_list.xlsx）。
+        /// </summary>
+        [HttpGet]
+        [Route("equipment-list/pdf")]
+        public async Task<HttpResponseMessage> GenerateEquipmentListPdf()
+        {
+            GemBoxPrintRequestDto gemBoxPrintRequest;
+            try
+            {
+                gemBoxPrintRequest = _payloadService.BuildEquipmentListPdfRequest();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, ex.Message);
+            }
+
+            if (gemBoxPrintRequest == null)
+                return Request.CreateErrorResponse(HttpStatusCode.InternalServerError, "一覧印刷データの組み立てに失敗しました。");
 
             return await ForwardGemBoxPrintAsync(gemBoxPrintRequest);
         }
