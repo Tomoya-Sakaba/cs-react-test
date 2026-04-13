@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -25,65 +26,60 @@ namespace backend.Services
         /// </summary>
         public const string DefaultRelativeMappingPath = "~/common/print-mappings/equipment_gembox.json";
 
-        public static GemBoxPrintMappingDefinition LoadDefinition(string absolutePath)
+        /// <summary>
+        /// マッピングJSONを読み込む（引数は基本「JSONファイル名」）。
+        /// Web.config の <c>GemBoxPrintMappingsBasePath</c> をベースに物理パスへ解決して読み込む。
+        /// </summary>
+        public static GemBoxPrintMappingDefinition LoadDefinition(string mappingFileName, out string resolvedPath)
         {
-            if (string.IsNullOrWhiteSpace(absolutePath) || !File.Exists(absolutePath))
+            resolvedPath = null;
+
+            if (string.IsNullOrWhiteSpace(mappingFileName))
                 return null;
-            var json = File.ReadAllText(absolutePath);
+
+            // 絶対パスで渡された場合はそのまま
+            if (Path.IsPathRooted(mappingFileName))
+            {
+                resolvedPath = mappingFileName;
+            }
+            else
+            {
+                // ファイル名のみ運用（Web.config の base + ファイル名）
+                var configured = (ConfigurationManager.AppSettings["GemBoxPrintMappingsBasePath"] ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(configured))
+                    configured = "~/common/print-mappings";
+
+                var baseDir = Path.IsPathRooted(configured)
+                    ? configured
+                    : (HostingEnvironment.MapPath(configured) ?? "");
+
+                baseDir = baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                resolvedPath = Path.Combine(baseDir, mappingFileName);
+            }
+
+            if (string.IsNullOrWhiteSpace(resolvedPath) || !File.Exists(resolvedPath))
+                return null;
+            var json = File.ReadAllText(resolvedPath);
             return JsonConvert.DeserializeObject<GemBoxPrintMappingDefinition>(json);
         }
 
-        public static string ResolveMappingFilePath()
+        public static GemBoxPrintMappingDefinition LoadDefinition(string mappingFileName)
         {
-            var configured = System.Configuration.ConfigurationManager.AppSettings["GemBoxPrintMappingFile"]
-                ?? "";
-            if (!string.IsNullOrWhiteSpace(configured))
-            {
-                if (Path.IsPathRooted(configured))
-                    return configured;
-                return HostingEnvironment.MapPath(configured);
-            }
-            return HostingEnvironment.MapPath(DefaultRelativeMappingPath);
+            return LoadDefinition(mappingFileName, out _);
         }
 
-        /// <summary>
-        /// 一覧用マッピング（既定: ~/common/print-mappings/equipment_list_gembox.json）
-        /// </summary>
-        public static string ResolveEquipmentListMappingFilePath()
-        {
-            var configured = System.Configuration.ConfigurationManager.AppSettings["GemBoxEquipmentListMappingFile"]
-                ?? "";
-            if (!string.IsNullOrWhiteSpace(configured))
-            {
-                if (Path.IsPathRooted(configured))
-                    return configured;
-                return HostingEnvironment.MapPath(configured);
-            }
-            return HostingEnvironment.MapPath("~/common/print-mappings/equipment_list_gembox.json");
-        }
 
         /// <summary>
-        /// 機器詳細（部品・関連機器テーブル付き）既定: ~/common/print-mappings/equipment_detail_gembox.json
+        /// マッピング定義とデータソース（単票・画像・テーブル）から backend-print 用 DTO を汎用的に組み立てる。
+        /// - scalars: def.Scalars の excelKey/dbColumn を scalarSource から解決して Data に入れる
+        /// - pictures: def.Pictures の key（Excel の {{key}}）/ dbColumn（pictureSource 側のキー）を解決し DTO.Pictures に入れ、埋め込み用に Data にも同じキーを複製する（pictureSource が null のときは空）
+        /// - tables: def.Tables[].columns を tableRowSourcesByKey[tableKey] の各行から解決して Tables に入れる
         /// </summary>
-        public static string ResolveEquipmentDetailMappingFilePath()
-        {
-            var configured = System.Configuration.ConfigurationManager.AppSettings["GemBoxEquipmentDetailMappingFile"]
-                ?? "";
-            if (!string.IsNullOrWhiteSpace(configured))
-            {
-                if (Path.IsPathRooted(configured))
-                    return configured;
-                return HostingEnvironment.MapPath(configured);
-            }
-            return HostingEnvironment.MapPath("~/common/print-mappings/equipment_detail_gembox.json");
-        }
-
-        /// <summary>
-        /// 機器一覧。ヘッダは scalars（now / literal のみ）、明細は DB の全件を <paramref name="tableKey"/> テーブルに展開する。
-        /// </summary>
-        public static GemBoxPrintRequestDto BuildEquipmentListRequest(
-            IEnumerable<EquipmentEntity> entities,
-            GemBoxPrintMappingDefinition def)
+        public static GemBoxPrintRequestDto BuildRequest(
+            GemBoxPrintMappingDefinition def,
+            object scalarSource,
+            object pictureSource,
+            IDictionary<string, IEnumerable<object>> tableRowSourcesByKey)
         {
             if (def == null) return null;
 
@@ -94,102 +90,13 @@ namespace backend.Services
                 {
                     if (string.IsNullOrWhiteSpace(item?.ExcelKey)) continue;
                     var key = item.ExcelKey.Trim();
-                    var src = (item.Source ?? "").Trim().ToLowerInvariant();
-                    switch (src)
+                    if (string.IsNullOrWhiteSpace(item.DbColumn))
                     {
-                        case "now":
-                            data[key] = string.IsNullOrWhiteSpace(item.Format)
-                                ? DateTime.Now.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture)
-                                : DateTime.Now.ToString(item.Format, CultureInfo.InvariantCulture);
-                            break;
-                        case "literal":
-                            data[key] = item.Value ?? "";
-                            break;
-                        default:
-                            data[key] = "";
-                            break;
+                        data[key] = "";
+                        continue;
                     }
-                }
-            }
-
-            var rows = new List<Dictionary<string, object>>();
-            if (entities != null)
-            {
-                foreach (var e in entities)
-                {
-                    if (e == null) continue;
-                    rows.Add(new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        ["equipment_id"] = e.EquipmentId,
-                        ["equipment_code"] = e.EquipmentCode ?? "",
-                        ["equipment_name"] = e.EquipmentName ?? "",
-                        ["category"] = e.Category ?? "",
-                        ["manufacturer"] = e.Manufacturer ?? "",
-                        ["model"] = e.Model ?? "",
-                        ["location"] = e.Location ?? "",
-                        ["note"] = e.Note ?? "",
-                        ["updated_at"] = FormatScalar(e.UpdatedAt, "yyyy/MM/dd HH:mm"),
-                    });
-                }
-            }
-
-            var tableKey = "items";
-            if (def.Tables != null && def.Tables.Count > 0 && !string.IsNullOrWhiteSpace(def.Tables[0].TableKey))
-                tableKey = def.Tables[0].TableKey.Trim();
-
-            var tables = new Dictionary<string, List<Dictionary<string, object>>>(StringComparer.OrdinalIgnoreCase)
-            {
-                [tableKey] = rows
-            };
-
-            var download = def.DownloadFileNamePattern ?? "equipment_list_gembox.pdf";
-            download = ReplaceDownloadPattern(download, data);
-
-            return new GemBoxPrintRequestDto
-            {
-                TemplateFileName = def.TemplateFileName ?? "equipment_list.xlsx",
-                DownloadFileName = download,
-                Data = data,
-                Tables = tables
-            };
-        }
-
-        public static GemBoxPrintRequestDto BuildEquipmentRequest(EquipmentEntity entity, GemBoxPrintMappingDefinition def)
-        {
-            if (entity == null || def == null) return null;
-
-            var data = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-
-            if (def.Scalars != null)
-            {
-                foreach (var item in def.Scalars)
-                {
-                    if (string.IsNullOrWhiteSpace(item?.ExcelKey)) continue;
-                    var key = item.ExcelKey.Trim();
-                    var src = (item.Source ?? "").Trim().ToLowerInvariant();
-
-                    switch (src)
-                    {
-                        case "now":
-                            data[key] = string.IsNullOrWhiteSpace(item.Format)
-                                ? DateTime.Now.ToString("yyyy/MM/dd", CultureInfo.InvariantCulture)
-                                : DateTime.Now.ToString(item.Format, CultureInfo.InvariantCulture);
-                            break;
-                        case "literal":
-                            data[key] = item.Value ?? "";
-                            break;
-                        case "entity":
-                        default:
-                            if (string.IsNullOrWhiteSpace(item.DbColumn))
-                            {
-                                data[key] = "";
-                                break;
-                            }
-                            var propName = DbColumnToPropertyName(item.DbColumn.Trim());
-                            var raw = GetPropertyValue(entity, propName);
-                            data[key] = FormatScalar(raw, item.Format);
-                            break;
-                    }
+                    var raw = GetValueFromSource(scalarSource, item.DbColumn.Trim());
+                    data[key] = FormatScalar(raw);
                 }
             }
 
@@ -199,19 +106,73 @@ namespace backend.Services
                 foreach (var t in def.Tables)
                 {
                     if (string.IsNullOrWhiteSpace(t?.TableKey)) continue;
-                    var list = new List<Dictionary<string, object>>();
-                    if (t.Rows != null)
+                    var tableKey = t.TableKey.Trim();
+
+                    // テーブル行ソース（repository等）を優先し、無ければ JSON の rows（デモ/固定値）を使う
+                    var sources = (tableRowSourcesByKey != null && tableRowSourcesByKey.TryGetValue(tableKey, out var s))
+                        ? (s ?? Enumerable.Empty<object>())
+                        : null;
+
+                    if (sources == null)
                     {
-                        foreach (var row in t.Rows)
+                        var list = new List<Dictionary<string, object>>();
+                        if (t.Rows != null)
                         {
-                            if (row == null) continue;
-                            var d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-                            foreach (var kv in row)
-                                d[kv.Key] = kv.Value ?? "";
-                            list.Add(d);
+                            foreach (var row in t.Rows)
+                            {
+                                if (row == null) continue;
+                                var d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                                foreach (var kv in row)
+                                    d[kv.Key] = kv.Value ?? "";
+                                list.Add(d);
+                            }
                         }
+                        tables[tableKey] = list;
+                        continue;
                     }
-                    tables[t.TableKey.Trim()] = list;
+
+                    if (t.Columns == null || t.Columns.Count == 0)
+                        throw new InvalidOperationException($"テーブル '{tableKey}' の columns 定義がありません。");
+
+                    var mappedRows = new List<Dictionary<string, object>>();
+                    foreach (var srcRow in sources)
+                    {
+                        if (srcRow == null) continue;
+                        var mapped = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var col in t.Columns)
+                        {
+                            if (string.IsNullOrWhiteSpace(col?.Field)) continue;
+                            var field = col.Field.Trim();
+                            if (string.IsNullOrWhiteSpace(col.DbColumn))
+                            {
+                                mapped[field] = "";
+                                continue;
+                            }
+                            var raw = GetValueFromSource(srcRow, col.DbColumn.Trim());
+                            mapped[field] = FormatScalar(raw);
+                        }
+                        mappedRows.Add(mapped);
+                    }
+                    tables[tableKey] = mappedRows;
+                }
+            }
+
+            var pictures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (def.Pictures != null)
+            {
+                foreach (var p in def.Pictures)
+                {
+                    if (string.IsNullOrWhiteSpace(p?.Key)) continue;
+                    var key = p.Key.Trim();
+                    if (string.IsNullOrWhiteSpace(p.DbColumn))
+                    {
+                        pictures[key] = "";
+                        continue;
+                    }
+                    var raw = GetValueFromSource(pictureSource, p.DbColumn.Trim());
+                    pictures[key] = raw == null
+                        ? ""
+                        : Convert.ToString(raw, CultureInfo.InvariantCulture) ?? "";
                 }
             }
 
@@ -220,14 +181,19 @@ namespace backend.Services
 
             return new GemBoxPrintRequestDto
             {
-                TemplateFileName = def.TemplateFileName ?? "equipment_master.xlsx",
+                TemplateFileName = def.TemplateFileName ?? "document.xlsx",
                 DownloadFileName = download,
                 Data = data,
-                Tables = tables
+                Tables = tables,
+                Pictures = pictures
             };
         }
 
-        private static string ReplaceDownloadPattern(string pattern, Dictionary<string, object> data)
+        /// <summary>
+        /// JSON定義（now / literal と tables.rows）だけで DTO を組み立てる（デモ用）。
+        /// entity 参照は行わない。
+        /// </summary>
+        public static string ReplaceDownloadPattern(string pattern, Dictionary<string, object> data)
         {
             return PlaceholderPattern.Replace(pattern, m =>
             {
@@ -257,13 +223,40 @@ namespace backend.Services
             return prop?.GetValue(entity);
         }
 
-        private static string FormatScalar(object raw, string format)
+        private static object GetValueFromSource(object source, string dbColumn)
+        {
+            if (source == null || string.IsNullOrWhiteSpace(dbColumn)) return null;
+
+            // 1) 既に辞書で来ている場合（Repository側で snake_case をキーにして返す運用にも対応）
+            if (source is IDictionary<string, object> dict)
+            {
+                // dbColumn をそのままキーとして引く（大小文字は無視）
+                foreach (var kv in dict)
+                {
+                    if (string.Equals(kv.Key, dbColumn, StringComparison.OrdinalIgnoreCase))
+                        return kv.Value;
+                }
+                return null;
+            }
+
+            // 2) Entity 等のオブジェクトの場合（snake_case → PascalCase に変換して reflection）
+            if (source is EquipmentEntity entity)
+            {
+                var propName = DbColumnToPropertyName(dbColumn);
+                return GetPropertyValue(entity, propName);
+            }
+
+            // 3) その他オブジェクト（parts/linked の行など）も同様に reflection で拾う
+            var t = source.GetType();
+            var prop = t.GetProperty(DbColumnToPropertyName(dbColumn), BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            return prop?.GetValue(source);
+        }
+
+        private static string FormatScalar(object raw)
         {
             if (raw == null) return "";
             if (raw is DateTime dt)
-                return string.IsNullOrWhiteSpace(format)
-                    ? dt.ToString("yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture)
-                    : dt.ToString(format, CultureInfo.InvariantCulture);
+                return dt.ToString("yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture);
             if (raw is bool b) return b ? "true" : "false";
             return Convert.ToString(raw, CultureInfo.InvariantCulture) ?? "";
         }

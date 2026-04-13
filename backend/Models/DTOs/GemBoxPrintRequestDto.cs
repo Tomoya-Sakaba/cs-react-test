@@ -20,6 +20,10 @@ namespace backend.Models.DTOs
         [JsonProperty("tables")]
         public Dictionary<string, List<Dictionary<string, object>>> Tables { get; set; }
 
+        /// <summary>画像の {{key}} 差し込み用（キー → ファイル名/パス）</summary>
+        [JsonProperty("pictures")]
+        public Dictionary<string, string> Pictures { get; set; }
+
         [JsonProperty("downloadFileName")]
         public string DownloadFileName { get; set; }
     }

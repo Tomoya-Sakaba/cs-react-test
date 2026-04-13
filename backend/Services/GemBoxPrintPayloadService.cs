@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Configuration;
+using System.Linq;
 using backend.Models.DTOs;
 using backend.Models.Repository;
 
@@ -14,6 +17,17 @@ namespace backend.Services
     {
         private readonly EquipmentRepository _repository = new EquipmentRepository();
 
+        private const string EquipmentMappingFileName = "equipment_gembox.json";
+        private const string EquipmentDetailMappingFileName = "equipment_detail_gembox.json";
+        private const string EquipmentListMappingFileName = "equipment_list_gembox.json";
+        private const string DemoMappingFileName = "demo_gembox.json";
+
+        private static void LogMappingLoadFailure(string message)
+        {
+            var path = (ConfigurationManager.AppSettings["PrintProxyLogFilePath"] ?? "").Trim();
+            SimpleFileLogger.Log(path, message);
+        }
+
         /// <summary>
         /// 機器台帳テンプレ用のリクエストを組み立てる。対象機器が無い場合は null。
         /// マッピングJSONが読めない場合は <see cref="InvalidOperationException"/>。
@@ -23,17 +37,15 @@ namespace backend.Services
             var e = _repository.GetById(equipmentId);
             if (e == null) return null;
 
-            var path = GemBoxPrintMappingEngine.ResolveMappingFilePath();
-            var def = GemBoxPrintMappingEngine.LoadDefinition(path);
+            var def = GemBoxPrintMappingEngine.LoadDefinition(EquipmentMappingFileName, out var resolvedPath);
             if (def == null)
             {
+                LogMappingLoadFailure($"[GemBox] mapping load failed. kind=equipment, path='{resolvedPath}', exists={File.Exists(resolvedPath)}");
                 throw new InvalidOperationException(
-                    "GemBox のマッピング定義JSONを読み込めません。Web.config の GemBoxPrintMappingFile と、" +
-                    "サイト配下の common/print-mappings/equipment_gembox.json の配置を確認してください。解決パス: " +
-                    path);
+                    "印刷設定の読み込みに失敗しました（帳票定義）。管理者に連絡してください。");
             }
 
-            return GemBoxPrintMappingEngine.BuildEquipmentRequest(e, def);
+            return GemBoxPrintMappingEngine.BuildRequest(def, scalarSource: e, pictureSource: e, tableRowSourcesByKey: null);
         }
 
         /// <summary>
@@ -45,22 +57,24 @@ namespace backend.Services
             var e = _repository.GetById(equipmentId);
             if (e == null) return null;
 
-            var path = GemBoxPrintMappingEngine.ResolveEquipmentDetailMappingFilePath();
-            var def = GemBoxPrintMappingEngine.LoadDefinition(path);
+            var def = GemBoxPrintMappingEngine.LoadDefinition(EquipmentDetailMappingFileName, out var resolvedPath);
             if (def == null)
             {
+                LogMappingLoadFailure($"[GemBox] mapping load failed. kind=equipment_detail, path='{resolvedPath}', exists={File.Exists(resolvedPath)}");
                 throw new InvalidOperationException(
-                    "機器詳細用 GemBox マッピングJSONを読み込めません。Web.config の GemBoxEquipmentDetailMappingFile と、" +
-                    "サイト配下の common/print-mappings/equipment_detail_gembox.json の配置を確認してください。解決パス: " +
-                    path);
+                    "印刷設定の読み込みに失敗しました（帳票定義）。管理者に連絡してください。");
             }
 
-            var dto = GemBoxPrintMappingEngine.BuildEquipmentRequest(e, def);
+            var tableSources = new Dictionary<string, IEnumerable<object>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["parts"] = EquipmentDetailGemBoxTestData.GetPartsRows(equipmentId).Cast<object>(),
+                ["linked"] = EquipmentDetailGemBoxTestData.GetLinkedEquipmentRows(equipmentId).Cast<object>(),
+            };
+
+            var dto = GemBoxPrintMappingEngine.BuildRequest(def, scalarSource: e, pictureSource: e, tableRowSourcesByKey: tableSources);
             if (dto?.Tables == null)
                 return dto;
 
-            dto.Tables["parts"] = EquipmentDetailGemBoxTestData.GetPartsRows(equipmentId);
-            dto.Tables["linked"] = EquipmentDetailGemBoxTestData.GetLinkedEquipmentRows(equipmentId);
             return dto;
         }
 
@@ -69,50 +83,78 @@ namespace backend.Services
         /// </summary>
         public GemBoxPrintRequestDto BuildEquipmentListPdfRequest()
         {
-            var path = GemBoxPrintMappingEngine.ResolveEquipmentListMappingFilePath();
-            var def = GemBoxPrintMappingEngine.LoadDefinition(path);
+            var def = GemBoxPrintMappingEngine.LoadDefinition(EquipmentListMappingFileName, out var resolvedPath);
             if (def == null)
             {
+                LogMappingLoadFailure($"[GemBox] mapping load failed. kind=equipment_list, path='{resolvedPath}', exists={File.Exists(resolvedPath)}");
                 throw new InvalidOperationException(
-                    "一覧用 GemBox マッピングJSONを読み込めません。Web.config の GemBoxEquipmentListMappingFile と、" +
-                    "サイト配下の common/print-mappings/equipment_list_gembox.json の配置を確認してください。解決パス: " +
-                    path);
+                    "印刷設定の読み込みに失敗しました（帳票定義）。管理者に連絡してください。");
             }
 
             var list = _repository.GetAll();
-            return GemBoxPrintMappingEngine.BuildEquipmentListRequest(list, def);
+            return GemBoxPrintMappingEngine.BuildRequest(
+                def,
+                scalarSource: null,
+                pictureSource: null,
+                tableRowSourcesByKey: new Dictionary<string, IEnumerable<object>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [(def.Tables != null && def.Tables.Count > 0 && !string.IsNullOrWhiteSpace(def.Tables[0]?.TableKey))
+                        ? def.Tables[0].TableKey.Trim()
+                        : "items"] = (list ?? new List<backend.Models.Entities.EquipmentEntity>()).Cast<object>()
+                });
         }
 
         /// <summary>
-        /// 疎通・デモ用: Web.config のテンプレートファイル名と固定データで GemBox 印刷リクエストを組み立てる。
+        /// 疎通・デモ用: <c>common/print-mappings/demo_gembox.json</c> の定義を正として GemBox 印刷リクエストを組み立てる。
         /// テンプレは backend-print 側の <c>BReportTemplateBasePath</c> 配下に配置する。
+        /// 画像は <c>demo_gembox.json</c> の <c>pictures[].dbColumn</c> と同じキーで <c>pictureSource</c> にファイル名を載せる（例: picture1 → test1.png）。
         /// </summary>
         public GemBoxPrintRequestDto BuildDemoGemBoxPdfRequest()
         {
-            var template = (ConfigurationManager.AppSettings["GemBoxDemoTemplateFileName"] ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(template))
+            var def = GemBoxPrintMappingEngine.LoadDefinition(DemoMappingFileName, out var resolvedPath);
+            if (def == null)
             {
+                LogMappingLoadFailure($"[GemBox] mapping load failed. kind=demo, path='{resolvedPath}', exists={File.Exists(resolvedPath)}");
                 throw new InvalidOperationException(
-                    "GemBoxDemoTemplateFileName を Web.config に設定してください（例: demo_gembox.xlsx）。backend-print のテンプレフォルダに同名ファイルを置きます。");
+                    "印刷設定の読み込みに失敗しました（デモ帳票定義）。管理者に連絡してください。");
             }
 
-            // デモ用 DTO の DownloadFileName（Web.config の GemBoxDemoPdfFileName）。JSON で backend-print に送り、返ってきた PDF には gateway が同じ名前で Content-Disposition を付ける
-            var download = (ConfigurationManager.AppSettings["GemBoxDemoPdfFileName"] ?? "document.pdf")
-                .Trim();
-            if (string.IsNullOrEmpty(download))
-                download = "document.pdf";
-
-            return new GemBoxPrintRequestDto
+            var scalarSource = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
             {
-                TemplateFileName = template,
-                Data = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
-                {
-                    { "title", "GemBox demo" },
-                    { "generatedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") },
-                },
-                Tables = new Dictionary<string, List<Dictionary<string, object>>>(StringComparer.OrdinalIgnoreCase),
-                DownloadFileName = download,
+                ["title"] = "GemBox demo",
+                ["generatedAt"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
             };
+
+            var pictureSource = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["picture1"] = "test1.png",
+                ["picture2"] = "test2.png",
+            };
+
+            var tableSources = new Dictionary<string, IEnumerable<object>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["items"] = new List<Dictionary<string, object>>
+                {
+                    new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["name"] = "Item A",
+                        ["qty"] = 1,
+                        ["note"] = "demo row"
+                    },
+                    new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["name"] = "Item B",
+                        ["qty"] = 2,
+                        ["note"] = ""
+                    }
+                }.Cast<object>()
+            };
+
+            var dto = GemBoxPrintMappingEngine.BuildRequest(def, scalarSource, pictureSource, tableSources);
+            if (dto == null)
+                throw new InvalidOperationException("印刷データの組み立てに失敗しました（デモ）。");
+
+            return dto;
         }
     }
 }

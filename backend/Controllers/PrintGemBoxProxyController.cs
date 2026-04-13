@@ -98,7 +98,7 @@ namespace backend.Controllers
         }
 
         /// <summary>
-        /// デモ用 PDF（Web.config の GemBoxDemoTemplateFileName）。テンプレは backend-print のテンプレフォルダに配置。
+        /// デモ用 PDF（common/print-mappings/demo_gembox.json）。テンプレは backend-print のテンプレフォルダに配置。
         /// </summary>
         [HttpGet]
         [Route("demo/pdf")]

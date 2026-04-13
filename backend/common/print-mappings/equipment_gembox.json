@@ -4,55 +4,43 @@
   "downloadFileNamePattern": "equipment_{equipment_code}_gembox.pdf",
   "scalars": [
     {
-      "excelKey": "print_date",
-      "source": "now",
-      "format": "yyyy/MM/dd"
+      "excelKey": "print_date"
     },
     {
       "excelKey": "equipment_id",
-      "source": "entity",
       "dbColumn": "equipment_id"
     },
     {
       "excelKey": "equipment_code",
-      "source": "entity",
       "dbColumn": "equipment_code"
     },
     {
       "excelKey": "equipment_name",
-      "source": "entity",
       "dbColumn": "equipment_name"
     },
     {
       "excelKey": "category",
-      "source": "entity",
       "dbColumn": "category"
     },
     {
       "excelKey": "manufacturer",
-      "source": "entity",
       "dbColumn": "manufacturer"
     },
     {
       "excelKey": "model",
-      "source": "entity",
       "dbColumn": "model"
     },
     {
       "excelKey": "location",
-      "source": "entity",
       "dbColumn": "location"
     },
     {
       "excelKey": "note",
-      "source": "entity",
       "dbColumn": "note"
     },
     {
       "excelKey": "updated_at",
-      "source": "entity",
-      "dbColumn": "updated_at",
-      "format": "yyyy/MM/dd HH:mm"
+      "dbColumn": "updated_at"
     }
   ],
   "tables": [

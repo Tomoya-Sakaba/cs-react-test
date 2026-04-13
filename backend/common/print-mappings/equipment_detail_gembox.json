@@ -3,16 +3,16 @@
   "templateFileName": "equipment_master_detail.xlsx",
   "downloadFileNamePattern": "equipment_{equipment_code}_detail_gembox.pdf",
   "scalars": [
-    { "excelKey": "print_date", "source": "now", "format": "yyyy/MM/dd" },
-    { "excelKey": "equipment_id", "source": "entity", "dbColumn": "equipment_id" },
-    { "excelKey": "equipment_code", "source": "entity", "dbColumn": "equipment_code" },
-    { "excelKey": "equipment_name", "source": "entity", "dbColumn": "equipment_name" },
-    { "excelKey": "category", "source": "entity", "dbColumn": "category" },
-    { "excelKey": "manufacturer", "source": "entity", "dbColumn": "manufacturer" },
-    { "excelKey": "model", "source": "entity", "dbColumn": "model" },
-    { "excelKey": "location", "source": "entity", "dbColumn": "location" },
-    { "excelKey": "note", "source": "entity", "dbColumn": "note" },
-    { "excelKey": "updated_at", "source": "entity", "dbColumn": "updated_at", "format": "yyyy/MM/dd HH:mm" }
+    { "excelKey": "print_date" },
+    { "excelKey": "equipment_id", "dbColumn": "equipment_id" },
+    { "excelKey": "equipment_code", "dbColumn": "equipment_code" },
+    { "excelKey": "equipment_name", "dbColumn": "equipment_name" },
+    { "excelKey": "category", "dbColumn": "category" },
+    { "excelKey": "manufacturer", "dbColumn": "manufacturer" },
+    { "excelKey": "model", "dbColumn": "model" },
+    { "excelKey": "location", "dbColumn": "location" },
+    { "excelKey": "note", "dbColumn": "note" },
+    { "excelKey": "updated_at", "dbColumn": "updated_at" }
   ],
   "tables": [
     {
@@ -24,10 +24,20 @@
     },
     {
       "tableKey": "parts",
+      "columns": [
+        { "field": "part_code", "dbColumn": "part_code" },
+        { "field": "qty", "dbColumn": "qty" },
+        { "field": "note", "dbColumn": "note" }
+      ],
       "rows": []
     },
     {
       "tableKey": "linked",
+      "columns": [
+        { "field": "equipment_code", "dbColumn": "equipment_code" },
+        { "field": "equipment_name", "dbColumn": "equipment_name" },
+        { "field": "relation", "dbColumn": "relation" }
+      ],
       "rows": []
     }
   ]

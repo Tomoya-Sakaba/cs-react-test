@@ -26,6 +26,12 @@ namespace backend.Models.Config
 
         [JsonProperty("tables")]
         public List<GemBoxTableMappingItem> Tables { get; set; }
+
+        /// <summary>
+        /// 画像差し込み定義。Excel テンプレ内の {{key}} を「画像」として扱い、ファイル名（またはパス）をソースから取得する。
+        /// </summary>
+        [JsonProperty("pictures")]
+        public List<GemBoxPictureMappingItem> Pictures { get; set; }
     }
 
     public class GemBoxScalarMappingItem
@@ -34,21 +40,10 @@ namespace backend.Models.Config
         [JsonProperty("excelKey")]
         public string ExcelKey { get; set; }
 
-        /// <summary>entity | now | literal</summary>
-        [JsonProperty("source")]
-        public string Source { get; set; }
-
         /// <summary>m_equipment のカラム名（snake_case）。source=entity のとき使用。</summary>
         [JsonProperty("dbColumn")]
         public string DbColumn { get; set; }
 
-        /// <summary>source=literal のときの固定文字列</summary>
-        [JsonProperty("value")]
-        public string Value { get; set; }
-
-        /// <summary>日付の表示形式（source=now または entity の DateTime フィールド）</summary>
-        [JsonProperty("format")]
-        public string Format { get; set; }
     }
 
     public class GemBoxTableMappingItem
@@ -57,8 +52,37 @@ namespace backend.Models.Config
         [JsonProperty("tableKey")]
         public string TableKey { get; set; }
 
-        /// <summary>明細行。キーは {{tableKey.col}} の col 部分。</summary>
+        /// <summary>
+        /// 明細列のマッピング定義（DB→Excel）。キーは {{tableKey.col}} の col 部分。
+        /// </summary>
+        [JsonProperty("columns")]
+        public List<GemBoxTableColumnMappingItem> Columns { get; set; }
+
+        /// <summary>明細行（デモや固定値用）。キーは {{tableKey.col}} の col 部分。</summary>
         [JsonProperty("rows")]
         public List<Dictionary<string, object>> Rows { get; set; }
+    }
+
+    public class GemBoxTableColumnMappingItem
+    {
+        /// <summary>{{tableKey.col}} の col 部分</summary>
+        [JsonProperty("field")]
+        public string Field { get; set; }
+
+        /// <summary>m_equipment のカラム名（snake_case）。source=entity のとき使用。</summary>
+        [JsonProperty("dbColumn")]
+        public string DbColumn { get; set; }
+
+    }
+
+    public class GemBoxPictureMappingItem
+    {
+        /// <summary>Excel テンプレ内の {{...}} のキー名（写真枠セルに置く）</summary>
+        [JsonProperty("key")]
+        public string Key { get; set; }
+
+        /// <summary>ファイル名（またはパス）が入っているソース側のキー（<see cref="GemBoxPrintMappingEngine.BuildRequest"/> の pictureSource）</summary>
+        [JsonProperty("dbColumn")]
+        public string DbColumn { get; set; }
     }
 }
