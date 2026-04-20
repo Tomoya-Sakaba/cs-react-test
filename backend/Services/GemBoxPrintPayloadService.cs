@@ -54,9 +54,13 @@ namespace backend.Services
         /// </summary>
         public GemBoxPrintRequestDto BuildEquipmentDetailListsPdfRequest(int equipmentId)
         {
+            // 1) DBから「単票に使う基本情報」を取得する。
+            //    ここでは EquipmentRepository が EquipmentEntity（= 1件分のDTO/Entity）を返す。
             var e = _repository.GetById(equipmentId);
             if (e == null) return null;
 
+            // 2) 帳票定義（マッピングJSON）を読み込む。
+            //    JSONには「Excelのキー」と「取得元キー(dbColumn)」の対応（scalars / tables / pictures）が書かれている。
             var def = GemBoxPrintMappingEngine.LoadDefinition(EquipmentDetailMappingFileName, out var resolvedPath);
             if (def == null)
             {
@@ -65,12 +69,22 @@ namespace backend.Services
                     "印刷設定の読み込みに失敗しました（帳票定義）。管理者に連絡してください。");
             }
 
+            // 3) 明細（テーブル）用の「行データ」を用意する。
+            //    - キー: JSON定義の tableKey（例: parts / linked）
+            //    - 値  : 行の配列（IEnumerable<object>）。1行は DTO/Entity/辞書のどれでもよい。
+            //
+            //    BuildRequest はこの行データを受け取り、JSON定義の columns に従って
+            //    {{parts.xxx}} / {{linked.xxx}} の "xxx" に値を流し込める形へ変換する。
             var tableSources = new Dictionary<string, IEnumerable<object>>(StringComparer.OrdinalIgnoreCase)
             {
                 ["parts"] = EquipmentDetailGemBoxTestData.GetPartsRows(equipmentId).Cast<object>(),
                 ["linked"] = EquipmentDetailGemBoxTestData.GetLinkedEquipmentRows(equipmentId).Cast<object>(),
             };
 
+            // 4) 汎用マッピング関数で「backend-print に渡す DTO」を組み立てる。
+            //    - scalarSource: 単票の取得元（JSONの scalars の dbColumn をここから引く）
+            //    - pictureSource: 画像の取得元（JSONの pictures の dbColumn をここから引く）
+            //    - tableRowSourcesByKey: テーブル行の取得元（JSONの tables[].tableKey ごとに行配列を渡す）
             var dto = GemBoxPrintMappingEngine.BuildRequest(def, scalarSource: e, pictureSource: e, tableRowSourcesByKey: tableSources);
             if (dto?.Tables == null)
                 return dto;
@@ -111,6 +125,7 @@ namespace backend.Services
         /// </summary>
         public GemBoxPrintRequestDto BuildDemoGemBoxPdfRequest()
         {
+            // 定義ファイル（jsonファイル）を読み込む
             var def = GemBoxPrintMappingEngine.LoadDefinition(DemoMappingFileName, out var resolvedPath);
             if (def == null)
             {
@@ -138,13 +153,13 @@ namespace backend.Services
                     new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                     {
                         ["name"] = "Item A",
-                        ["qty"] = 1,
+                        ["qty"] = 1.1111,
                         ["note"] = "demo row"
                     },
                     new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                     {
                         ["name"] = "Item B",
-                        ["qty"] = 2,
+                        ["qty"] = 2.0000,
                         ["note"] = ""
                     }
                 }.Cast<object>()
