@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { equipmentApi, type Equipment } from "../../api/equipmentApi";
 import { printApi } from "../../api/printApi";
-import PdfPreview from "../../components/PdfPreview";
+import { downloadPdf } from "../../utils/pdfUtils";
 import type { AgGridReact as AgGridReactType } from "ag-grid-react";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -17,8 +17,6 @@ const EquipmentList = () => {
   const [rowData, setRowData] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [quickFilter, setQuickFilter] = useState("");
-  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
-  const [pdfFileName, setPdfFileName] = useState("equipment_list_gembox.pdf");
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
@@ -69,11 +67,9 @@ const EquipmentList = () => {
             onClick={async () => {
               setPdfLoading(true);
               setPdfError(null);
-              setPdfBlob(null);
               try {
-                const blob = await printApi.generateEquipmentListPdfGemBox();
-                setPdfBlob(blob);
-                setPdfFileName("equipment_list_gembox.pdf");
+                const { blob, fileName } = await printApi.generateEquipmentListPdfGemBox();
+                await downloadPdf(blob, fileName);
               } catch (e) {
                 console.error(e);
                 setPdfError("一覧PDFの生成に失敗しました（テンプレ equipment_list.xlsx・backend-print を確認）");
@@ -82,7 +78,7 @@ const EquipmentList = () => {
               }
             }}
           >
-            {pdfLoading ? "PDF生成中..." : "一覧PDF（GemBox）"}
+            {pdfLoading ? "PDF生成中..." : "一覧PDF（GemBox）ダウンロード"}
           </button>
           <input
             value={quickFilter}
@@ -116,16 +112,6 @@ const EquipmentList = () => {
           loading={loading}
         />
       </div>
-
-      {pdfBlob && (
-        <PdfPreview
-          pdfBlob={pdfBlob}
-          fileName={pdfFileName}
-          onClose={() => setPdfBlob(null)}
-          loading={pdfLoading}
-          error={pdfError}
-        />
-      )}
     </div>
   );
 };

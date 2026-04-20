@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { equipmentApi, type Equipment } from "../../api/equipmentApi";
-import PdfPreview from "../../components/PdfPreview";
 import { printApi } from "../../api/printApi";
+import { downloadPdf } from "../../utils/pdfUtils";
 import {
   getTestLinkedEquipmentForEquipment,
   getTestPartsForEquipment,
@@ -18,8 +18,6 @@ const EquipmentDetail = () => {
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
-  const [pdfFileName, setPdfFileName] = useState<string>("");
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
@@ -100,15 +98,13 @@ const EquipmentDetail = () => {
               if (!equipment) return;
               setPdfLoading(true);
               setPdfError(null);
-              setPdfBlob(null);
               try {
                 const fileName = `機器台帳_${equipment.equipmentCode}.pdf`;
                 const blob = await printApi.generatePdfByPage(pageCode, {
                   fileName,
                   equipmentId: equipment.equipmentId,
                 });
-                setPdfBlob(blob);
-                setPdfFileName(fileName);
+                await downloadPdf(blob, fileName);
               } catch (e) {
                 console.error(e);
                 setPdfError("PDFの生成に失敗しました");
@@ -117,7 +113,7 @@ const EquipmentDetail = () => {
               }
             }}
           >
-            {pdfLoading ? "生成中..." : "印刷（PDF）"}
+            {pdfLoading ? "生成中..." : "PDFダウンロード"}
           </button>
           <button
             disabled={!printEnabled || pdfLoading}
@@ -126,15 +122,16 @@ const EquipmentDetail = () => {
               if (!equipment) return;
               setPdfLoading(true);
               setPdfError(null);
-              setPdfBlob(null);
               try {
                 const fileName = `機器台帳_${equipment.equipmentCode}_GemBox.pdf`;
-                const blob = await printApi.generatePdfByPageGemBox(pageCode, {
-                  fileName,
-                  equipmentId: equipment.equipmentId,
-                });
-                setPdfBlob(blob);
-                setPdfFileName(fileName);
+                const { blob, fileName: resolvedName } = await printApi.generatePdfByPageGemBox(
+                  pageCode,
+                  {
+                    fileName,
+                    equipmentId: equipment.equipmentId,
+                  }
+                );
+                await downloadPdf(blob, resolvedName);
               } catch (e) {
                 console.error(e);
                 setPdfError("PDF（GemBox）の生成に失敗しました");
@@ -143,7 +140,7 @@ const EquipmentDetail = () => {
               }
             }}
           >
-            {pdfLoading ? "生成中..." : "印刷（PDF/GemBox）"}
+            {pdfLoading ? "生成中..." : "PDF（GemBox）ダウンロード"}
           </button>
           <button
             disabled={!printEnabled || pdfLoading}
@@ -152,12 +149,11 @@ const EquipmentDetail = () => {
               if (!equipment) return;
               setPdfLoading(true);
               setPdfError(null);
-              setPdfBlob(null);
               try {
                 const fileName = `機器詳細_部品関連_${equipment.equipmentCode}_GemBox.pdf`;
-                const blob = await printApi.generateEquipmentDetailListsGemBox(equipment.equipmentId);
-                setPdfBlob(blob);
-                setPdfFileName(fileName);
+                const { blob, fileName: resolvedName } =
+                  await printApi.generateEquipmentDetailListsGemBox(equipment.equipmentId, fileName);
+                await downloadPdf(blob, resolvedName);
               } catch (e) {
                 console.error(e);
                 setPdfError(
@@ -168,7 +164,7 @@ const EquipmentDetail = () => {
               }
             }}
           >
-            {pdfLoading ? "生成中..." : "PDF（部品・関連機器）"}
+            {pdfLoading ? "生成中..." : "PDF（部品・関連）ダウンロード"}
           </button>
           <button
             disabled={!equipment || saving}
@@ -312,16 +308,6 @@ const EquipmentDetail = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {pdfBlob && (
-        <PdfPreview
-          pdfBlob={pdfBlob}
-          fileName={pdfFileName}
-          onClose={() => setPdfBlob(null)}
-          loading={pdfLoading}
-          error={pdfError}
-        />
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { httpClient } from "./httpClient";
+import { pdfAxiosResponseToResult, type PdfBlobResult } from "../utils/pdfUtils";
 
 export type GeneratePdfRequest = {
   fileName?: string;
@@ -42,10 +43,13 @@ export const printApi = {
   async generatePdfByPageGemBox(
     _pageCode: string,
     args: { fileName?: string; equipmentId?: number }
-  ): Promise<Blob> {
+  ): Promise<PdfBlobResult> {
     if (args.equipmentId == null) {
       throw new Error("equipmentId is required");
     }
+    const fallback =
+      args.fileName?.trim() ||
+      `equipment_gembox_${args.equipmentId}.pdf`;
     const res = await httpClient.get(
       `/api/print-gembox/equipment/${encodeURIComponent(String(args.equipmentId))}/pdf`,
       {
@@ -56,11 +60,17 @@ export const printApi = {
         },
       }
     );
-    return res.data;
+    return pdfAxiosResponseToResult(res, fallback);
   },
 
   /** 機器詳細＋部品(parts)＋関連機器(linked)。テンプレ equipment_master_detail.xlsx を backend-print に配置。 */
-  async generateEquipmentDetailListsGemBox(equipmentId: number): Promise<Blob> {
+  async generateEquipmentDetailListsGemBox(
+    equipmentId: number,
+    fallbackFileName?: string
+  ): Promise<PdfBlobResult> {
+    const fallback =
+      fallbackFileName?.trim() ||
+      `equipment_detail_lists_${equipmentId}.pdf`;
     const res = await httpClient.get(
       `/api/print-gembox/equipment/${encodeURIComponent(String(equipmentId))}/detail-lists/pdf`,
       {
@@ -69,27 +79,31 @@ export const printApi = {
         headers: { Accept: "application/pdf" },
       }
     );
-    return res.data;
+    return pdfAxiosResponseToResult(res, fallback);
   },
 
   /** 機器マスタ一覧（全件）を GemBox テンプレで PDF 化。テンプレ equipment_list.xlsx を backend-print 側に配置。 */
-  async generateEquipmentListPdfGemBox(): Promise<Blob> {
+  async generateEquipmentListPdfGemBox(
+    fallbackFileName = "equipment_list_gembox.pdf"
+  ): Promise<PdfBlobResult> {
     const res = await httpClient.get("/api/print-gembox/equipment-list/pdf", {
       responseType: "blob",
       timeout: 120_000,
       headers: { Accept: "application/pdf" },
     });
-    return res.data;
+    return pdfAxiosResponseToResult(res, fallbackFileName);
   },
 
   /** GemBox デモ: Web.config のテンプレ名に対応する xlsx を backend-print で PDF 化 */
-  async fetchDemoGemBoxPdf(): Promise<Blob> {
+  async fetchDemoGemBoxPdf(
+    fallbackFileName = "demo_gembox.pdf"
+  ): Promise<PdfBlobResult> {
     const res = await httpClient.get("/api/print-gembox/demo/pdf", {
       responseType: "blob",
       timeout: 120_000,
       headers: { Accept: "application/pdf" },
     });
-    return res.data;
+    return pdfAxiosResponseToResult(res, fallbackFileName);
   },
 };
 
