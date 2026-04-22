@@ -1,11 +1,8 @@
 using System;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using System.Web.Http;
-using backend.Models.Config;
-using backend.Models.DTOs;
 using backend.Services;
 using log4net;
 using Newtonsoft.Json;
@@ -32,7 +29,7 @@ namespace backend.Controllers
         private readonly GemBoxPrintPayloadService _payloadService = new GemBoxPrintPayloadService();
         private readonly PrintServiceHttpProxyService _printProxy = new PrintServiceHttpProxyService();
 
-        /// <summary>帳票コード（<see cref="GemBoxReportCodes"/>）で GemBox PDF を生成する唯一の入口。</summary>
+        /// <summary>クエリ <c>report</c>（帳票識別子）で GemBox PDF を生成する唯一の入口。</summary>
         [HttpGet]
         [Route("pdf")]
         public async Task<HttpResponseMessage> GetGemBoxPdf(string report, int? reportNo = null)
@@ -43,13 +40,15 @@ namespace backend.Controllers
                 return CreateUniformPrintErrorResponse();
             }
 
+            var reportFromRequest = report.Trim();
+
             GemBoxPrintRequestDto gemBoxPrintRequest;
             // BuildGemBoxPdfRequest 内で「帳票コード不正・必須パラメータ不足」などは ArgumentException、
             // 「マッピングJSONが読めない」など設定・業務上の不整合は InvalidOperationException を投げる想定。
             // クライアントには常に PRINT_ERROR、中身は log4net へ。
             try
             {
-                gemBoxPrintRequest = _payloadService.BuildGemBoxPdfRequest(report.Trim(), reportNo);
+                gemBoxPrintRequest = _payloadService.BuildGemBoxPdfRequest(reportFromRequest, reportNo);
             }
             catch (ArgumentException ex)
             {
@@ -66,23 +65,11 @@ namespace backend.Controllers
                 return CreateUniformPrintErrorResponse();
             }
 
-            // サービスは「例外ではなく null」で表すケースがある。
-            // ・equipment_master / equipment_detail: DB に該当設備がない（GetById が null）
-            // ・equipment_list: 上記以外でペイロード組み立てが null になった場合（マッピング／BuildRequest 側の不整合など。0件リスト自体は null にはならない）
+            // サービスは「例外ではなく null」で表すケースがある（理由はログで、クライアントは PRINT_ERROR のみ）。
             if (gemBoxPrintRequest == null)
             {
-                var isList = string.Equals(report.Trim(), GemBoxReportCodes.EquipmentList, StringComparison.OrdinalIgnoreCase);
-                if (isList)
-                {
-                    Log.Error(
-                        $"PrintGemBox: ペイロード組み立て結果が null（帳票=equipment_list, reportNo={reportNo}）。PRINT_GEMBOX_LIST_BUILD_FAILED 相当。");
-                }
-                else
-                {
-                    Log.Error(
-                        $"PrintGemBox: ペイロード組み立て結果が null（帳票={report}, reportNo={reportNo}）。該当機器なし等 PRINT_GEMBOX_NOT_FOUND 相当。");
-                }
-
+                Log.Error(
+                    $"PrintGemBox: ペイロード組み立て結果が null（report={reportFromRequest}, reportNo={reportNo}）。該当データなし・マッピング不整合等。");
                 return CreateUniformPrintErrorResponse();
             }
 
@@ -105,11 +92,14 @@ namespace backend.Controllers
             }
         }
 
-        /// <summary>HTTP 200 + JSON。ErrCode / X-Err-Code は常に <see cref="ClientErrorCode"/>。</summary>
+        /// <summary>HTTP 200 + JSON。errCode / X-Err-Code は常に <see cref="ClientErrorCode"/>（DTO クラスは使わない）。</summary>
         private HttpResponseMessage CreateUniformPrintErrorResponse()
         {
-            var dto = new ApiErrorDto { ErrCode = ClientErrorCode, Message = "PDFの取得に失敗しました。" };
-            var json = JsonConvert.SerializeObject(dto);
+            var json = JsonConvert.SerializeObject(new
+            {
+                errCode = ClientErrorCode,
+                message = "PDFの取得に失敗しました。",
+            });
             var res = new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")

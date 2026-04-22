@@ -276,9 +276,7 @@
     <Compile Include="Models\DTOs\EquipmentDto.cs" />
     <Compile Include="Models\DTOs\GemBoxPrintRequestDto.cs" />
     <Compile Include="Models\Config\GemBoxPrintMappingDefinition.cs" />
-    <Compile Include="Models\Config\GemBoxReportCodes.cs" />
     <Compile Include="Models\DTOs\GeneratePdfRequestDto.cs" />
-    <Compile Include="Models\DTOs\ApiErrorDto.cs" />
     <Compile Include="Models\DTOs\PrintTemplateSettingDto.cs" />
     <Compile Include="Models\DTOs\PrintFieldMappingDto.cs" />
     <Compile Include="Models\DTOs\PlanHistoryDto.cs" />

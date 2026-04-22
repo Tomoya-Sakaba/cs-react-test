@@ -4,7 +4,6 @@ using System.Globalization;
 using System.IO;
 using System.Configuration;
 using System.Linq;
-using backend.Models.Config;
 using backend.Models.DTOs;
 using backend.Models.Repository;
 
@@ -17,6 +16,17 @@ namespace backend.Services
     /// </summary>
     public class GemBoxPrintPayloadService
     {
+        /// <summary>
+        /// <c>BuildGemBoxPdfRequest</c> の <c>switch</c> と GET <c>report</c> クエリを揃える（追加時はここだけでなくフロントも更新）。
+        /// </summary>
+        private static class ReportCodes
+        {
+            public const string EquipmentMaster = "equipment_master";
+            public const string EquipmentDetailLists = "equipment_detail_lists";
+            public const string EquipmentList = "equipment_list";
+            public const string Demo = "demo";
+        }
+
         private readonly EquipmentRepository _repository = new EquipmentRepository();
 
         private const string EquipmentMappingFileName = "equipment_gembox.json";
@@ -31,7 +41,7 @@ namespace backend.Services
         }
 
         /// <summary>
-        /// 帳票コード（<see cref="GemBoxReportCodes"/>）でペイロード組み立てを振り分ける。
+        /// クエリ <c>report</c> の文字列（小文字化して比較）でペイロード組み立てを振り分ける。
         /// </summary>
         public GemBoxPrintRequestDto BuildGemBoxPdfRequest(string reportCode, int? reportNo)
         {
@@ -41,9 +51,9 @@ namespace backend.Services
 
             switch (code.ToLowerInvariant())
             {
-                case GemBoxReportCodes.EquipmentMaster:
+                case ReportCodes.EquipmentMaster:
                     if (!reportNo.HasValue || reportNo.Value <= 0)
-                        throw new ArgumentException($"{GemBoxReportCodes.EquipmentMaster} では reportNo が必要です。");
+                        throw new ArgumentException($"{ReportCodes.EquipmentMaster} では reportNo が必要です。");
                     {
                         var id = reportNo.Value;
                         var equipment = _repository.GetById(id);
@@ -62,9 +72,9 @@ namespace backend.Services
                             tableRowsInOrder);
                     }
 
-                case GemBoxReportCodes.EquipmentDetailLists:
+                case ReportCodes.EquipmentDetailLists:
                     if (!reportNo.HasValue || reportNo.Value <= 0)
-                        throw new ArgumentException($"{GemBoxReportCodes.EquipmentDetailLists} では reportNo が必要です。");
+                        throw new ArgumentException($"{ReportCodes.EquipmentDetailLists} では reportNo が必要です。");
                     {
                         var id = reportNo.Value;
                         var equipment = _repository.GetById(id);
@@ -86,7 +96,7 @@ namespace backend.Services
                             tableRowsInOrder);
                     }
 
-                case GemBoxReportCodes.EquipmentList:
+                case ReportCodes.EquipmentList:
                     {
                         var list = _repository.GetAll();
                         object scalarSource = null;
@@ -102,7 +112,7 @@ namespace backend.Services
                             tableRowsInOrder);
                     }
 
-                case GemBoxReportCodes.Demo:
+                case ReportCodes.Demo:
                     {
                         object scalarSource = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                         {

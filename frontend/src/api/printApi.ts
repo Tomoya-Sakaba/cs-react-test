@@ -1,12 +1,6 @@
 import { axiosClientBlob, httpClient } from './httpClient';
 import type { AxiosResponse } from 'axios';
 
-function gemBoxUnifiedPdfUrl(report: string, reportNo?: number): string {
-  const q = new URLSearchParams({ report });
-  if (reportNo != null) q.set('reportNo', String(reportNo));
-  return `/api/print-gembox/pdf?${q.toString()}`;
-}
-
 export type GeneratePdfRequest = {
   fileName?: string;
   data: Record<string, unknown>;
@@ -48,14 +42,17 @@ export const printApi = {
 
   /**
    * GemBox 帳票PDF（または 200 JSON エラー）を取得する共通API。
-   * report は backend の GemBoxReportCodes と同じ値を呼び出し側で渡す。
+   * GET /api/print-gembox/pdf?report=...&reportNo=...（reportNo は任意）
+   * report は backend の GemBoxPrintPayloadService が解釈する帳票識別子（例: equipment_master, demo）を渡す。
    */
   async fetchGemBoxPdf(args: {
     report: string;
     reportNo?: number;
     timeoutMs?: number;
   }): Promise<AxiosResponse<Blob>> {
-    return await axiosClientBlob.get(gemBoxUnifiedPdfUrl(args.report, args.reportNo), {
+    const q = new URLSearchParams({ report: args.report });
+    if (args.reportNo != null) q.set('reportNo', String(args.reportNo));
+    return axiosClientBlob.get(`/api/print-gembox/pdf?${q.toString()}`, {
       timeout: args.timeoutMs ?? 120_000,
     });
   },
