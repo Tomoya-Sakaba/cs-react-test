@@ -1,6 +1,7 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+[assembly: log4net.Config.XmlConfigurator(Watch = true)]
 
 // アセンブリに関する全般的な情報は以下を通して制御されます
 // 制御されます。アセンブリに関連付けられている情報を変更するには、
