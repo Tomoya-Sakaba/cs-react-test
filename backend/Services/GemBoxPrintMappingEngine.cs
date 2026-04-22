@@ -5,7 +5,6 @@ using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using System.Web.Hosting;
 using backend.Models.Config;
 using backend.Models.DTOs;
@@ -18,17 +17,17 @@ namespace backend.Services
     /// </summary>
     public static class GemBoxPrintMappingEngine
     {
-        private static readonly Regex PlaceholderPattern = new Regex(@"\{([a-zA-Z0-9_]+)\}", RegexOptions.Compiled);
-
         /// <summary>
         /// マッピングファイルの既定パス（Web.config で上書き可）
         /// </summary>
         public const string DefaultRelativeMappingPath = "~/common/print-mappings/equipment_gembox.json";
 
         /// <summary>
-        /// マッピングJSONを読み込む（引数は基本「JSONファイル名」）。
-        /// Web.config の <c>GemBoxPrintMappingsBasePath</c> をベースに物理パスへ解決して読み込む。
+        /// jsonファイルを読み込む
         /// </summary>
+        /// <param name="mappingFileName">jsonファイル名</param>
+        /// <param name="resolvedPath">jsonファイルの物理パス</param>
+        /// <returns>jsonファイルの内容</returns>
         public static GemBoxPrintMappingDefinition LoadDefinition(string mappingFileName, out string resolvedPath)
         {
             resolvedPath = null;
@@ -153,30 +152,16 @@ namespace backend.Services
                     // Excel の {{table:...}} のキー名（空白除去）。
                     var tableKey = t.TableKey.Trim();
 
-                    // テーブル行ソース（repository等）を優先し、無ければ JSON の rows（デモ/固定値）を使う
-                    // 呼び出し側から渡された「行ソース」があればそれを使う。無ければ null のまま（後で JSON rows にフォールバック）。
+                    // テーブル行ソース（repository等）を優先する。
+                    // 呼び出し側から行ソースが渡されていない場合は「空テーブル（0行）」として扱う（JSON の tables[].rows は使わない）。
                     var sources = (tableRowSourcesByKey != null && tableRowSourcesByKey.TryGetValue(tableKey, out var s))
                         ? (s ?? Enumerable.Empty<object>())
                         : null;
 
                     if (sources == null)
                     {
-                        // 行ソースが渡されていない場合は、マッピングJSON内の tables[].rows（固定値/デモ用）をそのまま使う。
-                        var list = new List<Dictionary<string, object>>();
-                        if (t.Rows != null)
-                        {
-                            foreach (var row in t.Rows)
-                            {
-                                if (row == null) continue;
-                                // JSONの rows は既に「列名->値」なので、そのまま行データとしてコピーする（大小文字は無視）。
-                                var d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-                                foreach (var kv in row)
-                                    d[kv.Key] = kv.Value ?? "";
-                                list.Add(d);
-                            }
-                        }
                         // tableKey ごとの行配列を tables に登録して次のテーブルへ。
-                        tables[tableKey] = list;
+                        tables[tableKey] = new List<Dictionary<string, object>>();
                         continue;
                     }
 
@@ -254,43 +239,16 @@ namespace backend.Services
             }
 
             // ----------------------------
-            // 4) ダウンロードファイル名を組み立てる
-            // ----------------------------
-            // downloadFileNamePattern は JSON 定義で
-            //   "equipment_{equipment_code}.pdf"
-            // のように {excelKey} 形式で data の値を埋め込める。
-            // 既定のファイル名パターン（未指定なら document.pdf）。
-            var download = def.DownloadFileNamePattern ?? "document.pdf";
-            // {xxx} を data["xxx"] の値で置換して最終ファイル名にする。
-            download = ReplaceDownloadPattern(download, data);
-
-            // ----------------------------
-            // 5) backend-print に渡す DTO を返す
+            // 4) backend-print に渡す DTO を返す
             // ----------------------------
             // backend-print はこの DTO を受け取り、テンプレExcelに data/tables/pictures を埋め込んでPDF化する。
             return new GemBoxPrintRequestDto
             {
                 TemplateFileName = def.TemplateFileName ?? "document.xlsx",
-                DownloadFileName = download,
                 Data = data,
                 Tables = tables,
                 Pictures = pictures
             };
-        }
-
-        /// <summary>
-        /// JSON定義（now / literal と tables.rows）だけで DTO を組み立てる（デモ用）。
-        /// entity 参照は行わない。
-        /// </summary>
-        public static string ReplaceDownloadPattern(string pattern, Dictionary<string, object> data)
-        {
-            return PlaceholderPattern.Replace(pattern, m =>
-            {
-                var key = m.Groups[1].Value;
-                if (data != null && data.TryGetValue(key, out var v) && v != null)
-                    return v.ToString();
-                return "";
-            });
         }
 
         /// <summary>
@@ -320,9 +278,13 @@ namespace backend.Services
                 return null;
             }
 
-            // 2) オブジェクトの場合は、snake_case → PascalCase に変換して reflection で拾う（DTO / Entity 等を問わない）。
+            // 2) オブジェクトの場合は reflection で拾う（DTO / Entity 等を問わない）。
+            //    現場では Dapper 等によりプロパティ名が Report_no のように snake_case を含むことがあるため、
+            //    まず dbColumn（snake_case）そのままを優先して探し、見つからなければ PascalCase へ変換して探す。
             var t = source.GetType();
-            var prop = t.GetProperty(DbColumnToPropertyName(dbColumn), BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            var prop =
+                t.GetProperty(dbColumn, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase) ??
+                t.GetProperty(DbColumnToPropertyName(dbColumn), BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
             return prop?.GetValue(source);
         }
 

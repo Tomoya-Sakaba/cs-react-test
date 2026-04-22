@@ -1,7 +1,6 @@
 {
   "description": "機器詳細＋部品テーブル(parts)＋関連機器(linked)＋履歴(history)。テンプレ equipment_master_detail.xlsx を BReportTemplateBasePath に置く。テーブルは上から history → parts → linked の順で行を配置（先行テーブル展開後に下へずれるため）。各 {{table:xxx}} と {{xxx.col}} は同一行。",
   "templateFileName": "equipment_master_detail.xlsx",
-  "downloadFileNamePattern": "equipment_{equipment_code}_detail_gembox.pdf",
   "scalars": [
     { "excelKey": "print_date" },
     { "excelKey": "equipment_id", "dbColumn": "equipment_id" },
@@ -16,20 +15,12 @@
   ],
   "tables": [
     {
-      "tableKey": "history",
-      "rows": [
-        { "date": "2026/03/01", "action": "点検", "note": "外観確認" },
-        { "date": "2026/03/20", "action": "交換", "note": "フィルタ交換" }
-      ]
-    },
-    {
       "tableKey": "parts",
       "columns": [
         { "field": "part_code", "dbColumn": "part_code" },
         { "field": "qty", "dbColumn": "qty" },
         { "field": "note", "dbColumn": "note" }
-      ],
-      "rows": []
+      ]
     },
     {
       "tableKey": "linked",
@@ -37,8 +28,7 @@
         { "field": "equipment_code", "dbColumn": "equipment_code" },
         { "field": "equipment_name", "dbColumn": "equipment_name" },
         { "field": "relation", "dbColumn": "relation" }
-      ],
-      "rows": []
+      ]
     }
   ]
 }

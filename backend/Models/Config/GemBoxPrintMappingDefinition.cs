@@ -15,12 +15,6 @@ namespace backend.Models.Config
         [JsonProperty("templateFileName")]
         public string TemplateFileName { get; set; }
 
-        /// <summary>
-        /// ダウンロードファイル名。{equipment_code} など excelKey を {...} で参照可能。
-        /// </summary>
-        [JsonProperty("downloadFileNamePattern")]
-        public string DownloadFileNamePattern { get; set; }
-
         [JsonProperty("scalars")]
         public List<GemBoxScalarMappingItem> Scalars { get; set; }
 
@@ -57,10 +51,6 @@ namespace backend.Models.Config
         /// </summary>
         [JsonProperty("columns")]
         public List<GemBoxTableColumnMappingItem> Columns { get; set; }
-
-        /// <summary>明細行（デモや固定値用）。キーは {{tableKey.col}} の col 部分。</summary>
-        [JsonProperty("rows")]
-        public List<Dictionary<string, object>> Rows { get; set; }
     }
 
     public class GemBoxTableColumnMappingItem

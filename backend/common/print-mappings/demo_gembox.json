@@ -1,7 +1,6 @@
 {
   "description": "デモ用 GemBox 印刷。Excel の {{picture1}} / {{picture2}} は pictures[].key、値の取得元キーは pictures[].dbColumn（BuildDemoGemBoxPdfRequest の pictureSource の picture1 / picture2）と一致させる。",
   "templateFileName": "demo_gembox.xlsx",
-  "downloadFileNamePattern": "demo_gembox.pdf",
   "scalars": [
     { "excelKey": "title", "dbColumn": "title" },
     { "excelKey": "generatedAt", "dbColumn": "generatedAt" }
@@ -17,8 +16,7 @@
         { "field": "name", "dbColumn": "name" },
         { "field": "qty", "dbColumn": "qty" },
         { "field": "note", "dbColumn": "note" }
-      ],
-      "rows": []
+      ]
     }
   ]
 }

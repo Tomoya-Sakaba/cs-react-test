@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
+using backend.Models.DTOs;
 using backend.Services;
 using log4net;
 using Newtonsoft.Json;

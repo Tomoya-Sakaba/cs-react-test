@@ -23,8 +23,5 @@ namespace backend.Models.DTOs
         /// <summary>画像の {{key}} 差し込み用（キー → ファイル名/パス）</summary>
         [JsonProperty("pictures")]
         public Dictionary<string, string> Pictures { get; set; }
-
-        [JsonProperty("downloadFileName")]
-        public string DownloadFileName { get; set; }
     }
 }

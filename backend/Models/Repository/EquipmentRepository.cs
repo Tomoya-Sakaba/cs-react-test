@@ -56,8 +56,27 @@ namespace backend.Models.Repository
                         updated_at AS UpdatedAt
                     FROM dbo.m_equipment
                     WHERE equipment_id = @EquipmentId;
+
+                    SELECT
+                        equipment_id AS EquipmentId,
+                        picture_tab AS PictureTab,
+                        picture_no AS PictureNo,
+                        picture_path AS PicturePath,
+                        picture_comments AS PictureComments,
+                        created_at AS CreatedAt,
+                        updated_at AS UpdatedAt
+                    FROM dbo.t_pictures
+                    WHERE equipment_id = @EquipmentId
+                    ORDER BY picture_tab, picture_no;
                 ";
-                return db.QuerySingleOrDefault<EquipmentEntity>(sql, new { EquipmentId = reportNo });
+                using (var multi = db.QueryMultiple(sql, new { EquipmentId = reportNo }))
+                {
+                    var equipment = multi.ReadSingleOrDefault<EquipmentEntity>();
+                    if (equipment == null) return null;
+
+                    equipment.Pictures = multi.Read<EquipmentPictureEntity>().ToList();
+                    return equipment;
+                }
             }
         }
 

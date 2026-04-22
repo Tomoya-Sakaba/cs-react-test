@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using backend.Models.DTOs;
+using log4net;
 using Newtonsoft.Json;
 
 namespace backend.Services
@@ -16,6 +17,8 @@ namespace backend.Services
     /// </summary>
     public class PrintServiceHttpProxyService
     {
+
+        private static readonly ILog Log = LogManager.GetLogger(typeof(PrintServiceHttpProxyService));
         // 接続の使い回し用。Timeout は無限にし、リクエストごとに CancellationToken で打ち切る。
         private static readonly HttpClient Client = new HttpClient
         {
@@ -128,7 +131,7 @@ namespace backend.Services
                 ? s
                 : 60;
 
-            // backend-print が期待する JSON（templateFileName / data / tables / downloadFileName）
+            // backend-print が期待する JSON（templateFileName / data / tables / pictures）
             var json = JsonConvert.SerializeObject(gemBoxPrintRequest);
             var correlationId = Guid.NewGuid().ToString("N");
 
@@ -143,7 +146,7 @@ namespace backend.Services
                     if (!upstream.IsSuccessStatusCode)
                     {
                         var err = await upstream.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        LogProxy(
+                        Log.Error(
                             $"GemBox upstream error. correlationId={correlationId}, status={(int)upstream.StatusCode} {upstream.ReasonPhrase}, " +
                             $"target='{target}', contentType='{upstream.Content?.Headers?.ContentType}', errLen={err?.Length ?? 0}");
                         // エラー応答の整形は Controller に一元化する
@@ -161,11 +164,7 @@ namespace backend.Services
                 response.Content.Headers.ContentType =
                     upstream.Content.Headers.ContentType ?? new MediaTypeHeaderValue("application/pdf");
 
-                // クライアント向け名は backend が組み立てた DTO の DownloadFileName（上流の Content-Disposition は使わない）
-                response.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment")
-                {
-                    FileName = gemBoxPrintRequest.DownloadFileName.Trim(),
-                };
+                // ファイル名はフロント側で決める運用のため、ここでは Content-Disposition / filename を付けない
 
                     return response;
                 }

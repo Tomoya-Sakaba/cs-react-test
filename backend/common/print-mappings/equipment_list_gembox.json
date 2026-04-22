@@ -1,7 +1,6 @@
 {
   "description": "機器マスタ一覧 GemBox 印刷。1行目に見出し、2行目に {{table:items}} と {{items.xxx}} を並べたテンプレ equipment_list.xlsx と対応。",
   "templateFileName": "equipment_list.xlsx",
-  "downloadFileNamePattern": "equipment_list_gembox.pdf",
   "scalars": [],
   "tables": [
     {
@@ -16,8 +15,7 @@
         { "field": "location", "dbColumn": "location" },
         { "field": "note", "dbColumn": "note" },
         { "field": "updated_at", "dbColumn": "updated_at" }
-      ],
-      "rows": []
+      ]
     }
   ]
 }

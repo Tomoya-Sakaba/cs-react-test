@@ -1,7 +1,6 @@
 {
   "description": "機器台帳 GemBox 印刷。Excelの {{excelKey}} と下記 source/dbColumn の対応を編集して運用する。",
   "templateFileName": "equipment_master.xlsx",
-  "downloadFileNamePattern": "equipment_{equipment_code}_gembox.pdf",
   "scalars": [
     {
       "excelKey": "print_date"
@@ -43,13 +42,9 @@
       "dbColumn": "updated_at"
     }
   ],
-  "tables": [
-    {
-      "tableKey": "history",
-      "rows": [
-        { "date": "2026/03/01", "action": "点検", "note": "外観確認" },
-        { "date": "2026/03/20", "action": "交換", "note": "フィルタ交換" }
-      ]
-    }
-  ]
+  "pictures": [
+    { "key": "pic_1_1", "dbColumn": "pic_1_1" },
+    { "key": "pic_1_2", "dbColumn": "pic_1_2" }
+  ],
+  "tables": []
 }

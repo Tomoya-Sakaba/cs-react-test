@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Configuration;
 using System.Linq;
+using backend.Models.Config;
 using backend.Models.DTOs;
+using backend.Models.Entities;
 using backend.Models.Repository;
+using log4net;
 
 namespace backend.Services
 {
@@ -16,6 +18,7 @@ namespace backend.Services
     /// </summary>
     public class GemBoxPrintPayloadService
     {
+        private static readonly ILog Log = LogManager.GetLogger(typeof(GemBoxPrintPayloadService));
         /// <summary>
         /// <c>BuildGemBoxPdfRequest</c> の <c>switch</c> と GET <c>report</c> クエリを揃える（追加時はここだけでなくフロントも更新）。
         /// </summary>
@@ -34,10 +37,20 @@ namespace backend.Services
         private const string EquipmentListMappingFileName = "equipment_list_gembox.json";
         private const string DemoMappingFileName = "demo_gembox.json";
 
-        private static void LogMappingLoadFailure(string message)
+        private static Dictionary<string, object> BuildPictureSourceFromEquipment(EquipmentEntity equipment)
         {
-            var path = (ConfigurationManager.AppSettings["PrintProxyLogFilePath"] ?? "").Trim();
-            SimpleFileLogger.Log(path, message);
+            var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            if (equipment?.Pictures == null || equipment.Pictures.Count == 0)
+                return dict;
+
+            foreach (var p in equipment.Pictures)
+            {
+                if (p == null) continue;
+
+                var key = $"pic_{p.PictureTab}_{p.PictureNo}";
+                dict[key] = (p.PicturePath ?? "").Trim();
+            }
+            return dict;
         }
 
         /// <summary>
@@ -61,7 +74,7 @@ namespace backend.Services
                             return null;
 
                         object scalarSource = equipment;
-                        object pictureSource = equipment;
+                        object pictureSource = BuildPictureSourceFromEquipment(equipment);
                         IEnumerable<object>[] tableRowsInOrder = null;
 
                         return BuildFromMappingFile(
@@ -82,7 +95,7 @@ namespace backend.Services
                             return null;
 
                         object scalarSource = equipment;
-                        object pictureSource = equipment;
+                        object pictureSource = BuildPictureSourceFromEquipment(equipment);
                         // テーブルキーは JSON(def.tables[]) の順序で割り当てる（ここではキー文字列を書かない）
                         IEnumerable<object> partsRows = EquipmentDetailGemBoxTestData.GetPartsRows(id).Cast<object>();
                         IEnumerable<object> linkedRows = EquipmentDetailGemBoxTestData.GetLinkedEquipmentRows(id).Cast<object>();
@@ -140,23 +153,7 @@ namespace backend.Services
                                 ["note"] = ""
                             }
                         }.Cast<object>();
-                        // テーブルキーは JSON(def.tables[]) の順序で割り当てる
-                        IEnumerable<object> testsRows = new List<Dictionary<string, object>>
-                        {
-                            new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
-                            {
-                                ["name"] = "Item A",
-                                ["qty"] = 1.1111,
-                                ["note"] = "demo row"
-                            },
-                            new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
-                            {
-                                ["name"] = "Item B",
-                                ["qty"] = 2.0000,
-                                ["note"] = ""
-                            }
-                        }.Cast<object>();
-                        IEnumerable<object>[] tableRowsInOrder = { itemsRows, testsRows };
+                        IEnumerable<object>[] tableRowsInOrder = { itemsRows };
 
                         var dto = BuildFromMappingFile(
                             DemoMappingFileName,
@@ -188,7 +185,7 @@ namespace backend.Services
             var mappingDefinition = GemBoxPrintMappingEngine.LoadDefinition(mappingFileName, out var resolvedPath);
             if (mappingDefinition == null)
             {
-                LogMappingLoadFailure($"[GemBox] mapping load failed. kind={logKind}, path='{resolvedPath}', exists={File.Exists(resolvedPath)}");
+                Log.Error($"[GemBox] mapping load failed. kind={logKind}, path='{resolvedPath}', exists={File.Exists(resolvedPath)}");
                 throw new InvalidOperationException(
                     "印刷設定の読み込みに失敗しました（帳票定義）。管理者に連絡してください。");
             }
