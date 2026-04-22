@@ -18,9 +18,11 @@ namespace backend.Models.Entities
         public DateTime UpdatedAt { get; set; }
 
         public List<EquipmentPictureEntity> Pictures { get; set; }
+
+        public List<EquipmentPictureEntity> PicturesSubParts { get; set; }
     }
 
-    public class EquipmentPictureEntity
+    public class EquipmentPicturenEtity
     {
         public int EquipmentId { get; set; }
         public int PictureTab { get; set; }

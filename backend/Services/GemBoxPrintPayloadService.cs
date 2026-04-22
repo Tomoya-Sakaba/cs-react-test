@@ -37,18 +37,43 @@ namespace backend.Services
         private const string EquipmentListMappingFileName = "equipment_list_gembox.json";
         private const string DemoMappingFileName = "demo_gembox.json";
 
-        private static Dictionary<string, object> BuildPictureSourceFromEquipment(EquipmentEntity equipment)
+        private static Dictionary<string, object> BuildPictureSource<T>(
+            T entity,
+            Func<T, IEnumerable<EquipmentPictureEntity>> getPictures,
+            string keyPrefix = "pic")
         {
             var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-            if (equipment?.Pictures == null || equipment.Pictures.Count == 0)
-                return dict;
+            if (entity == null || getPictures == null) return dict;
 
-            foreach (var p in equipment.Pictures)
+            var pictures = getPictures(entity);
+            if (pictures == null) return dict;
+
+            foreach (var p in pictures)
             {
                 if (p == null) continue;
 
-                var key = $"pic_{p.PictureTab}_{p.PictureNo}";
+                var key = $"{keyPrefix}_{p.PictureTab}_{p.PictureNo}";
                 dict[key] = (p.PicturePath ?? "").Trim();
+            }
+            return dict;
+        }
+
+        private static Dictionary<string, object> BuildPictureCommentsOverrides<T>(
+            T entity,
+            Func<T, IEnumerable<EquipmentPictureEntity>> getPictures,
+            string commentKeyPrefix = "pic_comment")
+        {
+            var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            if (entity == null || getPictures == null) return dict;
+
+            var pictures = getPictures(entity);
+            if (pictures == null) return dict;
+
+            foreach (var p in pictures)
+            {
+                if (p == null) continue;
+                var key = $"{commentKeyPrefix}_{p.PictureTab}_{p.PictureNo}";
+                dict[key] = (p.PictureComments ?? "").Trim();
             }
             return dict;
         }
@@ -73,16 +98,23 @@ namespace backend.Services
                         if (equipment == null)
                             return null;
 
-                        object scalarSource = equipment;
-                        object pictureSource = BuildPictureSourceFromEquipment(equipment);
+                        IEnumerable<EquipmentPictureEntity> GetAllPictures(EquipmentEntity e) =>
+                            (e?.Pictures ?? Enumerable.Empty<EquipmentPictureEntity>())
+                            .Concat(e?.PicturesSubParts ?? Enumerable.Empty<EquipmentPictureEntity>());
+
+                        object scalarSource = new ValueSourceWithOverrides(
+                            equipment,
+                            BuildPictureCommentsOverrides(equipment, GetAllPictures));
+                        object pictureSource = BuildPictureSource(equipment, GetAllPictures);
                         IEnumerable<object>[] tableRowsInOrder = null;
 
-                        return BuildFromMappingFile(
+                        var dto = BuildFromMappingFile(
                             EquipmentMappingFileName,
                             "equipment",
                             scalarSource,
                             pictureSource,
                             tableRowsInOrder);
+                        return dto;
                     }
 
                 case ReportCodes.EquipmentDetailLists:
@@ -94,19 +126,26 @@ namespace backend.Services
                         if (equipment == null)
                             return null;
 
-                        object scalarSource = equipment;
-                        object pictureSource = BuildPictureSourceFromEquipment(equipment);
+                        IEnumerable<EquipmentPictureEntity> GetAllPictures(EquipmentEntity e) =>
+                            (e?.Pictures ?? Enumerable.Empty<EquipmentPictureEntity>())
+                            .Concat(e?.PicturesSubParts ?? Enumerable.Empty<EquipmentPictureEntity>());
+
+                        object scalarSource = new ValueSourceWithOverrides(
+                            equipment,
+                            BuildPictureCommentsOverrides(equipment, GetAllPictures));
+                        object pictureSource = BuildPictureSource(equipment, GetAllPictures);
                         // テーブルキーは JSON(def.tables[]) の順序で割り当てる（ここではキー文字列を書かない）
                         IEnumerable<object> partsRows = EquipmentDetailGemBoxTestData.GetPartsRows(id).Cast<object>();
                         IEnumerable<object> linkedRows = EquipmentDetailGemBoxTestData.GetLinkedEquipmentRows(id).Cast<object>();
                         IEnumerable<object>[] tableRowsInOrder = { partsRows, linkedRows };
 
-                        return BuildFromMappingFile(
+                        var dto = BuildFromMappingFile(
                             EquipmentDetailMappingFileName,
                             "equipment_detail",
                             scalarSource,
                             pictureSource,
                             tableRowsInOrder);
+                        return dto;
                     }
 
                 case ReportCodes.EquipmentList:

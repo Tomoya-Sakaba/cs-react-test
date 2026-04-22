@@ -13,6 +13,22 @@ using Newtonsoft.Json;
 namespace backend.Services
 {
     /// <summary>
+    /// 値の取得元を「ベースオブジェクト + 上書き辞書」で表す。
+    /// 例: Entity はそのまま使いつつ、一部のキー（pic_comment_1_1 など）だけ追加したいときに利用する。
+    /// </summary>
+    public sealed class ValueSourceWithOverrides
+    {
+        public ValueSourceWithOverrides(object baseSource, IDictionary<string, object> overrides)
+        {
+            BaseSource = baseSource;
+            Overrides = overrides;
+        }
+
+        public object BaseSource { get; }
+        public IDictionary<string, object> Overrides { get; }
+    }
+
+    /// <summary>
     /// JSONマッピング定義を読み込み、EquipmentEntity から GemBoxPrintRequestDto を組み立てる。
     /// </summary>
     public static class GemBoxPrintMappingEngine
@@ -265,6 +281,20 @@ namespace backend.Services
         private static object GetValueFromSource(object source, string dbColumn)
         {
             if (source == null || string.IsNullOrWhiteSpace(dbColumn)) return null;
+
+            // 0) 上書き辞書があればそれを優先し、無ければベースへフォールバック
+            if (source is ValueSourceWithOverrides composite)
+            {
+                if (composite.Overrides != null)
+                {
+                    foreach (var kv in composite.Overrides)
+                    {
+                        if (string.Equals(kv.Key, dbColumn, StringComparison.OrdinalIgnoreCase))
+                            return kv.Value;
+                    }
+                }
+                return GetValueFromSource(composite.BaseSource, dbColumn);
+            }
 
             // 1) 既に辞書で来ている場合（Repository側で snake_case をキーにして返す運用にも対応）
             if (source is IDictionary<string, object> dict)

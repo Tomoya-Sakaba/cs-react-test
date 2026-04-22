@@ -75,6 +75,7 @@ namespace backend.Models.Repository
                     if (equipment == null) return null;
 
                     equipment.Pictures = multi.Read<EquipmentPictureEntity>().ToList();
+                    equipment.PicturesSubParts = new List<EquipmentPictureEntity>();
                     return equipment;
                 }
             }
