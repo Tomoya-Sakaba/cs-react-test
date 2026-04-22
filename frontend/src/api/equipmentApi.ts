@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export type Equipment = {
-  equipmentId: number;
+  reportNo: number;
   equipmentCode: string;
   equipmentName: string;
   category: string;
@@ -21,15 +21,15 @@ export const equipmentApi = {
     return res.data;
   },
 
-  async get(equipmentId: number): Promise<Equipment> {
-    const res = await axios.get<Equipment>(`/api/equipment/${equipmentId}`, {
+  async get(reportNo: number): Promise<Equipment> {
+    const res = await axios.get<Equipment>(`/api/equipment/${reportNo}`, {
       headers: { Accept: "application/json" },
     });
     return res.data;
   },
 
-  async update(equipmentId: number, patch: Partial<Equipment>): Promise<Equipment> {
-    const res = await axios.put<Equipment>(`/api/equipment/${equipmentId}`, patch, {
+  async update(reportNo: number, patch: Partial<Equipment>): Promise<Equipment> {
+    const res = await axios.put<Equipment>(`/api/equipment/${reportNo}`, patch, {
       headers: { Accept: "application/json" },
     });
     return res.data;

@@ -1,7 +1,7 @@
 import Button from "../components/Button";
 import { httpClient } from "../api/httpClient";
 import { printApi } from "../api/printApi";
-import { downloadPdf } from "../utils/pdfUtils";
+import { downloadPdfOrThrowApiError } from "../utils/pdfUtils";
 
 /**
  * backend ↔ backend-print 疎通確認用（Hello/Test/Echo）と GemBox デモ PDF。
@@ -56,11 +56,12 @@ const PrintConnectivity = () => {
 
   const handleGemBoxDemoPdf = async () => {
     try {
-      const { blob, fileName } = await printApi.fetchDemoGemBoxPdf();
-      await downloadPdf(blob, fileName);
+      const res = await printApi.fetchGemBoxPdf({ report: "demo" });
+      await downloadPdfOrThrowApiError(res, "demo_gembox.pdf");
     } catch (e) {
       console.error("GemBox デモ PDF 失敗:", e);
-      alert("GemBox デモ PDF 失敗（テンプレ配置・backend-print・consoleを確認）");
+      alert("PDFの取得に失敗しました");
+      alert(`ErrCode: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 

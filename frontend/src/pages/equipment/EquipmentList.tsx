@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { equipmentApi, type Equipment } from "../../api/equipmentApi";
 import { printApi } from "../../api/printApi";
-import { downloadPdf } from "../../utils/pdfUtils";
+import { downloadPdfOrThrowApiError } from "../../utils/pdfUtils";
 import type { AgGridReact as AgGridReactType } from "ag-grid-react";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -38,7 +38,7 @@ const EquipmentList = () => {
 
   const columnDefs = useMemo<ColDef<Equipment>[]>(
     () => [
-      { headerName: "ID", field: "equipmentId", width: 90, sortable: true },
+      { headerName: "ID", field: "reportNo", width: 90, sortable: true },
       { headerName: "コード", field: "equipmentCode", width: 120, sortable: true, filter: true },
       { headerName: "機器名", field: "equipmentName", flex: 1, minWidth: 220, sortable: true, filter: true },
       { headerName: "カテゴリ", field: "category", width: 140, sortable: true, filter: true },
@@ -68,11 +68,12 @@ const EquipmentList = () => {
               setPdfLoading(true);
               setPdfError(null);
               try {
-                const { blob, fileName } = await printApi.generateEquipmentListPdfGemBox();
-                await downloadPdf(blob, fileName);
+                const res = await printApi.fetchGemBoxPdf({ report: "equipment_list" });
+                await downloadPdfOrThrowApiError(res, "equipment_list_gembox.pdf");
               } catch (e) {
                 console.error(e);
-                setPdfError("一覧PDFの生成に失敗しました（テンプレ equipment_list.xlsx・backend-print を確認）");
+                setPdfError("PDFの取得に失敗しました");
+                alert(`ErrCode: ${e instanceof Error ? e.message : String(e)}`);
               } finally {
                 setPdfLoading(false);
               }
@@ -105,7 +106,7 @@ const EquipmentList = () => {
           animateRows
           rowSelection={{ mode: "singleRow" }}
           onRowDoubleClicked={(e) => {
-            const id = e.data?.equipmentId;
+            const id = e.data?.reportNo;
             if (id != null) navigate(`/equipment/${id}`);
           }}
           overlayLoadingTemplate={'<span class="ag-overlay-loading-center">読み込み中...</span>'}

@@ -2,7 +2,7 @@ namespace backend.Models.DTOs
 {
     public class EquipmentDto
     {
-        public int EquipmentId { get; set; }
+        public int ReportNo { get; set; }
         public string EquipmentCode { get; set; }
         public string EquipmentName { get; set; }
         public string Category { get; set; }

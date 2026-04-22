@@ -17,21 +17,21 @@ namespace backend.Controllers
         }
 
         [HttpGet]
-        [Route("api/equipment/{equipmentId}")]
-        public IHttpActionResult Get(int equipmentId)
+        [Route("api/equipment/{reportNo}")]
+        public IHttpActionResult Get(int reportNo)
         {
-            var data = _service.Get(equipmentId);
+            var data = _service.Get(reportNo);
             if (data == null) return NotFound();
             return Ok(data);
         }
 
         [HttpPut]
-        [Route("api/equipment/{equipmentId}")]
-        public IHttpActionResult Update(int equipmentId, [FromBody] UpdateEquipmentRequestDto request)
+        [Route("api/equipment/{reportNo}")]
+        public IHttpActionResult Update(int reportNo, [FromBody] UpdateEquipmentRequestDto request)
         {
             if (request == null) return BadRequest("リクエストが空です。");
 
-            var updated = _service.Update(equipmentId, request);
+            var updated = _service.Update(reportNo, request);
             if (updated == null) return NotFound();
             return Ok(updated);
         }

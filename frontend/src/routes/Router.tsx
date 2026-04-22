@@ -48,7 +48,7 @@ const Router = createBrowserRouter(
         <Route path="/waste-schedule" element={<WasteSchedule />} />
         <Route path="/budget-plan-mock" element={<BudgetPlanMock />} />
         <Route path="/equipment" element={<EquipmentList />} />
-        <Route path="/equipment/:equipmentId" element={<EquipmentDetail />} />
+        <Route path="/equipment/:reportNo" element={<EquipmentDetail />} />
         <Route path="/photo-comments" element={<PhotoComments />} />
         <Route path="/print-connectivity" element={<PrintConnectivity />} />
         <Route path="/" element={<Home />} />

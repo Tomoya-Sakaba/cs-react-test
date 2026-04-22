@@ -82,7 +82,7 @@ namespace backend.Controllers
 
             var scalar = new[]
             {
-                new { key = "equipment.equipmentId", label = "機器ID" },
+                new { key = "equipment.reportNo", label = "機器ID" },
                 new { key = "equipment.equipmentCode", label = "機器コード" },
                 new { key = "equipment.equipmentName", label = "機器名" },
                 new { key = "equipment.category", label = "カテゴリ" },

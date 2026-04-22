@@ -14,7 +14,7 @@ namespace backend.Services
             var entities = _repository.GetAll(includeInactive);
             return entities.Select(e => new EquipmentDto
             {
-                EquipmentId = e.EquipmentId,
+                ReportNo = e.EquipmentId,
                 EquipmentCode = e.EquipmentCode,
                 EquipmentName = e.EquipmentName,
                 Category = e.Category,
@@ -27,13 +27,13 @@ namespace backend.Services
             }).ToList();
         }
 
-        public EquipmentDto Get(int equipmentId)
+        public EquipmentDto Get(int reportNo)
         {
-            var e = _repository.GetById(equipmentId);
+            var e = _repository.GetById(reportNo);
             if (e == null) return null;
             return new EquipmentDto
             {
-                EquipmentId = e.EquipmentId,
+                ReportNo = e.EquipmentId,
                 EquipmentCode = e.EquipmentCode,
                 EquipmentName = e.EquipmentName,
                 Category = e.Category,
@@ -46,9 +46,9 @@ namespace backend.Services
             };
         }
 
-        public EquipmentDto Update(int equipmentId, UpdateEquipmentRequestDto req)
+        public EquipmentDto Update(int reportNo, UpdateEquipmentRequestDto req)
         {
-            var existing = _repository.GetById(equipmentId);
+            var existing = _repository.GetById(reportNo);
             if (existing == null) return null;
 
             existing.EquipmentName = req.EquipmentName ?? existing.EquipmentName;
@@ -60,7 +60,7 @@ namespace backend.Services
             if (req.IsActive.HasValue) existing.IsActive = req.IsActive.Value;
 
             _repository.Update(existing);
-            return Get(equipmentId);
+            return Get(reportNo);
         }
     }
 }

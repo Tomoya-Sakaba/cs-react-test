@@ -37,7 +37,7 @@ namespace backend.Models.Repository
             }
         }
 
-        public EquipmentEntity GetById(int equipmentId)
+        public EquipmentEntity GetById(int reportNo)
         {
             using (IDbConnection db = new SqlConnection(connectionString))
             {
@@ -57,7 +57,7 @@ namespace backend.Models.Repository
                     FROM dbo.m_equipment
                     WHERE equipment_id = @EquipmentId;
                 ";
-                return db.QuerySingleOrDefault<EquipmentEntity>(sql, new { EquipmentId = equipmentId });
+                return db.QuerySingleOrDefault<EquipmentEntity>(sql, new { EquipmentId = reportNo });
             }
         }
 

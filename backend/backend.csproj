@@ -153,6 +153,9 @@
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="log4net, Version=2.0.17.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
+      <HintPath>..\packages\log4net.2.0.17\lib\net45\log4net.dll</HintPath>
+    </Reference>
     <Reference Include="System.Net.Http">
     </Reference>
     <Reference Include="System.Net.Http.Formatting, Version=5.2.9.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
@@ -273,7 +276,9 @@
     <Compile Include="Models\DTOs\EquipmentDto.cs" />
     <Compile Include="Models\DTOs\GemBoxPrintRequestDto.cs" />
     <Compile Include="Models\Config\GemBoxPrintMappingDefinition.cs" />
+    <Compile Include="Models\Config\GemBoxReportCodes.cs" />
     <Compile Include="Models\DTOs\GeneratePdfRequestDto.cs" />
+    <Compile Include="Models\DTOs\ApiErrorDto.cs" />
     <Compile Include="Models\DTOs\PrintTemplateSettingDto.cs" />
     <Compile Include="Models\DTOs\PrintFieldMappingDto.cs" />
     <Compile Include="Models\DTOs\PlanHistoryDto.cs" />

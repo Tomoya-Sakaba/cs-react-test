@@ -140,22 +140,14 @@ namespace backend.Services
                 using (var upstream = await Client.SendAsync(req, cts.Token).ConfigureAwait(false))
                 {
 
-                    // 失敗時は本文がテキスト（エラーメッセージ）のことが多いので文字列で返す
                     if (!upstream.IsSuccessStatusCode)
                     {
                         var err = await upstream.Content.ReadAsStringAsync().ConfigureAwait(false);
                         LogProxy(
                             $"GemBox upstream error. correlationId={correlationId}, status={(int)upstream.StatusCode} {upstream.ReasonPhrase}, " +
                             $"target='{target}', contentType='{upstream.Content?.Headers?.ContentType}', errLen={err?.Length ?? 0}");
-                        return new HttpResponseMessage(upstream.StatusCode)
-                        {
-                            Content = new StringContent(
-                                string.IsNullOrWhiteSpace(err)
-                                    ? $"Upstream returned {(int)upstream.StatusCode} {upstream.ReasonPhrase}. correlationId={correlationId}"
-                                    : err,
-                                Encoding.UTF8,
-                                "text/plain"),
-                        };
+                        // エラー応答の整形は Controller に一元化する
+                        throw new InvalidOperationException("PRINT_GEMBOX_UPSTREAM_ERROR");
                     }
 
                 // 成功時は PDF のバイト列。ReadAsStringAsync は使わない（エンコーディングで壊れる）

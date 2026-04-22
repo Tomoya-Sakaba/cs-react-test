@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { equipmentApi, type Equipment } from "../../api/equipmentApi";
 import { printApi } from "../../api/printApi";
-import { downloadPdf } from "../../utils/pdfUtils";
+import { downloadPdf, downloadPdfOrThrowApiError } from "../../utils/pdfUtils";
 import {
   getTestLinkedEquipmentForEquipment,
   getTestPartsForEquipment,
@@ -10,9 +10,9 @@ import {
 
 const EquipmentDetail = () => {
   const navigate = useNavigate();
-  const { equipmentId } = useParams();
+  const { reportNo: reportNoParam } = useParams();
 
-  const id = Number(equipmentId);
+  const id = Number(reportNoParam);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [equipment, setEquipment] = useState<Equipment | null>(null);
@@ -50,7 +50,7 @@ const EquipmentDetail = () => {
     if (!equipment) return;
     setSaving(true);
     try {
-      const saved = await equipmentApi.update(equipment.equipmentId, {
+      const saved = await equipmentApi.update(equipment.reportNo, {
         equipmentName: equipment.equipmentName,
         category: equipment.category,
         manufacturer: equipment.manufacturer,
@@ -102,9 +102,9 @@ const EquipmentDetail = () => {
                 const fileName = `機器台帳_${equipment.equipmentCode}.pdf`;
                 const blob = await printApi.generatePdfByPage(pageCode, {
                   fileName,
-                  equipmentId: equipment.equipmentId,
+                  reportNo: equipment.reportNo,
                 });
-                await downloadPdf(blob, fileName);
+                downloadPdf(blob, fileName);
               } catch (e) {
                 console.error(e);
                 setPdfError("PDFの生成に失敗しました");
@@ -124,17 +124,16 @@ const EquipmentDetail = () => {
               setPdfError(null);
               try {
                 const fileName = `機器台帳_${equipment.equipmentCode}_GemBox.pdf`;
-                const { blob, fileName: resolvedName } = await printApi.generatePdfByPageGemBox(
-                  pageCode,
-                  {
-                    fileName,
-                    equipmentId: equipment.equipmentId,
-                  }
-                );
-                await downloadPdf(blob, resolvedName);
+                const res = await printApi.fetchGemBoxPdf({
+                  report: "equipment_master",
+                  reportNo: equipment.reportNo,
+                  timeoutMs: 60000,
+                });
+                await downloadPdfOrThrowApiError(res, fileName);
               } catch (e) {
                 console.error(e);
-                setPdfError("PDF（GemBox）の生成に失敗しました");
+                setPdfError("PDFの取得に失敗しました");
+                alert(`ErrCode: ${e instanceof Error ? e.message : String(e)}`);
               } finally {
                 setPdfLoading(false);
               }
@@ -151,14 +150,16 @@ const EquipmentDetail = () => {
               setPdfError(null);
               try {
                 const fileName = `機器詳細_部品関連_${equipment.equipmentCode}_GemBox.pdf`;
-                const { blob, fileName: resolvedName } =
-                  await printApi.generateEquipmentDetailListsGemBox(equipment.equipmentId, fileName);
-                await downloadPdf(blob, resolvedName);
+                const res = await printApi.fetchGemBoxPdf({
+                  report: "equipment_detail_lists",
+                  reportNo: equipment.reportNo,
+                  timeoutMs: 120_000,
+                });
+                await downloadPdfOrThrowApiError(res, fileName);
               } catch (e) {
                 console.error(e);
-                setPdfError(
-                  "PDF（部品・関連機器/GemBox）の生成に失敗しました（equipment_master_detail.xlsx を配置してください）"
-                );
+                setPdfError("PDFの取得に失敗しました");
+                alert(`ErrCode: ${e instanceof Error ? e.message : String(e)}`);
               } finally {
                 setPdfLoading(false);
               }
@@ -271,7 +272,7 @@ const EquipmentDetail = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {getTestPartsForEquipment(equipment.equipmentId).map((row) => (
+                    {getTestPartsForEquipment(equipment.reportNo).map((row) => (
                       <tr key={row.partCode} className="border-t border-gray-100">
                         <td className="px-3 py-2 font-mono">{row.partCode}</td>
                         <td className="px-3 py-2 text-right">{row.qty}</td>
@@ -295,7 +296,7 @@ const EquipmentDetail = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {getTestLinkedEquipmentForEquipment(equipment.equipmentId).map((row) => (
+                    {getTestLinkedEquipmentForEquipment(equipment.reportNo).map((row) => (
                       <tr key={row.equipmentCode} className="border-t border-gray-100">
                         <td className="px-3 py-2 font-mono">{row.equipmentCode}</td>
                         <td className="px-3 py-2">{row.equipmentName}</td>

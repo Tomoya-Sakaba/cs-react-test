@@ -9,9 +9,9 @@ namespace backend.Services
     /// </summary>
     public static class EquipmentDetailGemBoxTestData
     {
-        public static List<Dictionary<string, object>> GetPartsRows(int equipmentId)
+        public static List<Dictionary<string, object>> GetPartsRows(int reportNo)
         {
-            var code = $"P-{equipmentId:D4}";
+            var code = $"P-{reportNo:D4}";
             return new List<Dictionary<string, object>>
             {
                 NewRow(
@@ -54,64 +54,64 @@ namespace backend.Services
             };
         }
 
-        public static List<Dictionary<string, object>> GetLinkedEquipmentRows(int equipmentId)
+        public static List<Dictionary<string, object>> GetLinkedEquipmentRows(int reportNo)
         {
-            var a = Math.Max(1, equipmentId + 100);
-            var b = Math.Max(1, equipmentId + 200);
+            var a = Math.Max(1, reportNo + 100);
+            var b = Math.Max(1, reportNo + 200);
             return new List<Dictionary<string, object>>
             {
                 NewRow(
                     ("equipment_code", $"EQ-{a:D5}"),
-                    ("equipment_name", $"ライン連携ユニット（テスト {equipmentId}）"),
+                    ("equipment_name", $"ライン連携ユニット（テスト {reportNo}）"),
                     ("relation", "上位機")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
                 NewRow(
                     ("equipment_code", $"EQ-{b:D5}"),
-                    ("equipment_name", $"予備機（テスト {equipmentId}）"),
+                    ("equipment_name", $"予備機（テスト {reportNo}）"),
                     ("relation", "冗長ペア")),
             };
         }

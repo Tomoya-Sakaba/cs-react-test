@@ -69,15 +69,15 @@ namespace backend.Controllers
                 Dictionary<string, object> data;
                 if (pageCode == "equipment_master")
                 {
-                    var equipmentIdStr = Request.GetQueryNameValuePairs()
-                        .FirstOrDefault(kv => kv.Key == "equipmentId").Value;
+                    var reportNoStr = Request.GetQueryNameValuePairs()
+                        .FirstOrDefault(kv => kv.Key == "reportNo").Value;
 
-                    if (string.IsNullOrWhiteSpace(equipmentIdStr) || !int.TryParse(equipmentIdStr, out int equipmentId))
+                    if (string.IsNullOrWhiteSpace(reportNoStr) || !int.TryParse(reportNoStr, out int reportNo))
                     {
-                        return Request.CreateErrorResponse(HttpStatusCode.BadRequest, "equipmentId は必須です。");
+                        return Request.CreateErrorResponse(HttpStatusCode.BadRequest, "reportNo は必須です。");
                     }
 
-                    var equipment = _equipmentRepository.GetById(equipmentId);
+                    var equipment = _equipmentRepository.GetById(reportNo);
                     if (equipment == null)
                     {
                         return Request.CreateErrorResponse(HttpStatusCode.NotFound, "機器が見つかりません。");
@@ -144,7 +144,7 @@ namespace backend.Controllers
                 if (string.IsNullOrWhiteSpace(sourceKey)) return "";
                 switch (sourceKey)
                 {
-                    case "equipment.equipmentId": return equipment.EquipmentId;
+                    case "equipment.reportNo": return equipment.EquipmentId;
                     case "equipment.equipmentCode": return equipment.EquipmentCode ?? "";
                     case "equipment.equipmentName": return equipment.EquipmentName ?? "";
                     case "equipment.category": return equipment.Category ?? "";
