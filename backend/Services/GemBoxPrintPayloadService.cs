@@ -98,12 +98,16 @@ namespace backend.Services
                         if (equipment == null)
                             return null;
 
+                        var scalarRow = _repository.GetEquipmentMasterScalarRow(id);
+                        if (scalarRow == null)
+                            return null;
+
                         IEnumerable<EquipmentPictureEntity> GetAllPictures(EquipmentEntity e) =>
                             (e?.Pictures ?? Enumerable.Empty<EquipmentPictureEntity>())
                             .Concat(e?.PicturesSubParts ?? Enumerable.Empty<EquipmentPictureEntity>());
 
                         object scalarSource = new ValueSourceWithOverrides(
-                            equipment,
+                            scalarRow,
                             BuildPictureCommentsOverrides(equipment, GetAllPictures));
                         object pictureSource = BuildPictureSource(equipment, GetAllPictures);
                         IEnumerable<object>[] tableRowsInOrder = null;

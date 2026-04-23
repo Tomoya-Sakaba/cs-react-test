@@ -1,11 +1,12 @@
-﻿using backend.Models.Entity;
+﻿using backend.Models.DTOs;
+using backend.Models.Entities;
+using backend.Models.Entity;
 using backend.Models.Repository;
-using backend.Models.DTOs;
 using System;
-using System.Linq;
-using System.Web.Http;
-using System.Text;
 using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Web.Http;
 
 namespace backend.Controllers
 {

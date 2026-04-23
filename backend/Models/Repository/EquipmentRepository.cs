@@ -81,6 +81,40 @@ namespace backend.Models.Repository
             }
         }
 
+        /// <summary>
+        /// 印刷（GemBox）用に、機器の単票データを snake_case キーの辞書で返す。
+        /// DTO/Entity のプロパティ名に依存せず、マッピングJSONの dbColumn と 1:1 で対応させる目的。
+        /// </summary>
+        public Dictionary<string, object> GetEquipmentMasterScalarRow(int equipmentId)
+        {
+            using (IDbConnection db = new SqlConnection(connectionString))
+            {
+                var sql = @"
+                    SELECT
+                        e.equipment_id   AS equipment_id,
+                        e.equipment_code AS equipment_code,
+                        e.equipment_name AS equipment_name,
+                        e.category       AS category,
+                        e.manufacturer   AS manufacturer,
+                        e.model          AS model,
+                        e.location       AS location,
+                        e.note           AS note,
+                        e.updated_at     AS updated_at,
+                        u.name         AS created_user_name
+                    FROM dbo.m_equipment e
+                    LEFT JOIN dbo.t_users u ON u.id = e.created_user_id
+                    WHERE e.equipment_id = @EquipmentId;
+                ";
+
+                var row = db.QuerySingleOrDefault(sql, new { EquipmentId = equipmentId });
+                if (row == null) return null;
+
+                // DapperRow は IDictionary<string, object> として扱える
+                var dict = (IDictionary<string, object>)row;
+                return new Dictionary<string, object>(dict, System.StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
         public void Update(EquipmentEntity entity)
         {
             using (IDbConnection db = new SqlConnection(connectionString))

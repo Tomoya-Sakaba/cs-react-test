@@ -41,6 +41,11 @@
       "excelKey": "updated_at",
       "dbColumn": "updated_at"
     }
+    ,
+    {
+      "excelKey": "created_user_name",
+      "dbColumn": "created_user_name"
+    }
   ],
   "pictures": [
     { "key": "pic_1_1", "dbColumn": "pic_1_1" },

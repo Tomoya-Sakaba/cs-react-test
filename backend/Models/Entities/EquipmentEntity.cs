@@ -20,9 +20,11 @@ namespace backend.Models.Entities
         public List<EquipmentPictureEntity> Pictures { get; set; }
 
         public List<EquipmentPictureEntity> PicturesSubParts { get; set; }
+
+        public UsersEntity CreatedUser { get; set; }
     }
 
-    public class EquipmentPicturenEtity
+    public class EquipmentPictureEntity
     {
         public int EquipmentId { get; set; }
         public int PictureTab { get; set; }

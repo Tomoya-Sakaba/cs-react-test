@@ -1,11 +1,12 @@
-﻿using System;
+﻿using backend.Models.Entities;
+using backend.Models.Entity;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
-using backend.Models.Entity;
 
 namespace backend.Models.Repository
 {
