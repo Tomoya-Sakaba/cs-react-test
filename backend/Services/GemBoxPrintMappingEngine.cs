@@ -34,11 +34,6 @@ namespace backend.Services
     public static class GemBoxPrintMappingEngine
     {
         /// <summary>
-        /// マッピングファイルの既定パス（Web.config で上書き可）
-        /// </summary>
-        public const string DefaultRelativeMappingPath = "~/common/print-mappings/equipment_gembox.json";
-
-        /// <summary>
         /// jsonファイルを読み込む
         /// </summary>
         /// <param name="mappingFileName">jsonファイル名</param>
