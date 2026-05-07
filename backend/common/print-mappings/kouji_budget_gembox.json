@@ -1,0 +1,45 @@
+{
+  "description": "工事予算（年度）一覧。1行目に見出し、2行目に {{table:items}} と {{items.xxx}} を並べたテンプレ kouji_budget.xlsx と対応。",
+  "templateFileName": "kouji_budget.xlsx",
+  "scalars": [
+    { "excelKey": "fiscal_year", "dbColumn": "fiscal_year" },
+    { "excelKey": "generated_at", "dbColumn": "generated_at" }
+  ],
+  "tables": [
+    {
+      "tableKey": "items",
+      "columns": [
+        { "field": "kouji_id", "dbColumn": "kouji_id" },
+        { "field": "kouji_name", "dbColumn": "kouji_name" },
+        { "field": "cycle", "dbColumn": "cycle" },
+        { "field": "total_budget", "dbColumn": "total_budget" },
+
+        { "field": "m04", "dbColumn": "m04" },
+        { "field": "m04_type", "dbColumn": "m04_type" },
+        { "field": "m05", "dbColumn": "m05" },
+        { "field": "m05_type", "dbColumn": "m05_type" },
+        { "field": "m06", "dbColumn": "m06" },
+        { "field": "m06_type", "dbColumn": "m06_type" },
+        { "field": "m07", "dbColumn": "m07" },
+        { "field": "m07_type", "dbColumn": "m07_type" },
+        { "field": "m08", "dbColumn": "m08" },
+        { "field": "m08_type", "dbColumn": "m08_type" },
+        { "field": "m09", "dbColumn": "m09" },
+        { "field": "m09_type", "dbColumn": "m09_type" },
+        { "field": "m10", "dbColumn": "m10" },
+        { "field": "m10_type", "dbColumn": "m10_type" },
+        { "field": "m11", "dbColumn": "m11" },
+        { "field": "m11_type", "dbColumn": "m11_type" },
+        { "field": "m12", "dbColumn": "m12" },
+        { "field": "m12_type", "dbColumn": "m12_type" },
+        { "field": "m01", "dbColumn": "m01" },
+        { "field": "m01_type", "dbColumn": "m01_type" },
+        { "field": "m02", "dbColumn": "m02" },
+        { "field": "m02_type", "dbColumn": "m02_type" },
+        { "field": "m03", "dbColumn": "m03" }
+        ,{ "field": "m03_type", "dbColumn": "m03_type" }
+      ]
+    }
+  ]
+}
+

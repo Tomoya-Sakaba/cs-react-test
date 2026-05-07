@@ -262,6 +262,7 @@
     <Compile Include="Controllers\UsersController.cs" />
     <Compile Include="Controllers\ValuesController.cs" />
     <Compile Include="Controllers\PhotoCommentsController.cs" />
+    <Compile Include="Controllers\KoujiController.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
@@ -292,17 +293,20 @@
     <Compile Include="Models\DTOs\UpdateUserRepuest.cs" />
     <Compile Include="Models\DTOs\UserResponse.cs" />
     <Compile Include="Models\DTOs\PhotoCommentDto.cs" />
+    <Compile Include="Models\DTOs\KoujiDto.cs" />
     <Compile Include="Models\Entities\ApprovalEntity.cs" />
     <Compile Include="Models\Entities\CompanyEntity.cs" />
     <Compile Include="Models\Entities\EquipmentEntity.cs" />
     <Compile Include="Models\Entities\PlanEntity.cs" />
     <Compile Include="Models\Entities\PlanVersionSnapshotEntity.cs" />
+    <Compile Include="Models\Entities\KoujiEntity.cs" />
     <Compile Include="Models\Entities\ResultEntity.cs" />
     <Compile Include="Models\Entities\UsersEntity.cs" />
     <Compile Include="Models\Entities\PhotoCommentEntity.cs" />
     <Compile Include="Models\Repository\ApprovalRepository.cs" />
     <Compile Include="Models\Repository\CompanyRepository.cs" />
     <Compile Include="Models\Repository\EquipmentRepository.cs" />
+    <Compile Include="Models\Repository\KoujiRepository.cs" />
     <Compile Include="Models\Repository\PrintFieldMappingRepository.cs" />
     <Compile Include="Models\Repository\PlanRepository.cs" />
     <Compile Include="Models\Repository\ReportRepository.cs" />
@@ -317,6 +321,7 @@
     <Compile Include="Services\ApprovalService.cs" />
     <Compile Include="Services\CompanyService.cs" />
     <Compile Include="Services\EquipmentService.cs" />
+    <Compile Include="Services\KoujiService.cs" />
     <Compile Include="Services\EquipmentDetailGemBoxTestData.cs" />
     <Compile Include="Services\GemBoxPrintPayloadService.cs" />
     <Compile Include="Services\GemBoxPrintMappingEngine.cs" />

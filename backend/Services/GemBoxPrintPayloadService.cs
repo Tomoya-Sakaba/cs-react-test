@@ -27,14 +27,17 @@ namespace backend.Services
             public const string EquipmentMaster = "equipment_master";
             public const string EquipmentDetailLists = "equipment_detail_lists";
             public const string EquipmentList = "equipment_list";
+            public const string KoujiBudget = "kouji_budget";
             public const string Demo = "demo";
         }
 
         private readonly EquipmentRepository _repository = new EquipmentRepository();
+        private readonly KoujiRepository _koujiRepository = new KoujiRepository();
 
         private const string EquipmentMappingFileName = "equipment_gembox.json";
         private const string EquipmentDetailMappingFileName = "equipment_detail_gembox.json";
         private const string EquipmentListMappingFileName = "equipment_list_gembox.json";
+        private const string KoujiBudgetMappingFileName = "kouji_budget_gembox.json";
         private const string DemoMappingFileName = "demo_gembox.json";
 
         private static Dictionary<string, object> BuildPictureSource<T>(
@@ -168,6 +171,103 @@ namespace backend.Services
                             tableRowsInOrder);
                     }
 
+                case ReportCodes.KoujiBudget:
+                    if (!reportNo.HasValue || reportNo.Value < 2000 || reportNo.Value > 2100)
+                        throw new ArgumentException($"{ReportCodes.KoujiBudget} では reportNo に年度（例: 2026）が必要です。");
+                    {
+                        var fiscalYear = reportNo.Value;
+                        var kouji = _koujiRepository.GetAll(includeInactive: false);
+
+                        // 年度: 4月〜翌年3月
+                        var from = fiscalYear * 100 + 4;
+                        var to = (fiscalYear + 1) * 100 + 3;
+                        var monthly = _koujiRepository.GetMonthlyByYyyymmRange(from, to);
+
+                        object scalarSource = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["fiscal_year"] = fiscalYear,
+                            ["generated_at"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                        };
+                        object pictureSource = null;
+
+                        // 1工事 = 1行。月セルは1つだけ（m04..m03）。
+                        // 同月に予算と実績が両方ある場合は「実績を優先」してセルに入れる（=セルの値は常に1レコード分）。
+                        // 背景色は選ばれた type（budget/actual）で backend-print 側が塗る（rowData["m04_type"] 等）。
+                        var monthlyByKey = (monthly ?? new List<KoujiMonthlyEntity>())
+                            .GroupBy(x => $"{x.KoujiId}:{x.Yyyymm}:{x.Type}")
+                            .ToDictionary(g => g.Key, g => g.First());
+
+                        bool TryGetAmount(int koujiId, int yyyymm, byte type, out decimal amount)
+                        {
+                            amount = 0;
+                            if (monthlyByKey.TryGetValue($"{koujiId}:{yyyymm}:{type}", out var row))
+                            {
+                                amount = row.Amount;
+                                return true;
+                            }
+                            return false;
+                        }
+
+                        void FillMonth(Dictionary<string, object> r, int koujiId, int month1to12, int yyyymm)
+                        {
+                            // 優先順: 実績(1) -> 予算(0)
+                            if (TryGetAmount(koujiId, yyyymm, 1, out var a))
+                            {
+                                r[$"m{month1to12:00}"] = a.ToString("0.##", CultureInfo.InvariantCulture);
+                                r[$"m{month1to12:00}_type"] = "actual";
+                                return;
+                            }
+                            if (TryGetAmount(koujiId, yyyymm, 0, out var b))
+                            {
+                                r[$"m{month1to12:00}"] = b.ToString("0.##", CultureInfo.InvariantCulture);
+                                r[$"m{month1to12:00}_type"] = "budget";
+                                return;
+                            }
+                            r[$"m{month1to12:00}"] = "";
+                            r[$"m{month1to12:00}_type"] = "";
+                        }
+
+                        var rows = new List<Dictionary<string, object>>();
+                        foreach (var k in kouji ?? new List<KoujiEntity>())
+                        {
+                            decimal totalBudget = 0;
+                            for (int m = 4; m <= 12; m++)
+                            {
+                                var yyyymm = fiscalYear * 100 + m;
+                                if (TryGetAmount(k.KoujiId, yyyymm, 0, out var bb)) totalBudget += bb;
+                            }
+                            for (int m = 1; m <= 3; m++)
+                            {
+                                var yyyymm = (fiscalYear + 1) * 100 + m;
+                                if (TryGetAmount(k.KoujiId, yyyymm, 0, out var bb)) totalBudget += bb;
+                            }
+
+                            var r = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["kouji_id"] = k.KoujiId,
+                                ["kouji_name"] = k.KoujiName,
+                                ["cycle"] = $"{k.CycleYears}年に{k.CycleTimes}回",
+                                ["total_budget"] = totalBudget.ToString("0.##", CultureInfo.InvariantCulture),
+                            };
+                            for (int m = 4; m <= 12; m++)
+                                FillMonth(r, k.KoujiId, m, fiscalYear * 100 + m);
+                            for (int m = 1; m <= 3; m++)
+                                FillMonth(r, k.KoujiId, m, (fiscalYear + 1) * 100 + m);
+
+                            rows.Add(r);
+                        }
+
+                        IEnumerable<object> itemsRows = rows.Cast<object>();
+                        IEnumerable<object>[] tableRowsInOrder = { itemsRows };
+
+                        return BuildFromMappingFile(
+                            KoujiBudgetMappingFileName,
+                            "kouji_budget",
+                            scalarSource,
+                            pictureSource,
+                            tableRowsInOrder);
+                    }
+
                 case ReportCodes.Demo:
                     {
                         object scalarSource = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
@@ -177,8 +277,8 @@ namespace backend.Services
                         };
                         object pictureSource = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                         {
-                            ["picture1"] = "test1.png",
-                            ["picture2"] = "test2.png",
+                            ["picture1"] = "C:\\app_data\\picuture\\test1.png",
+                            ["picture2"] = "C:\\app_data\\picuture\\test2.png",
                         };
                         // テーブルキーは JSON(def.tables[]) の順序で割り当てる
                         IEnumerable<object> itemsRows = new List<Dictionary<string, object>>

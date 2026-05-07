@@ -32,6 +32,8 @@ import FlexibleSchedule from "../pages/FlexibleSchedule";
 import WasteSchedule from "../pages/WasteSchedule";
 // 予算計画（テーブル定義前のモック）
 import BudgetPlanMock from "../pages/BudgetPlanMock";
+// 工事予算（モック）
+import KoujiBudgetMock from "../pages/kouji/KoujiBudgetMock";
 import EquipmentList from "../pages/equipment/EquipmentList";
 import EquipmentDetail from "../pages/equipment/EquipmentDetail";
 import PhotoComments from "../pages/PhotoComments";
@@ -47,6 +49,7 @@ const Router = createBrowserRouter(
         <Route path="/flexible-schedule" element={<FlexibleSchedule />} />
         <Route path="/waste-schedule" element={<WasteSchedule />} />
         <Route path="/budget-plan-mock" element={<BudgetPlanMock />} />
+        <Route path="/kouji-budget-mock" element={<KoujiBudgetMock />} />
         <Route path="/equipment" element={<EquipmentList />} />
         <Route path="/equipment/:reportNo" element={<EquipmentDetail />} />
         <Route path="/photo-comments" element={<PhotoComments />} />

@@ -59,9 +59,8 @@ const Home = () => {
           <Button onClick={() => navigate("/csv-import")}>CSV取り込み</Button>
           <Button onClick={() => navigate("/flexible-schedule")}>柔軟な計画スケジュール</Button>
           <Button onClick={() => navigate("/photo-comments")}>写真コメント</Button>
-          <Button onClick={() => navigate("/print-connectivity")}>
-            疎通確認（print / GemBox）
-          </Button>
+          <Button onClick={() => navigate("/print-connectivity")}>疎通確認（print / GemBox）</Button>
+          <Button onClick={() => navigate("/kouji-budget-mock")}>工事管理</Button>
         </div>
       </div>
     </>
