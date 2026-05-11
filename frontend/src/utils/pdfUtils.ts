@@ -20,20 +20,17 @@ export const openPdfInNewTab = (blob: Blob, revokeAfterMs = 120_000) => {
 
 export type ApiError = { errCode?: string; message?: string };
 
-/**
- * PDF取得系（responseType: blob）で「HTTP 200 だけど JSON エラーが返る」運用向け。
- * - PDF: download
- * - JSON: { errCode, message } を返す
- */
-export async function downloadPdfOrThrowApiError(
+async function downloadBlobOrThrowApiError(
   res: AxiosResponse<Blob>,
-  fileName: string
+  fileName: string,
+  isExpectedContentType: (contentTypeLower: string) => boolean,
+  unknownErrCode: string
 ): Promise<void> {
   const headers = (res.headers ?? {}) as Record<string, string | undefined>;
   const contentType =
     (headers["content-type"] ?? headers["Content-Type"] ?? "").toLowerCase();
 
-  if (contentType.includes("application/pdf")) {
+  if (isExpectedContentType(contentType)) {
     downloadPdf(res.data, fileName);
     return;
   }
@@ -47,8 +44,43 @@ export async function downloadPdfOrThrowApiError(
     parsed = null;
   }
 
-  const errCode = parsed?.errCode ?? xErr ?? "PRINT_PDF_UNKNOWN_ERROR";
+  const errCode = parsed?.errCode ?? xErr ?? unknownErrCode;
   throw new Error(errCode);
+}
+
+/**
+ * PDF取得系（responseType: blob）で「HTTP 200 だけど JSON エラーが返る」運用向け。
+ * - PDF: download
+ * - JSON: { errCode, message } を返す
+ */
+export async function downloadPdfOrThrowApiError(
+  res: AxiosResponse<Blob>,
+  fileName: string
+): Promise<void> {
+  return downloadBlobOrThrowApiError(
+    res,
+    fileName,
+    (ct) => ct.includes("application/pdf"),
+    "PRINT_PDF_UNKNOWN_ERROR"
+  );
+}
+
+/**
+ * GemBox 埋め込み済み Excel（responseType: blob）向け。成功時は .xlsx を保存。
+ */
+export async function downloadExcelOrThrowApiError(
+  res: AxiosResponse<Blob>,
+  fileName: string
+): Promise<void> {
+  return downloadBlobOrThrowApiError(
+    res,
+    fileName,
+    (ct) =>
+      ct.includes("spreadsheetml") ||
+      ct.includes("application/vnd.ms-excel") ||
+      ct.includes("application/octet-stream"),
+    "PRINT_EXCEL_UNKNOWN_ERROR"
+  );
 }
 
 

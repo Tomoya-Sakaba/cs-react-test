@@ -1,5 +1,5 @@
+import { type AxiosResponse } from 'axios';
 import { axiosClientBlob, httpClient } from './httpClient';
-import type { AxiosResponse } from 'axios';
 
 export type GeneratePdfRequest = {
   fileName?: string;
@@ -53,6 +53,37 @@ export const printApi = {
     const q = new URLSearchParams({ report: args.report });
     if (args.reportNo != null) q.set('reportNo', String(args.reportNo));
     return axiosClientBlob.get(`/api/print-gembox/pdf?${q.toString()}`, {
+      timeout: args.timeoutMs ?? 120_000,
+    });
+  },
+
+  /**
+   * GemBox 埋め込み済み Excel（.xlsx）。GET /api/print-gembox/excel?report=...（reportNo は任意）
+   */
+  async fetchGemBoxExcel(args: {
+    report: string;
+    reportNo?: number;
+    timeoutMs?: number;
+  }): Promise<AxiosResponse<Blob>> {
+    const q = new URLSearchParams({ report: args.report });
+    if (args.reportNo != null) q.set('reportNo', String(args.reportNo));
+    return axiosClientBlob.get(`/api/print-gembox/excel?${q.toString()}`, {
+      timeout: args.timeoutMs ?? 120_000,
+    });
+  },
+
+  /**
+   * GemBox サンドイッチPDF。サーバが定義JSONを読み backend-print へ転送する。
+   * GET /api/print-gembox/sandwich-pdf?report=sandwich_demo（reportNo は将来用・任意）
+   */
+  async fetchGemBoxSandwichPdf(args: {
+    report: string;
+    reportNo?: number;
+    timeoutMs?: number;
+  }): Promise<AxiosResponse<Blob>> {
+    const q = new URLSearchParams({ report: args.report });
+    if (args.reportNo != null) q.set('reportNo', String(args.reportNo));
+    return axiosClientBlob.get(`/api/print-gembox/sandwich-pdf?${q.toString()}`, {
       timeout: args.timeoutMs ?? 120_000,
     });
   },

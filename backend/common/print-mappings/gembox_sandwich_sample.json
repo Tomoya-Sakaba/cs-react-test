@@ -1,0 +1,24 @@
+{
+  "description": "サンドイッチPDFデモ。firstSheetIndex / secondSheetIndex。中間PDFパスは GemBoxSandwichPrintPayloadService のソース定数（後ほどDB）。",
+  "templateFileName": "sandwich_two_sheets.xlsx",
+  "firstSheetIndex": 0,
+  "secondSheetIndex": 1,
+  "scalars": [
+    { "excelKey": "title", "dbColumn": "title" },
+    { "excelKey": "generatedAt", "dbColumn": "generatedAt" }
+  ],
+  "pictures": [
+    { "key": "picture1", "dbColumn": "picture1" },
+    { "key": "picture2", "dbColumn": "picture2" }
+  ],
+  "tables": [
+    {
+      "tableKey": "items",
+      "columns": [
+        { "field": "name", "dbColumn": "name" },
+        { "field": "qty", "dbColumn": "qty" },
+        { "field": "note", "dbColumn": "note" }
+      ]
+    }
+  ]
+}

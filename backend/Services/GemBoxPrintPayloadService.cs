@@ -21,6 +21,7 @@ namespace backend.Services
         private static readonly ILog Log = LogManager.GetLogger(typeof(GemBoxPrintPayloadService));
         /// <summary>
         /// <c>BuildGemBoxPdfRequest</c> の <c>switch</c> と GET <c>report</c> クエリを揃える（追加時はここだけでなくフロントも更新）。
+        /// サンドイッチPDF用コードは <see cref="GemBoxSandwichPrintPayloadService"/> 側。
         /// </summary>
         private static class ReportCodes
         {
@@ -333,6 +334,23 @@ namespace backend.Services
                     "印刷設定の読み込みに失敗しました（帳票定義）。管理者に連絡してください。");
             }
 
+            return BuildFromLoadedMappingDefinition(
+                mappingDefinition,
+                scalarSource,
+                pictureSource,
+                tableRowsInOrder);
+        }
+
+        /// <summary>
+        /// マッピング定義オブジェクト（既にロード済み）から <see cref="GemBoxPrintRequestDto"/> を組み立てる。
+        /// <see cref="BuildFromMappingFile"/> と同じ経路（<see cref="BuildTableSourcesByDefinition"/> → <see cref="GemBoxPrintMappingEngine.BuildRequest"/>）。
+        /// </summary>
+        internal static GemBoxPrintRequestDto BuildFromLoadedMappingDefinition(
+            GemBoxPrintMappingDefinition mappingDefinition,
+            object scalarSource,
+            object pictureSource,
+            IEnumerable<object>[] tableRowsInOrder)
+        {
             var tableRowSourcesByKey = BuildTableSourcesByDefinition(mappingDefinition, tableRowsInOrder);
 
             return GemBoxPrintMappingEngine.BuildRequest(

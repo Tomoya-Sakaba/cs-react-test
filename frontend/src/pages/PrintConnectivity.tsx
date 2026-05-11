@@ -1,12 +1,15 @@
+import { useState } from "react";
 import Button from "../components/Button";
 import { httpClient } from "../api/httpClient";
 import { printApi } from "../api/printApi";
-import { downloadPdfOrThrowApiError } from "../utils/pdfUtils";
+import { downloadExcelOrThrowApiError, downloadPdfOrThrowApiError } from "../utils/pdfUtils";
 
 /**
- * backend ↔ backend-print 疎通確認用（Hello/Test/Echo）と GemBox デモ PDF。
+ * backend ↔ backend-print 疎通確認用（Hello/Test/Echo）と GemBox デモ PDF / Excel。
  */
 const PrintConnectivity = () => {
+  const [sandwichLoading, setSandwichLoading] = useState(false);
+
   const showAxiosData = (data: unknown) => {
     alert(typeof data === "string" ? data : JSON.stringify(data));
   };
@@ -65,6 +68,31 @@ const PrintConnectivity = () => {
     }
   };
 
+  const handleGemBoxDemoExcel = async () => {
+    try {
+      const res = await printApi.fetchGemBoxExcel({ report: "demo" });
+      await downloadExcelOrThrowApiError(res, "demo_gembox.xlsx");
+    } catch (e) {
+      console.error("GemBox デモ Excel 失敗:", e);
+      alert("Excelの取得に失敗しました");
+      alert(`ErrCode: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const handleGemBoxSandwichPdf = async () => {
+    setSandwichLoading(true);
+    try {
+      const res = await printApi.fetchGemBoxSandwichPdf({ report: "sandwich_demo" });
+      await downloadPdfOrThrowApiError(res, "gembox-sandwich.pdf");
+    } catch (e) {
+      console.error("GemBox サンドイッチ PDF 失敗:", e);
+      alert("PDFの取得に失敗しました");
+      alert(`ErrCode: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSandwichLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="mx-8 flex h-full flex-col">
@@ -80,6 +108,12 @@ const PrintConnectivity = () => {
           </Button>
           <Button onClick={handleGemBoxDemoPdf}>
             GemBox デモ PDF ダウンロード
+          </Button>
+          <Button onClick={handleGemBoxDemoExcel}>
+            GemBox デモ Excel ダウンロード
+          </Button>
+          <Button disabled={sandwichLoading} onClick={handleGemBoxSandwichPdf}>
+            {sandwichLoading ? "生成中…" : "サンドイッチPDFをダウンロード"}
           </Button>
         </div>
       </div>

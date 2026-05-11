@@ -34,17 +34,15 @@ namespace backend.Services
     public static class GemBoxPrintMappingEngine
     {
         /// <summary>
-        /// jsonファイルを読み込む
+        /// <see cref="LoadDefinition"/> / <see cref="LoadSandwichDefinition"/> 共通のパス解決。
+        /// 差は JSON を <see cref="GemBoxPrintMappingDefinition"/> に読むか <see cref="GemBoxSandwichMappingDefinition"/> に読むかだけ。
         /// </summary>
-        /// <param name="mappingFileName">jsonファイル名</param>
-        /// <param name="resolvedPath">jsonファイルの物理パス</param>
-        /// <returns>jsonファイルの内容</returns>
-        public static GemBoxPrintMappingDefinition LoadDefinition(string mappingFileName, out string resolvedPath)
+        private static bool TryResolveMappingJsonPath(string mappingFileName, out string resolvedPath)
         {
             resolvedPath = null;
 
             if (string.IsNullOrWhiteSpace(mappingFileName))
-                return null;
+                return false;
 
             // マッピングは「ファイル名（または base 配下の相対パス）」のみ運用する。
             // 物理パスは Web.config の base（GemBoxPrintMappingsBasePath）から解決する。
@@ -63,8 +61,19 @@ namespace backend.Services
             // ベースディレクトリとファイル名を結合
             resolvedPath = Path.Combine(baseDir, mappingFileName);
 
-            // ファイルが存在しない場合はnullを返す
-            if (string.IsNullOrWhiteSpace(resolvedPath) || !File.Exists(resolvedPath))
+            return !string.IsNullOrWhiteSpace(resolvedPath) && File.Exists(resolvedPath);
+        }
+
+        /// <summary>
+        /// jsonファイルを読み込む
+        /// </summary>
+        /// <param name="mappingFileName">jsonファイル名</param>
+        /// <param name="resolvedPath">jsonファイルの物理パス</param>
+        /// <returns>jsonファイルの内容</returns>
+        public static GemBoxPrintMappingDefinition LoadDefinition(string mappingFileName, out string resolvedPath)
+        {
+            resolvedPath = null;
+            if (!TryResolveMappingJsonPath(mappingFileName, out resolvedPath))
                 return null;
             // ファイルを読み込む
             var json = File.ReadAllText(resolvedPath);
@@ -73,10 +82,22 @@ namespace backend.Services
         }
 
         /// <summary>
-        /// マッピングファイルを読み込む
+        /// サンドイッチ用マッピングJSONを読み込む。
         /// </summary>
-        /// <param name="mappingFileName">マッピングファイル名</param>
-        /// <returns>マッピング定義</returns>
+        /// <param name="mappingFileName">jsonファイル名</param>
+        /// <param name="resolvedPath">jsonファイルの物理パス</param>
+        /// <returns>jsonファイルの内容</returns>
+        public static GemBoxSandwichMappingDefinition LoadSandwichDefinition(string mappingFileName, out string resolvedPath)
+        {
+            resolvedPath = null;
+            if (!TryResolveMappingJsonPath(mappingFileName, out resolvedPath))
+                return null;
+            // ファイルを読み込む
+            var json = File.ReadAllText(resolvedPath);
+            // ファイルをデシリアライズ
+            return JsonConvert.DeserializeObject<GemBoxSandwichMappingDefinition>(json);
+        }
+
         /// <summary>
         /// マッピング定義とデータソース（単票・画像・テーブル）から backend-print 用 DTO を汎用的に組み立てる。
         /// - scalars: def.Scalars の excelKey/dbColumn を scalarSource から解決して Data に入れる
