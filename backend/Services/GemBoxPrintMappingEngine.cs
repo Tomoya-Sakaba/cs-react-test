@@ -34,8 +34,7 @@ namespace backend.Services
     public static class GemBoxPrintMappingEngine
     {
         /// <summary>
-        /// <see cref="LoadDefinition"/> / <see cref="LoadSandwichDefinition"/> 共通のパス解決。
-        /// 差は JSON を <see cref="GemBoxPrintMappingDefinition"/> に読むか <see cref="GemBoxSandwichMappingDefinition"/> に読むかだけ。
+        /// マッピングJSONのパス解決（<see cref="LoadDefinition"/>）。
         /// </summary>
         private static bool TryResolveMappingJsonPath(string mappingFileName, out string resolvedPath)
         {
@@ -79,23 +78,6 @@ namespace backend.Services
             var json = File.ReadAllText(resolvedPath);
             // ファイルをデシリアライズ
             return JsonConvert.DeserializeObject<GemBoxPrintMappingDefinition>(json);
-        }
-
-        /// <summary>
-        /// サンドイッチ用マッピングJSONを読み込む。
-        /// </summary>
-        /// <param name="mappingFileName">jsonファイル名</param>
-        /// <param name="resolvedPath">jsonファイルの物理パス</param>
-        /// <returns>jsonファイルの内容</returns>
-        public static GemBoxSandwichMappingDefinition LoadSandwichDefinition(string mappingFileName, out string resolvedPath)
-        {
-            resolvedPath = null;
-            if (!TryResolveMappingJsonPath(mappingFileName, out resolvedPath))
-                return null;
-            // ファイルを読み込む
-            var json = File.ReadAllText(resolvedPath);
-            // ファイルをデシリアライズ
-            return JsonConvert.DeserializeObject<GemBoxSandwichMappingDefinition>(json);
         }
 
         /// <summary>

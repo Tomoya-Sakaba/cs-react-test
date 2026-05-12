@@ -21,7 +21,6 @@ namespace backend.Services
         private static readonly ILog Log = LogManager.GetLogger(typeof(GemBoxPrintPayloadService));
         /// <summary>
         /// <c>BuildGemBoxPdfRequest</c> の <c>switch</c> と GET <c>report</c> クエリを揃える（追加時はここだけでなくフロントも更新）。
-        /// サンドイッチPDF用コードは <see cref="GemBoxSandwichPrintPayloadService"/> 側。
         /// </summary>
         private static class ReportCodes
         {

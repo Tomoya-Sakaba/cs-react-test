@@ -276,9 +276,7 @@
     <Compile Include="Models\DTOs\CsvImportDto.cs" />
     <Compile Include="Models\DTOs\EquipmentDto.cs" />
     <Compile Include="Models\DTOs\GemBoxPrintRequestDto.cs" />
-    <Compile Include="Models\DTOs\GemBoxPrintSandwichPdfRequestDto.cs" />
     <Compile Include="Models\Config\GemBoxPrintMappingDefinition.cs" />
-    <Compile Include="Models\Config\GemBoxSandwichMappingDefinition.cs" />
     <Compile Include="Models\DTOs\GeneratePdfRequestDto.cs" />
     <Compile Include="Models\DTOs\PrintTemplateSettingDto.cs" />
     <Compile Include="Models\DTOs\PrintFieldMappingDto.cs" />
@@ -326,7 +324,6 @@
     <Compile Include="Services\KoujiService.cs" />
     <Compile Include="Services\EquipmentDetailGemBoxTestData.cs" />
     <Compile Include="Services\GemBoxPrintPayloadService.cs" />
-    <Compile Include="Services\GemBoxSandwichPrintPayloadService.cs" />
     <Compile Include="Services\GemBoxPrintMappingEngine.cs" />
     <Compile Include="Services\CsvImportService.cs" />
     <Compile Include="Services\ExcelImportService.cs" />
@@ -360,7 +357,6 @@
     <Content Include="common\print-mappings\equipment_list_gembox.json" />
     <Content Include="common\print-mappings\equipment_detail_gembox.json" />
     <Content Include="common\print-mappings\equipment_master_detail_layout.txt" />
-    <Content Include="common\print-mappings\gembox_sandwich_sample.json" />
     <Content Include="favicon.ico" />
     <Content Include="Global.asax" />
     <Content Include="Scripts\bootstrap.bundle.js" />

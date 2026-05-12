@@ -20,8 +20,6 @@ namespace backend.Controllers
     /// GET /api/print-gembox/pdf?report=demo
     ///
     /// GET /api/print-gembox/excel?report=demo … 埋め込み済み <c>.xlsx</c>（<see cref="PrintServiceHttpProxyService.ForwardGemBoxExcelPostAsync"/>）
-    ///
-    /// GET /api/print-gembox/sandwich-pdf?report=sandwich_demo … サーバ側定義JSONからサンドイッチPDF（<see cref="GemBoxSandwichPrintPayloadService"/>）
     /// </summary>
     [RoutePrefix("api/print-gembox")]
     public class PrintGemBoxProxyController : ApiController
@@ -32,7 +30,6 @@ namespace backend.Controllers
         private const string ClientErrorCode = "PRINT_ERROR";
 
         private readonly GemBoxPrintPayloadService _payloadService = new GemBoxPrintPayloadService();
-        private readonly GemBoxSandwichPrintPayloadService _sandwichPayloadService = new GemBoxSandwichPrintPayloadService();
         private readonly PrintServiceHttpProxyService _printProxy = new PrintServiceHttpProxyService();
 
         /// <summary>クエリ <c>report</c>（帳票識別子）で GemBox PDF を生成する唯一の入口。</summary>
@@ -130,57 +127,6 @@ namespace backend.Controllers
             {
                 var upstreamHint = string.IsNullOrWhiteSpace(ex?.Message) ? "(メッセージなし)" : ex.Message.Trim();
                 Log.Error($"PrintGemBox ForwardGemBoxExcelPostAsync: InvalidOperationException。upstream/プロキシ詳細: {upstreamHint}", ex);
-                return CreateUniformPrintErrorResponse();
-            }
-        }
-
-        /// <summary>
-        /// クエリ <c>report</c> でサンドイッチ用定義JSONを選び、backend-print へ POST 転送する。
-        /// </summary>
-        [HttpGet]
-        [Route("sandwich-pdf")]
-        public async Task<HttpResponseMessage> GetGemBoxSandwichPdf(string report, int? reportNo = null)
-        {
-            if (string.IsNullOrWhiteSpace(report))
-            {
-                Log.Error("PrintGemBox GetGemBoxSandwichPdf: report が空です。");
-                return CreateUniformPrintErrorResponse();
-            }
-
-            GemBoxPrintSandwichPdfRequestDto sandwichRequest;
-            try
-            {
-                sandwichRequest = _sandwichPayloadService.BuildSandwichPdfRequest(report.Trim(), reportNo);
-            }
-            catch (ArgumentException ex)
-            {
-                Log.Error(
-                    $"PrintGemBox BuildSandwichPdfRequest: ArgumentException（report={report}, reportNo={reportNo}）。{ex.Message}",
-                    ex);
-                return CreateUniformPrintErrorResponse();
-            }
-            catch (InvalidOperationException ex)
-            {
-                Log.Error(
-                    $"PrintGemBox BuildSandwichPdfRequest: InvalidOperationException（report={report}, reportNo={reportNo}）。{ex.Message}",
-                    ex);
-                return CreateUniformPrintErrorResponse();
-            }
-
-            if (sandwichRequest == null)
-            {
-                Log.Error($"PrintGemBox: サンドイッチペイロードが null（report={report.Trim()}, reportNo={reportNo}）。");
-                return CreateUniformPrintErrorResponse();
-            }
-
-            try
-            {
-                return await _printProxy.ForwardGemBoxSandwichPdfPostAsync(sandwichRequest, Request).ConfigureAwait(false);
-            }
-            catch (InvalidOperationException ex)
-            {
-                var upstreamHint = string.IsNullOrWhiteSpace(ex?.Message) ? "(メッセージなし)" : ex.Message.Trim();
-                Log.Error($"PrintGemBox ForwardGemBoxSandwichPdfPostAsync: InvalidOperationException。upstream/プロキシ詳細: {upstreamHint}", ex);
                 return CreateUniformPrintErrorResponse();
             }
         }

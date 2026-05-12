@@ -71,20 +71,4 @@ export const printApi = {
       timeout: args.timeoutMs ?? 120_000,
     });
   },
-
-  /**
-   * GemBox サンドイッチPDF。サーバが定義JSONを読み backend-print へ転送する。
-   * GET /api/print-gembox/sandwich-pdf?report=sandwich_demo（reportNo は将来用・任意）
-   */
-  async fetchGemBoxSandwichPdf(args: {
-    report: string;
-    reportNo?: number;
-    timeoutMs?: number;
-  }): Promise<AxiosResponse<Blob>> {
-    const q = new URLSearchParams({ report: args.report });
-    if (args.reportNo != null) q.set('reportNo', String(args.reportNo));
-    return axiosClientBlob.get(`/api/print-gembox/sandwich-pdf?${q.toString()}`, {
-      timeout: args.timeoutMs ?? 120_000,
-    });
-  },
 };

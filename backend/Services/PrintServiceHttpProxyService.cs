@@ -220,51 +220,6 @@ namespace backend.Services
         }
 
         /// <summary>
-        /// GemBox サンドイッチ印刷: backend-print の <c>POST /api/print/gembox/sandwich-pdf</c> へ JSON を送る。
-        /// </summary>
-        public async Task<HttpResponseMessage> ForwardGemBoxSandwichPdfPostAsync(
-            GemBoxPrintSandwichPdfRequestDto sandwichRequest,
-            HttpRequestMessage incomingRequest)
-        {
-            var baseUrl = ResolvePrintServiceBaseUrl(incomingRequest);
-            var target = new Uri(new Uri(baseUrl, UriKind.Absolute), "api/print/gembox/sandwich-pdf");
-
-            var timeoutSec = int.TryParse(ConfigurationManager.AppSettings["PrintServiceTimeoutSeconds"], out var s)
-                ? s
-                : 60;
-
-            var json = JsonConvert.SerializeObject(sandwichRequest);
-            var correlationId = Guid.NewGuid().ToString("N");
-
-            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSec)))
-            using (var content = new StringContent(json, Encoding.UTF8, "application/json"))
-            using (var req = new HttpRequestMessage(HttpMethod.Post, target) { Content = content })
-            {
-                req.Headers.TryAddWithoutValidation("X-Correlation-Id", correlationId);
-                using (var upstream = await Client.SendAsync(req, cts.Token).ConfigureAwait(false))
-                {
-                    if (!upstream.IsSuccessStatusCode)
-                    {
-                        var err = await upstream.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        Log.Error(
-                            $"GemBox sandwich upstream error. correlationId={correlationId}, status={(int)upstream.StatusCode} {upstream.ReasonPhrase}, " +
-                            $"target='{target}', contentType='{upstream.Content?.Headers?.ContentType}', errLen={err?.Length ?? 0}");
-                        throw new InvalidOperationException("PRINT_GEMBOX_UPSTREAM_ERROR");
-                    }
-
-                    var bytes = await upstream.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
-                    var response = new HttpResponseMessage(HttpStatusCode.OK)
-                    {
-                        Content = new ByteArrayContent(bytes),
-                    };
-                    response.Content.Headers.ContentType =
-                        upstream.Content.Headers.ContentType ?? new MediaTypeHeaderValue("application/pdf");
-                    return response;
-                }
-            }
-        }
-
-        /// <summary>
         /// backend-print のベース URL（末尾スラッシュ付き）を返す。
         /// </summary>
         /// <param name="incomingRequest">現在の API リクエスト（オリジン・ホスト判定に使用）</param>
