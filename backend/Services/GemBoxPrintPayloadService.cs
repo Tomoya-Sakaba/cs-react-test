@@ -15,6 +15,7 @@ namespace backend.Services
     /// GemBox印刷向けに、DBから取得した内容を backend-print 用ペイロードへ組み立てる。
     /// 各 <c>case</c> ではリポジトリ取得と scalar / picture / tables の組み立てのみ。
     /// マッピング読込と <see cref="GemBoxPrintMappingEngine.BuildRequest"/> は <see cref="BuildFromMappingFile"/> に集約。
+    /// 末尾PDF結合は各 <c>case</c> で <see cref="GemBoxPrintRequestDto.AddPdfPath"/> を渡す（<see cref="BuildFromMappingFile"/> の <c>addPdfPath</c>）。
     /// </summary>
     public class GemBoxPrintPayloadService
     {
@@ -120,7 +121,8 @@ namespace backend.Services
                             "equipment",
                             scalarSource,
                             pictureSource,
-                            tableRowsInOrder);
+                            tableRowsInOrder,
+                            addPdfPath: null);
                         return dto;
                     }
 
@@ -151,7 +153,8 @@ namespace backend.Services
                             "equipment_detail",
                             scalarSource,
                             pictureSource,
-                            tableRowsInOrder);
+                            tableRowsInOrder,
+                            addPdfPath: null);
                         return dto;
                     }
 
@@ -168,7 +171,8 @@ namespace backend.Services
                             "equipment_list",
                             scalarSource,
                             pictureSource,
-                            tableRowsInOrder);
+                            tableRowsInOrder,
+                            addPdfPath: null);
                     }
 
                 case ReportCodes.KoujiBudget:
@@ -265,7 +269,8 @@ namespace backend.Services
                             "kouji_budget",
                             scalarSource,
                             pictureSource,
-                            tableRowsInOrder);
+                            tableRowsInOrder,
+                            addPdfPath: null);
                     }
 
                 case ReportCodes.Demo:
@@ -298,12 +303,16 @@ namespace backend.Services
                         }.Cast<object>();
                         IEnumerable<object>[] tableRowsInOrder = { itemsRows };
 
+                        string addPdfPath = "C:\\app_data\\b-templates\\test.pdf";
+
+                        // 末尾PDF: フルパスを指定すると backend-print で GemBox PDF の後に結合。不要なら null。
                         var dto = BuildFromMappingFile(
                             DemoMappingFileName,
                             "demo",
                             scalarSource,
                             pictureSource,
-                            tableRowsInOrder);
+                            tableRowsInOrder,
+                            addPdfPath);
                         if (dto == null)
                             throw new InvalidOperationException("印刷データの組み立てに失敗しました（デモ）。");
                         return dto;
@@ -318,12 +327,14 @@ namespace backend.Services
         /// マッピングファイルから <c>def</c> を読み、テーブル行データを <c>def.tables[]</c> の順序で辞書化して
         /// <see cref="GemBoxPrintMappingEngine.BuildRequest"/> へ渡す。
         /// </summary>
+        /// <param name="addPdfPath">backend-print の末尾PDF結合用フルパス。不要なら <c>null</c>。</param>
         private static GemBoxPrintRequestDto BuildFromMappingFile(
             string mappingFileName,
             string logKind,
             object scalarSource,
             object pictureSource,
-            IEnumerable<object>[] tableRowsInOrder)
+            IEnumerable<object>[] tableRowsInOrder,
+            string addPdfPath = null)
         {
             var mappingDefinition = GemBoxPrintMappingEngine.LoadDefinition(mappingFileName, out var resolvedPath);
             if (mappingDefinition == null)
@@ -333,11 +344,14 @@ namespace backend.Services
                     "印刷設定の読み込みに失敗しました（帳票定義）。管理者に連絡してください。");
             }
 
-            return BuildFromLoadedMappingDefinition(
+            var dto = BuildFromLoadedMappingDefinition(
                 mappingDefinition,
                 scalarSource,
                 pictureSource,
                 tableRowsInOrder);
+            if (dto != null)
+                dto.AddPdfPath = addPdfPath;
+            return dto;
         }
 
         /// <summary>

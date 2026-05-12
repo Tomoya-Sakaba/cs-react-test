@@ -23,5 +23,9 @@ namespace backend.Models.DTOs
         /// <summary>画像の {{key}} 差し込み用（キー → ファイル名/パス）</summary>
         [JsonProperty("pictures")]
         public Dictionary<string, string> Pictures { get; set; }
+
+        /// <summary>末尾に結合する既存PDFのフルパス（任意）。backend-print の PDF API のみで使用。</summary>
+        [JsonProperty("addPdfPath")]
+        public string AddPdfPath { get; set; }
     }
 }
